@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Augura · The Engine, Explained Simply</title>
+<style>
+/* ============================================================
+   Local Geist (copied from the brand kit) · same @font-face as
+   brand-identity.html, with relative URLs
+   ============================================================ */
+@font-face{font-family:'Geist';font-weight:400;font-style:normal;font-display:block;src:url(fonts/geist-400.woff2) format('woff2');}
+@font-face{font-family:'Geist';font-weight:500;font-style:normal;font-display:block;src:url(fonts/geist-500.woff2) format('woff2');}
+@font-face{font-family:'Geist';font-weight:600;font-style:normal;font-display:block;src:url(fonts/geist-600.woff2) format('woff2');}
+@font-face{font-family:'Geist';font-weight:700;font-style:normal;font-display:block;src:url(fonts/geist-700.woff2) format('woff2');}
+@font-face{font-family:'Geist Mono';font-weight:400;font-style:normal;font-display:block;src:url(fonts/geist-mono-400.woff2) format('woff2');}
+@font-face{font-family:'Geist Mono';font-weight:500;font-style:normal;font-display:block;src:url(fonts/geist-mono-500.woff2) format('woff2');}
+
+/* ============================================================
+   Tokens · identical to the brand guidelines v1.0
+   ============================================================ */
+:root{
+  --black:#000000; --emerald:#047857; --bluecorn:#3172B0;
+  --white:#FFFFFF; --neutral:#F6F4F1; --carmine:#C0392B; --soleil:#E8B800;
+  --ink-75:rgba(0,0,0,0.75); --ink-50:rgba(0,0,0,0.50); --ink-35:rgba(0,0,0,0.35);
+  --ink-10:rgba(0,0,0,0.10); --ink-07:rgba(0,0,0,0.07);
+  --brand-gradient:radial-gradient(circle at 32% 28%, #3F6FD0 0%, #2E7E84 42%, #047857 100%);
+  --font:'Geist', system-ui, -apple-system, sans-serif;
+  --mono:'Geist Mono', ui-monospace, Menlo, monospace;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+@page{ size:A4; margin:0; }
+html{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+body{ font-family:var(--font); color:var(--black); background:#d9d7d2; }
+
+.sheet{
+  position:relative; width:210mm; height:297mm; overflow:hidden;
+  background:var(--neutral); page-break-after:always; break-after:page;
+}
+.sheet:last-child{ page-break-after:auto; break-after:auto; }
+.pad{ position:absolute; inset:0; padding:24mm 22mm 18mm; display:flex; flex-direction:column; }
+
+/* ---------- shared type (brand) ---------- */
+.eyebrow{ font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--emerald); }
+.eyebrow.on-dark{ color:rgba(255,255,255,.78); }
+.mono{ font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.section-head{ display:flex; align-items:center; gap:12px; margin-bottom:4mm; }
+.section-head .num{ font-family:var(--mono); font-size:11px; color:var(--ink-35); letter-spacing:.04em; }
+.section-head .line{ flex:1; height:1px; background:var(--ink-10); }
+.title{ font-weight:600; font-size:32px; letter-spacing:-.02em; line-height:1.05; }
+.lede{ font-size:14.5px; line-height:1.62; color:var(--ink-75); max-width:150mm; }
+.wm{ display:block; height:auto; }
+
+.foot{ margin-top:auto; padding-top:6mm; display:flex; justify-content:space-between; align-items:center;
+  border-top:1px solid var(--ink-10); }
+.foot .fmark{ display:flex; align-items:center; gap:8px; }
+.foot .fmeta{ font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-35); font-weight:600; }
+
+/* ---------- cover / back (brand) ---------- */
+.cover{ background:var(--brand-gradient); color:#fff; }
+.cover .pad{ padding:26mm 24mm; z-index:1; align-items:flex-start; }
+.cover .top{ display:flex; justify-content:space-between; width:100%; align-items:flex-start; }
+.cover .center{ margin:auto 0; width:100%; }
+.cover .center .wm{ width:118mm; color:#fff; margin-bottom:9mm; }
+.cover .divider{ width:34mm; height:2px; background:rgba(255,255,255,.55); margin:0 0 7mm; }
+.cover .tag{ font-size:21px; font-weight:500; letter-spacing:-.01em; color:rgba(255,255,255,.95); }
+.cover .sub{ font-size:13px; color:rgba(255,255,255,.7); margin-top:5mm; line-height:1.6; max-width:128mm; }
+.cover .bottom{ display:flex; justify-content:space-between; align-items:flex-end; width:100%; }
+.cover .bottom .l{ font-size:12px; letter-spacing:.02em; color:rgba(255,255,255,.85); }
+.cover .bottom .r{ font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.6); font-weight:600; }
+
+.back{ background:var(--brand-gradient); color:#fff; }
+.back .pad{ padding:26mm 24mm; align-items:flex-start; }
+.back .center{ margin:auto 0; }
+.back .center .wm{ width:74mm; color:#fff; margin-bottom:8mm; }
+.back .center .tag{ font-size:30px; font-weight:600; letter-spacing:-.02em; line-height:1.18; max-width:155mm; }
+.back .center .sub{ font-size:14px; color:rgba(255,255,255,.8); margin-top:7mm; line-height:1.6; max-width:140mm; }
+.back .bottom{ display:flex; justify-content:space-between; align-items:flex-end; width:100%; }
+.back .bottom div{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.7); font-weight:600; }
+
+/* ---------- essence (brand) ---------- */
+.display{ font-weight:600; font-size:42px; line-height:1.06; letter-spacing:-.025em; max-width:158mm; margin:2mm 0 8mm; }
+.body{ font-size:14.5px; line-height:1.66; color:var(--ink-75); max-width:150mm; }
+.body + .body{ margin-top:4mm; }
+.body b{ font-weight:600; color:var(--black); }
+.antithesis{ margin:10mm 0; padding-left:9mm; border-left:2px solid var(--emerald); }
+.antithesis p{ font-weight:600; font-size:26px; line-height:1.2; letter-spacing:-.015em; }
+.antithesis p .em{ color:var(--emerald); }
+.pillars{ display:flex; gap:0; margin-top:auto; }
+.pillar{ flex:1; padding-right:8mm; }
+.pillar:not(:last-child){ border-right:1px solid var(--ink-10); margin-right:8mm; }
+.pillar .k{ font-family:var(--mono); font-size:10.5px; letter-spacing:.04em; color:var(--emerald); margin-bottom:3mm; text-transform:uppercase; }
+.pillar .v{ font-size:12.5px; line-height:1.55; color:var(--ink-75); }
+
+/* ---------- cards (brand) ---------- */
+.principles{ display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
+.principle{ background:#fff; border:1px solid var(--ink-07); border-radius:12px; padding:5mm 6mm; }
+.principle .k{ font-size:13px; font-weight:700; letter-spacing:-.01em; margin-bottom:2mm; }
+.principle .v{ font-size:11.5px; line-height:1.55; color:var(--ink-75); }
+.principle.span{ grid-column:span 2; }
+
+/* ---------- the restaurant diagram ---------- */
+.arch{ display:flex; flex-direction:column; }
+.arch-top{ display:grid; grid-template-columns:1.25fr .75fr; gap:5mm; }
+.acard{ background:#fff; border:1px solid var(--ink-07); border-radius:10px; padding:4mm 5mm; }
+.acard .n{ font-size:12.5px; font-weight:700; letter-spacing:-.01em; }
+.acard .d{ font-family:var(--mono); font-size:9px; color:var(--ink-50); margin-top:1.5mm; letter-spacing:.01em; }
+.acard.ghost{ background:transparent; border:1px dashed var(--ink-10); }
+.acard.ghost .n{ color:var(--ink-50); }
+.alink{ display:flex; flex-direction:column; align-items:center; padding:1.6mm 0; }
+.alink .vl{ width:1px; height:3.2mm; background:var(--ink-35); }
+.alink .tri{ width:0; height:0; border-left:3px solid transparent; border-right:3px solid transparent; border-top:4px solid var(--ink-35); }
+.alink .lbl{ font-family:var(--mono); font-size:8.5px; color:var(--ink-50); margin:1mm 0; letter-spacing:.02em; }
+.modal-wrap{ position:relative; border:1px dashed var(--ink-10); border-radius:12px; padding:7mm 5mm 5mm; }
+.modal-wrap .tag{ position:absolute; top:-2.6mm; left:6mm; background:var(--neutral); padding:0 2.5mm;
+  font-family:var(--mono); font-size:9px; color:var(--ink-50); letter-spacing:.04em; }
+.api-card{ background:#fff; border:1px solid var(--ink-07); border-radius:10px; padding:4.5mm 5mm; }
+.core-strip{ background:var(--neutral); border:1px solid var(--ink-07); border-radius:6px; padding:2.6mm 4mm;
+  font-family:var(--mono); font-size:9.5px; color:var(--ink-75); margin-bottom:3.5mm; }
+.core-strip b{ color:var(--emerald); font-weight:500; }
+.mod-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:2.5mm; }
+.mod{ background:rgba(4,120,87,.06); border:1px solid rgba(4,120,87,.20); border-radius:6px; padding:2.4mm 3mm; }
+.mod .n{ font-size:10.5px; font-weight:700; color:var(--emerald); letter-spacing:-.005em; }
+.mod .s{ font-family:var(--mono); font-size:8px; color:var(--ink-50); margin-top:1mm; }
+.jobs-strip{ background:#fff; border:1px solid var(--ink-07); border-radius:10px; padding:3mm 5mm;
+  display:flex; justify-content:space-between; align-items:baseline; }
+.jobs-strip .n{ font-size:11.5px; font-weight:700; }
+.jobs-strip .d{ font-family:var(--mono); font-size:9px; color:var(--ink-50); }
+.arch-bottom{ display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
+.alinks2{ display:grid; grid-template-columns:1fr 1fr; gap:5mm; }
+.acard .accent{ display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--emerald); margin-right:2mm; }
+.arch-note{ font-size:11px; color:var(--ink-50); line-height:1.55; margin-top:5mm; max-width:150mm; }
+
+/* ---------- plan (reused) ---------- */
+.phases{ margin-top:5mm; background:#fff; border:1px solid var(--ink-07); border-radius:12px; overflow:hidden; }
+.ph{ display:flex; align-items:baseline; gap:5mm; padding:2.8mm 6mm; border-bottom:1px solid rgba(0,0,0,.05); }
+.ph:last-child{ border-bottom:0; }
+.ph .n{ font-family:var(--mono); font-size:10px; color:var(--emerald); width:7mm; flex-shrink:0; }
+.ph .t{ font-size:11px; font-weight:600; letter-spacing:-.005em; width:42mm; flex-shrink:0; }
+.ph .d{ font-size:10.5px; color:var(--ink-50); line-height:1.45; flex:1; }
+.criterion{ margin-top:5mm; padding-left:9mm; border-left:2px solid var(--emerald); }
+.criterion p{ font-weight:600; font-size:17px; line-height:1.3; letter-spacing:-.01em; max-width:155mm; }
+.criterion p .em{ color:var(--emerald); }
+.criterion .s{ font-size:11px; color:var(--ink-50); margin-top:2mm; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<!-- recolorable vector wordmark (official lockup geometry) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="wm" viewBox="0 0 2609 770"><g><g><path d="M0,588.333l232.917,-588.333l118.333,0l230.833,588.333l-138.333,0l-176.25,-488.333l47.5,0l-179.167,488.333l-135.833,0Zm132.5,-106.25l0,-106.667l320.417,0l0,106.667l-320.417,0Z" style="fill:currentColor;fill-rule:nonzero;"></path><path d="M770.833,597.5c-36.832,0 -69.581,-7.639 -98.249,-22.917c-28.668,-15.278 -51.126,-36.437 -67.376,-63.477c-16.25,-27.04 -24.375,-58.073 -24.375,-93.099l0,-234.674l127.5,0l0,233.333c0,13.932 2.483,25.931 7.448,35.996c4.965,10.065 12.185,17.832 21.66,23.301c9.475,5.469 20.649,8.203 33.522,8.203c19.08,0 34.175,-5.981 45.286,-17.943c11.111,-11.962 16.667,-28.481 16.667,-49.557l0,-233.333l127.5,0l0,234.583c0,35.556 -8.056,66.806 -24.167,93.75c-16.111,26.944 -38.394,47.986 -66.849,63.125c-28.455,15.139 -61.311,22.708 -98.568,22.708Z" style="fill:currentColor;fill-rule:nonzero;"></path><path d="M1195,770c-44.167,0 -83.056,-7.639 -116.667,-22.917c-33.611,-15.278 -60.139,-36.806 -79.583,-64.583l78.333,-77.917c14.444,16.944 30.694,29.931 48.75,38.958c18.056,9.028 39.861,13.542 65.417,13.542c31.389,0 56.181,-7.847 74.375,-23.542c18.194,-15.694 27.292,-37.708 27.292,-66.042l0,-103.333l21.25,-88.333l-19.167,-88.333l0,-104.167l125.417,0l0,380.833c0,41.667 -9.722,77.847 -29.167,108.542c-19.444,30.694 -46.111,54.583 -80,71.667c-33.889,17.083 -72.639,25.625 -116.25,25.625Zm-5.833,-194.167c-36.944,0 -69.931,-8.819 -98.958,-26.458c-29.028,-17.639 -51.806,-41.736 -68.333,-72.292c-16.528,-30.556 -24.792,-64.583 -24.792,-102.083c0,-37.778 8.264,-71.736 24.792,-101.875c16.528,-30.139 39.306,-54.028 68.333,-71.667c29.028,-17.639 62.014,-26.458 98.958,-26.458c27.778,0 52.708,5.208 74.792,15.625c22.083,10.417 39.861,24.861 53.333,43.333c13.472,18.472 21.181,39.931 23.125,64.375l0,154.167c-1.944,24.167 -9.722,45.556 -23.333,64.167c-13.611,18.611 -31.458,33.125 -53.542,43.542c-22.083,10.417 -46.875,15.625 -74.375,15.625Zm24.167,-112.917c17.778,0 33.194,-3.889 46.25,-11.667c13.056,-7.778 23.125,-18.264 30.208,-31.458c7.083,-13.194 10.625,-28.125 10.625,-44.792c0,-16.667 -3.542,-31.597 -10.625,-44.792c-7.083,-13.194 -17.083,-23.681 -30,-31.458c-12.917,-7.778 -28.264,-11.667 -46.042,-11.667c-17.5,0 -32.847,3.889 -46.042,11.667c-13.194,7.778 -23.403,18.333 -30.625,31.667c-7.222,13.333 -10.833,28.194 -10.833,44.583c-0,15.833 3.611,30.486 10.833,43.958c7.222,13.472 17.361,24.167 30.417,32.083c13.056,7.917 28.333,11.875 45.833,11.875Z" style="fill:currentColor;fill-rule:nonzero;"></path><path d="M1656.25,597.5c-36.832,0 -69.581,-7.639 -98.249,-22.917c-28.668,-15.278 -51.126,-36.437 -67.376,-63.477c-16.25,-27.04 -24.375,-58.073 -24.375,-93.099l0,-234.674l127.5,0l0,233.333c0,13.932 2.483,25.931 7.448,35.996c4.965,10.065 12.185,17.832 21.66,23.301c9.475,5.469 20.649,8.203 33.522,8.203c19.08,0 34.175,-5.981 45.286,-17.943c11.111,-11.962 16.667,-28.481 16.667,-49.557l0,-233.333l127.5,0l0,234.583c0,35.556 -8.056,66.806 -24.167,93.75c-16.111,26.944 -38.394,47.986 -66.849,63.125c-28.455,15.139 -61.311,22.708 -98.568,22.708Z" style="fill:currentColor;fill-rule:nonzero;"></path><path d="M1892.5,588.333l0,-405l127.5,0l0,405l-127.5,0Zm127.5,-222.083l-53.75,-41.667c10.556,-47.5 28.472,-84.306 53.75,-110.417c25.278,-26.111 59.861,-39.167 103.75,-39.167c19.444,0 36.597,2.917 51.458,8.75c14.861,5.833 27.847,14.861 38.958,27.083l-75.833,95.833c-5.556,-6.111 -12.446,-10.764 -20.671,-13.958c-8.225,-3.194 -17.724,-4.792 -28.496,-4.792c-21.111,0 -37.917,6.493 -50.417,19.479c-12.5,12.986 -18.75,32.604 -18.75,58.854Z" style="fill:currentColor;fill-rule:nonzero;"></path><path d="M2372.083,596.667c-37.222,0 -70.486,-9.167 -99.792,-27.5c-29.306,-18.333 -52.361,-43.333 -69.167,-75c-16.806,-31.667 -25.208,-67.639 -25.208,-107.917c0,-40.556 8.403,-76.736 25.208,-108.542c16.806,-31.806 39.861,-56.875 69.167,-75.208c29.306,-18.333 62.569,-27.5 99.792,-27.5c27.222,0 51.806,5.278 73.75,15.833c21.944,10.556 39.792,25.139 53.542,43.75c13.75,18.611 21.597,39.861 23.542,63.75l0,175c-1.944,23.889 -9.722,45.139 -23.333,63.75c-13.611,18.611 -31.458,33.194 -53.542,43.75c-22.083,10.556 -46.736,15.833 -73.958,15.833Zm25.833,-115c27.222,0 49.167,-8.958 65.833,-26.875c16.667,-17.917 25,-40.903 25,-68.958c0,-18.889 -3.75,-35.486 -11.25,-49.792c-7.5,-14.306 -18.056,-25.556 -31.667,-33.75c-13.611,-8.194 -29.444,-12.292 -47.5,-12.292c-17.778,0 -33.472,4.097 -47.083,12.292c-13.611,8.194 -24.375,19.514 -32.292,33.958c-7.917,14.444 -11.875,30.972 -11.875,49.583c0,18.611 3.889,35.139 11.667,49.583c7.778,14.444 18.542,25.764 32.292,33.958c13.75,8.194 29.375,12.292 46.875,12.292Zm85.417,106.667l0,-108.75l19.167,-98.75l-19.167,-97.917l0,-99.583l125.417,0l0,405l-125.417,0Z" style="fill:currentColor;fill-rule:nonzero;"></path></g></g></symbol>
+</svg>
+
+<!-- ============================ PAGE 1 · COVER ============================ -->
+<section class="sheet cover">
+  <div class="pad">
+    <div class="top">
+      <div class="eyebrow on-dark">Plain language edition</div>
+      <div class="eyebrow on-dark">Augura&nbsp;Inc.</div>
+    </div>
+    <div class="center">
+      <svg class="wm"><use href="#wm"/></svg>
+      <div class="divider"></div>
+      <div class="tag">Our new engine, explained simply.</div>
+      <div class="sub">What we are rebuilding behind Augura, why it is genuinely hard, and how we make sure nothing breaks along the way. No technical background required.</div>
+    </div>
+    <div class="bottom">
+      <div class="l">Version 1.0&nbsp;&nbsp;·&nbsp;&nbsp;June 2026</div>
+      <div class="r">Internal use only</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PAGE 2 · 01 WHAT AUGURA IS ============================ -->
+<section class="sheet">
+  <div class="pad">
+    <div class="section-head">
+      <span class="eyebrow">What Augura is</span><span class="line"></span><span class="num">01</span>
+    </div>
+    <div class="display">Ideas are easy to claim.<br>Proof is hard to build.</div>
+    <p class="body">Augura is software that helps health technology companies prove their products actually work. It guides them through designing a credible clinical study: choosing the right patients, the right comparison, the right measurements, then simulating whether the study will convince doctors, insurers and regulators.</p>
+    <p class="body">The version that exists today is a prototype. It looks finished, it demos beautifully, and it taught us exactly what customers want. But under the surface it is held together the way prototypes always are: <b>quickly.</b> This document explains what we are rebuilding, in plain words.</p>
+    <div class="antithesis">
+      <p>A prototype proves the idea.<br><span class="em">A product serves customers.</span></p>
+    </div>
+    <div class="pillars">
+      <div class="pillar"><div class="k">What stays</div><div class="v">Everything you can see: the screens, the workflow, the experience. People who saw the demo will notice nothing different.</div></div>
+      <div class="pillar"><div class="k">What changes</div><div class="v">Everything you cannot see: the engine that stores the data, runs the science and talks to the AI is rebuilt on solid ground.</div></div>
+      <div class="pillar"><div class="k">How we stay safe</div><div class="v">The old engine keeps running until the new one passes every test. We switch on proof, never on hope.</div></div>
+    </div>
+    <div class="foot">
+      <div class="fmark"><svg class="wm" style="width:18mm;color:var(--emerald)"><use href="#wm"/></svg></div>
+      <div class="fmeta">Plain language edition · v1.0</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PAGE 3 · 02 THE RESTAURANT ============================ -->
+<section class="sheet">
+  <div class="pad">
+    <div class="section-head">
+      <span class="eyebrow">The new engine</span><span class="line"></span><span class="num">02</span>
+    </div>
+    <h2 class="title">Think of a restaurant</h2>
+    <p class="lede" style="margin:3mm 0 5mm;">Software has a part you see and a part you never see. The part you see is the dining room. Everything else is the kitchen, and the kitchen is what we are rebuilding. Here is the whole picture.</p>
+    <div class="arch">
+      <div class="arch-top">
+        <div class="acard"><div class="n">The dining room</div><div class="d">the Augura app on your screen · stays exactly as it is</div></div>
+        <div class="acard ghost"><div class="n">The showroom window</div><div class="d">the demo · plastic food · kept fully separate</div></div>
+      </div>
+      <div class="alink" style="width:62%;">
+        <span class="vl"></span><span class="lbl">every order travels as a printed ticket · no verbal orders</span><span class="tri"></span>
+      </div>
+      <div class="modal-wrap">
+        <span class="tag">The kitchen · one engine · the part we are rebuilding</span>
+        <div class="api-card">
+          <div class="core-strip"><b>shared plumbing</b> &nbsp;·&nbsp; power and safety rules · the identity desk: who you are, what you may see · the phone line to the AI</div>
+          <div class="mod-grid">
+            <div class="mod"><div class="n">The front desk</div><div class="s">keeps each study's file</div></div>
+            <div class="mod"><div class="n">The receiving dock</div><div class="s">accepts patient data</div></div>
+            <div class="mod"><div class="n">The library</div><div class="s">medical evidence, indexed</div></div>
+            <div class="mod"><div class="n">The specialists</div><div class="s">AI that reads and advises</div></div>
+            <div class="mod"><div class="n">The slow oven</div><div class="s">heavy math, on demand</div></div>
+            <div class="mod"><div class="n">The print shop</div><div class="s">reports ready to submit</div></div>
+            <div class="mod"><div class="n">The logbook</div><div class="s">who did what, what it cost</div></div>
+            <div class="mod" style="background:transparent;border-style:dashed;border-color:var(--ink-10);"><div class="n" style="color:var(--ink-35);">A future station</div><div class="s">added without a rebuild</div></div>
+          </div>
+        </div>
+        <div class="alink">
+          <span class="vl"></span><span class="lbl">slow orders go to the night kitchen · the counter never waits</span><span class="tri"></span>
+        </div>
+        <div class="jobs-strip"><span class="n">The night kitchen</span><span class="d">simulations and other long work · hours, not seconds · runs off the counter</span></div>
+      </div>
+      <div class="alinks2">
+        <div class="alink"><span class="vl"></span><span class="lbl">every shelf has its own lock</span><span class="tri"></span></div>
+        <div class="alink"><span class="vl"></span><span class="lbl">calls with a timer, never an endless hold</span><span class="tri"></span></div>
+      </div>
+      <div class="arch-bottom">
+        <div class="acard"><div class="n"><span class="accent"></span>The pantry</div><div class="d">all the data, in one place · a locked shelf per customer</div></div>
+        <div class="acard"><div class="n"><span class="accent"></span>Outside experts</div><div class="d">world class AI advisors · on call, by the minute</div></div>
+      </div>
+    </div>
+    <p class="arch-note">One kitchen, seven stations, one pantry. Each station does one job and hands over finished plates; no station ever reaches into another station's drawers. That single rule is what keeps the kitchen calm as it grows, and it is checked by a machine every single day.</p>
+    <div class="foot">
+      <div class="fmark"><svg class="wm" style="width:18mm;color:var(--emerald)"><use href="#wm"/></svg></div>
+      <div class="fmeta">Plain language edition · v1.0</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PAGE 4 · 03 THE PROBLEM TODAY ============================ -->
+<section class="sheet">
+  <div class="pad">
+    <div class="section-head">
+      <span class="eyebrow">Why rebuild</span><span class="line"></span><span class="num">03</span>
+    </div>
+    <h2 class="title">Today we run two kitchens</h2>
+    <p class="lede" style="margin:3mm 0 6mm;">The prototype grew fast, and it grew the way prototypes do: a quick counter up front, a science lab across town, and clever shortcuts holding the two together. Five of those shortcuts are now real problems.</p>
+    <div class="principles">
+      <div class="principle"><div class="k">Two kitchens, two languages</div><div class="v">The quick counter and the science lab literally speak different programming languages. They cannot share recipes, staff or tools. Every improvement has to be built twice, or it does not happen at all.</div></div>
+      <div class="principle"><div class="k">A five minute rule at the counter</div><div class="v">The current counter must answer every order within five minutes, or the line simply goes dead. Real science takes longer. Today our deepest analyses cannot run there at all: we cook them by hand, off the menu, and paste in the results.</div></div>
+      <div class="principle"><div class="k">Your file lives on your napkin</div><div class="v">The study you build is remembered by your own browser, like an order scribbled on a napkin. Change seats, change devices, or invite a colleague, and the kitchen has no idea who you are. Teamwork is impossible.</div></div>
+      <div class="principle"><div class="k">Plastic food in the real kitchen</div><div class="v">Our demo runs on convincing fake data, like the plastic dishes in a showroom window. Today the plastic and the real food share one kitchen. Sooner or later, someone serves the wrong plate.</div></div>
+      <div class="principle span"><div class="k">Shelves without locks</div><div class="v">Each customer's data should sit behind its own lock, so that one client can never see another client's patients. In the prototype, those locks exist on paper but are switched off. That is acceptable for a demo with fake data. It is unthinkable for a product with real data.</div></div>
+    </div>
+    <div class="antithesis" style="margin:8mm 0 0;">
+      <p>None of this shows on screen.<br><span class="em">All of it shows at scale.</span></p>
+    </div>
+    <div class="foot">
+      <div class="fmark"><svg class="wm" style="width:18mm;color:var(--emerald)"><use href="#wm"/></svg></div>
+      <div class="fmeta">Plain language edition · v1.0</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PAGE 5 · 04 WHY IT IS HARD ============================ -->
+<section class="sheet">
+  <div class="pad">
+    <div class="section-head">
+      <span class="eyebrow">Why it is hard</span><span class="line"></span><span class="num">04</span>
+    </div>
+    <h2 class="title">Six things must stay true at once</h2>
+    <p class="lede" style="margin:3mm 0 6mm;">No single piece of this rebuild is exotic. The difficulty is that all of the following must hold at the same time, for every customer, on every day of the project. That is what makes engine work slow and careful.</p>
+    <div class="principles">
+      <div class="principle"><div class="k">We rebuild while serving</div><div class="v">The old engine keeps serving customers during the entire rebuild. Nothing may break in the meantime. The new kitchen opens only when it cooks every dish exactly as well, and we switch in one clean, reversible move.</div></div>
+      <div class="principle"><div class="k">Walls between customers must be provable</div><div class="v">Promising privacy is not enough. We build the locks twice, once in the kitchen and once on the pantry shelves themselves, and an automatic test tries to break in every day. If it ever succeeds, the project stops until it cannot.</div></div>
+      <div class="principle"><div class="k">A fast lane and a slow lane</div><div class="v">A click must answer in a blink; a simulation may take hours. Mixing the two freezes the whole restaurant. The new engine runs two separate lanes and never lets the slow one block the fast one.</div></div>
+      <div class="principle"><div class="k">The AI needs guardrails</div><div class="v">Our AI advisors are brilliant and occasionally wrong. Every answer is checked against a strict form before anyone sees it. If the advisor rambles, we ask once for a correction; if the line drops, you get a clear message, never an endless spinner.</div></div>
+      <div class="principle"><div class="k">Everything is written down</div><div class="v">Every order, answer and failure follows a printed form, and machines check those forms thousands of times a day. This sounds bureaucratic; it is the opposite. What the machine verifies, no human ever has to babysit.</div></div>
+      <div class="principle"><div class="k">Proof before the switch</div><div class="v">We saved every real question the old engine has answered. The new engine must reproduce them all, like a chef passing a blind taste test, dish by dish. Until it passes, the old kitchen stays open and customers notice nothing.</div></div>
+    </div>
+    <div class="foot">
+      <div class="fmark"><svg class="wm" style="width:18mm;color:var(--emerald)"><use href="#wm"/></svg></div>
+      <div class="fmeta">Plain language edition · v1.0</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PAGE 6 · 05 THE PLAN ============================ -->
+<section class="sheet">
+  <div class="pad">
+    <div class="section-head">
+      <span class="eyebrow">The plan</span><span class="line"></span><span class="num">05</span>
+    </div>
+    <h2 class="title">Seven steps, one switch</h2>
+    <p class="lede" style="margin:3mm 0 2mm;">The rebuild is cut into seven steps. Each step ends with something real that works and is tested. Nothing is left half done, and at no point do we depend on luck.</p>
+    <div class="phases">
+      <div class="ph"><span class="n">01</span><span class="t">The shell</span><span class="d">build the empty kitchen: walls, power, safety inspections, automatic daily checks</span></div>
+      <div class="ph"><span class="n">02</span><span class="t">Identity and files</span><span class="d">the identity desk, the locks, and the front desk; the dining room connects for the first time</span></div>
+      <div class="ph"><span class="n">03</span><span class="t">Pantry and library</span><span class="d">patient data uploads and the medical library move in, intact, nothing retyped</span></div>
+      <div class="ph"><span class="n">04</span><span class="t">The specialists</span><span class="d">the AI advisors move in one by one, the most talkative one last</span></div>
+      <div class="ph"><span class="n">05</span><span class="t">The slow oven</span><span class="d">heavy simulations become a button customers press, instead of a phone call to us</span></div>
+      <div class="ph"><span class="n">06</span><span class="t">Print shop and logbook</span><span class="d">submission ready reports, plus a clean record of who did what and what it cost</span></div>
+      <div class="ph"><span class="n">07</span><span class="t">The taste test</span><span class="d">old and new compared dish by dish; only when every plate matches do we switch</span></div>
+    </div>
+    <div class="criterion">
+      <p>We do not switch on a date.<br><span class="em">We switch on proof.</span></p>
+      <div class="s">Every saved real case must come out identical from the new engine, end to end, before the old one retires. If a single dish tastes different, we fix it first. Customers never carry the risk.</div>
+    </div>
+    <p class="body" style="margin-top:6mm; font-size:13px;"><b>What you will notice during the rebuild: nothing.</b> What you will notice after: studies that save themselves, colleagues working on the same study together, simulations on demand, and reports generated in minutes instead of days.</p>
+    <div class="foot">
+      <div class="fmark"><svg class="wm" style="width:18mm;color:var(--emerald)"><use href="#wm"/></svg></div>
+      <div class="fmeta">Plain language edition · v1.0</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PAGE 7 · BACK ============================ -->
+<section class="sheet back">
+  <div class="pad">
+    <div class="top" style="display:flex;justify-content:flex-end;width:100%;">
+      <div class="eyebrow on-dark">Augura&nbsp;Inc.</div>
+    </div>
+    <div class="center">
+      <svg class="wm"><use href="#wm"/></svg>
+      <div class="tag">Simple on the surface.<br>Solid underneath.</div>
+      <div class="sub">Questions are welcome. A full technical edition of this document exists for those who want every detail: <span class="mono" style="font-size:12px;">Augura-Architecture-Backend.pdf</span></div>
+    </div>
+    <div class="bottom">
+      <div>augura.health</div>
+      <div>Internal · Plain language edition v1.0 · June 2026</div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -32,7 +32,7 @@ Conséquence de D1 + D2 : le backend est livré comme **code + tests**. La véri
 
 Chaque phase reçoit son propre plan écrit (skill `writing-plans`) juste avant exécution, puis est exécutée en TDD avec commits atomiques (sans trailer co-author, préférence Quentin). Rapport à chaque frontière de phase.
 
-## 3. Schéma de données complet (18 tables)
+## 3. Schéma de données complet (19 tables)
 
 Toutes les tables tenant-scopées portent une policy RLS fondée sur `current_setting('app.tenant_id')`. `documents`/`chunks` ont `org_id` **nullable** ⇒ corpus global lisible par tous les tenants.
 

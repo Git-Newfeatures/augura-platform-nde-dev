@@ -1,0 +1,111 @@
+"""Vérification structurelle du bundle SQL Supabase (sans base de données).
+
+Garde contre les omissions / typos / dérive. L'exécution réelle du bundle est
+prouvée en CI contre un Postgres + pgvector (job `db-bundle`).
+"""
+
+import re
+from pathlib import Path
+
+SUPABASE_DIR = Path(__file__).parents[2] / "supabase"
+
+EXPECTED_TABLES = {
+    "orgs",
+    "memberships",
+    "studies",
+    "study_members",
+    "study_state",
+    "datasets",
+    "dataset_columns",
+    "cohort_members",
+    "cohort_biomarkers",
+    "documents",
+    "chunks",
+    "agent_runs",
+    "agent_cache",
+    "simulation_runs",
+    "simulation_results",
+    "jobs",
+    "generated_documents",
+    "usage_events",
+    "outbox_events",
+}
+
+# Tables tenant-scopées qui DOIVENT porter une policy RLS.
+RLS_REQUIRED = {
+    "orgs",
+    "memberships",
+    "studies",
+    "study_members",
+    "study_state",
+    "datasets",
+    "dataset_columns",
+    "cohort_members",
+    "cohort_biomarkers",
+    "documents",
+    "chunks",
+    "agent_runs",
+    "simulation_runs",
+    "simulation_results",
+    "jobs",
+    "generated_documents",
+    "usage_events",
+}
+
+LUCIS_ORG_ID = "33cb3ba0-00fe-420b-a8c7-70736aaacc44"
+
+
+def _read(name: str) -> str:
+    return (SUPABASE_DIR / name).read_text(encoding="utf-8")
+
+
+def test_bundle_files_present_and_non_empty() -> None:
+    for name in ("schema.sql", "functions.sql", "policies.sql", "seed.sql"):
+        text = _read(name)
+        assert text.strip(), f"{name} est vide"
+
+
+def test_schema_declares_every_expected_table() -> None:
+    schema = _read("schema.sql")
+    declared = set(re.findall(r"create table if not exists (\w+)", schema))
+    assert declared == EXPECTED_TABLES, {
+        "manquantes": EXPECTED_TABLES - declared,
+        "en trop": declared - EXPECTED_TABLES,
+    }
+
+
+def test_schema_enables_pgvector_and_hnsw() -> None:
+    schema = _read("schema.sql")
+    assert "create extension if not exists vector" in schema
+    assert "vector(1536)" in schema
+    assert "using hnsw" in schema
+
+
+def test_policies_enable_rls_on_every_tenant_table() -> None:
+    policies = _read("policies.sql")
+    # Tables couvertes par la boucle array + les ALTER explicites.
+    array_block = re.search(r"array\[(.*?)\]", policies, re.DOTALL)
+    assert array_block is not None
+    looped = set(re.findall(r"'(\w+)'", array_block.group(1)))
+    explicit = set(re.findall(r"alter table (\w+) enable row level security", policies))
+    covered = looped | explicit
+    missing = RLS_REQUIRED - covered
+    assert not missing, f"RLS manquante sur : {missing}"
+    assert "force row level security" in policies
+
+
+def test_functions_define_match_chunks_and_coverage_view() -> None:
+    fns = _read("functions.sql")
+    assert "create or replace function match_chunks" in fns
+    assert "create or replace view v_coverage_map" in fns
+    assert "embedding <=> query_embedding" in fns  # distance cosinus pgvector
+
+
+def test_seed_has_lucis_org_and_full_validated_grid() -> None:
+    seed = _read("seed.sql")
+    assert LUCIS_ORG_ID in seed
+    # 3 scénarios × 4 estimateurs = 12 lignes de simulation_results.
+    sim_block = seed.split("simulation_results", 1)[1]
+    rows = re.findall(r"'(baseline|conservative|high_risk)',\s*'(lme|ols|ipw|tmle)'", sim_block)
+    assert len(rows) == 12, f"attendu 12 lignes VALIDATED, trouvé {len(rows)}"
+    assert len(set(rows)) == 12, "combinaisons scénario×estimateur dupliquées"

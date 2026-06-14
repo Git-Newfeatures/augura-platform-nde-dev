@@ -22,3 +22,73 @@ jobs:
       - run: uv run pyright
       - run: uv run lint-imports
       - run: uv run pytest -q
+
+  db-bundle:
+    # Applique le bundle Supabase sur un vrai Postgres + pgvector et prouve
+    # que le schéma se crée, que le seed entre, et que l'isolation RLS tient.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: augura
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGUSER: postgres
+      PGDATABASE: augura
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply bundle (schema → functions → seed → policies)
+        working-directory: apps/api/supabase
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -f schema.sql
+          psql -v ON_ERROR_STOP=1 -f functions.sql
+          psql -v ON_ERROR_STOP=1 -f seed.sql
+          psql -v ON_ERROR_STOP=1 -f policies.sql
+      - name: Smoke — seed counts
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          do $$ begin
+            if (select count(*) from documents)          <> 8  then raise exception 'documents != 8'; end if;
+            if (select count(*) from simulation_results) <> 12 then raise exception 'simulation_results != 12'; end if;
+            if (select count(*) from cohort_biomarkers)  <> 12 then raise exception 'cohort_biomarkers != 12'; end if;
+          end $$;
+          SQL
+      - name: Smoke — RLS isolation (rôle non exempt)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          set role augura_app;
+          set app.tenant_id = '33cb3ba0-00fe-420b-a8c7-70736aaacc44';
+          do $$ begin
+            if (select count(*) from cohort_members) <> 6 then
+              raise exception 'tenant courant : attendu 6 membres, vu %', (select count(*) from cohort_members);
+            end if;
+          end $$;
+          set app.tenant_id = '00000000-0000-0000-0000-000000000000';
+          do $$ begin
+            if (select count(*) from cohort_members) <> 0 then
+              raise exception 'isolation RLS rompue : un autre tenant voit % lignes', (select count(*) from cohort_members);
+            end if;
+          end $$;
+          -- corpus global (org_id NULL) reste visible quel que soit le tenant
+          do $$ begin
+            if (select count(*) from documents) <> 8 then
+              raise exception 'corpus global invisible sous RLS';
+            end if;
+          end $$;
+          SQL

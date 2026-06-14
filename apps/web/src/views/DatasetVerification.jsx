@@ -4,6 +4,7 @@ import { Card, Tag } from "../ui/components";
 import { Button } from "@/components/ui/button";
 import { useCollection } from "@/workspace/dataClient";
 import { isMockEnabled } from "@/mocks/mockMode";
+import { apiJson } from "@/api";
 
 // Realistic cardiometabolic column pool — sliced to the selected dataset's column
 // count so the agent classification matches it (e.g. a 47-col dataset → 47 columns).
@@ -420,15 +421,10 @@ export default function DatasetVerification({
           column_stats: s.column_stats || [],
         })),
       };
-      const r = await fetch("/api/variable-check", {
-        method:"POST", headers:{"Content-Type":"application/json"},
+      const data = await apiJson("/agents/variable-check", {
+        method: "POST",
         body: JSON.stringify(payload),
       });
-      if (!r.ok) {
-        const errBody = await r.json().catch(() => ({}));
-        throw new Error(errBody.error || `Variable check failed (${r.status})`);
-      }
-      const data = await r.json();
       setResult(data);
       // Seed decisions — keep any existing decisions, only seed missing ones
       const seed = { ...(variableMappings || {}) };

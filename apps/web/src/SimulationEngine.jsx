@@ -22,9 +22,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SubTabs } from "@/cockpit/SubTabs";
-import { supabase } from "./supabase";
+import { fetchCohort, fetchSimulationResults, engagementGroup } from "./workspace/cohortData";
 import {
-  COHORT_N, TREAT_PROP, TRUE_EFFECT, TENANT_ID,
+  COHORT_N, TREAT_PROP, TRUE_EFFECT,
   POWER_THRESHOLD, POWER_MARGINAL_FLOOR,
   BASE_BIAS, EST_EFFICIENCY,
   ESTIMATORS, VALIDATED, ESTIMATOR_FILTER,
@@ -504,40 +504,26 @@ export default function SimulationEngine({
   const [liveCohort, setLiveCohort] = useState(null);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key || key === "your_anon_key_here") return;
-    const client = supabase;
-
-    Promise.all([
-      client.from("validation_members")
-        .select("member_id, engagement_group")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort),
-      client.from("validation_biomarkers")
-        .select("member_id, timepoint_months, hba1c_pct")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort)
-        .in("timepoint_months", [0, 12]),
-    ]).then(([{ data: members }, { data: bio }]) => {
-      if (!members?.length) return;
+    let alive = true;
+    fetchCohort(selectedCohort).then(({ members, biomarkers }) => {
+      if (!alive || !members.length) return;
       const total  = members.length;
-      const highN  = members.filter(m => m.engagement_group === "High").length;
+      const highN  = members.filter(m => engagementGroup(m) === "high").length;
       const treatP = Math.round((highN / total) * 1000) / 1000;
 
       let att = TRUE_EFFECT;
-      if (bio?.length) {
-        const groupMap = Object.fromEntries(members.map(m => [m.member_id, m.engagement_group]));
+      if (biomarkers.length) {
+        const groupMap = Object.fromEntries(members.map(m => [m.member_id, engagementGroup(m)]));
         const t0map    = Object.fromEntries(
-          bio.filter(b => b.timepoint_months === 0).map(b => [b.member_id, b.hba1c_pct])
+          biomarkers.filter(b => b.timepoint_months === 0).map(b => [b.member_id, b.hba1c_pct])
         );
-        const t12rows  = bio.filter(b => b.timepoint_months === 12 && b.hba1c_pct != null);
+        const t12rows  = biomarkers.filter(b => b.timepoint_months === 12 && b.hba1c_pct != null);
         const deltas   = t12rows.map(b => ({
           delta: b.hba1c_pct - (t0map[b.member_id] ?? b.hba1c_pct),
           group: groupMap[b.member_id],
         }));
-        const highD = deltas.filter(d => d.group === "High").map(d => d.delta);
-        const restD = deltas.filter(d => d.group !== "High").map(d => d.delta);
+        const highD = deltas.filter(d => d.group === "high").map(d => d.delta);
+        const restD = deltas.filter(d => d.group !== "high").map(d => d.delta);
         if (highD.length && restD.length) {
           const mean = arr => arr.reduce((s, v) => s + v, 0) / arr.length;
           att = Math.round((mean(highD) - mean(restD)) * 1000) / 1000;
@@ -545,6 +531,7 @@ export default function SimulationEngine({
       }
       setLiveCohort({ total, highN, treatP, att });
     });
+    return () => { alive = false; };
   }, [selectedCohort]);
 
   const cohortN      = uploadedRowCount ?? liveCohort?.total ?? COHORT_N;
@@ -622,14 +609,13 @@ export default function SimulationEngine({
     setResult(r);
   }, [cohortN, dropout, effectAssumed, sigma, mode]);
 
-  // ── Supabase: fetch validated bootstrap results ───────────────────────────────
+  // ── Backend: résultats de bootstrap VALIDATED (read-model, scopé tenant) ──────
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key || key === "your_anon_key_here") return;
-    const client = supabase;
-    client.from("simulation_results").select("*").eq("tenant_id", TENANT_ID)
-      .then(({ data }) => { if (data?.length) setLiveData(data); });
+    let alive = true;
+    fetchSimulationResults().then((rows) => {
+      if (alive && rows?.length) setLiveData(rows);
+    });
+    return () => { alive = false; };
   }, []);
 
   // Re-load when Supabase data arrives (replaces config.js fallback values)

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { C, MONO } from "../theme";
 import InlineChatbot from "../components/InlineChatbot";
-import { TENANT_ID } from "../config";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 11: POST-STUDY MONITORING DASHBOARD
@@ -221,9 +220,10 @@ function SignalLog({ signals }) {
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export default function MonitoringView({ simResults, onBack, partnerLabel = 'Partner', chatProps = {} }) {
-  const [snapshots,   setSnapshots]   = useState(MOCK_SNAPSHOTS);
-  const [signals,     setSignals]     = useState(MOCK_SIGNALS);
-  const [dataSource,  setDataSource]  = useState("mock"); // "live" | "mock"
+  // Données de démonstration (pas encore d'endpoint backend /monitoring — cf. useEffect).
+  const [snapshots] = useState(MOCK_SNAPSHOTS);
+  const [signals]   = useState(MOCK_SIGNALS);
+  const [dataSource] = useState("mock"); // "live" | "mock"
   const [loading,     setLoading]     = useState(true);
   const [timeRange,   setTimeRange]   = useState("all"); // "3m" | "6m" | "all"
   const [showAlerts,  setShowAlerts]  = useState(false);
@@ -231,38 +231,13 @@ export default function MonitoringView({ simResults, onBack, partnerLabel = 'Par
   const [alertEValue, setAlertEValue] = useState("2.5");
   const [alertSaved,  setAlertSaved]  = useState(false);
 
-  // ── Fetch from Supabase ────────────────────────────────────────────────────
+  // ── Données de monitoring ───────────────────────────────────────────────────
+  // Pas encore d'endpoint backend (aucun module/table monitoring) : on rend les
+  // données de démonstration. L'ancienne lecture PostgREST directe (tenant codé en
+  // dur, tables inexistantes) a été retirée. À brancher quand le backend exposera
+  // /monitoring (snapshots + signals scopés tenant).
   useEffect(() => {
-    const url  = import.meta.env.VITE_SUPABASE_URL;
-    const key  = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) { setLoading(false); return; }
-
-    async function fetchData() {
-      try {
-        const [snapRes, sigRes] = await Promise.all([
-          fetch(`${url}/rest/v1/monitoring_snapshots?tenant_id=eq.${TENANT_ID}&order=wave_month.asc&select=*`, {
-            headers: { apikey: key, Authorization: `Bearer ${key}` },
-          }),
-          fetch(`${url}/rest/v1/monitoring_signals?tenant_id=eq.${TENANT_ID}&order=signal_date.asc&select=*`, {
-            headers: { apikey: key, Authorization: `Bearer ${key}` },
-          }),
-        ]);
-        const snaps = await snapRes.json();
-        const sigs  = await sigRes.json();
-        if (Array.isArray(snaps) && snaps.length > 0) {
-          setSnapshots(snaps);
-          setDataSource("live");
-        }
-        if (Array.isArray(sigs) && sigs.length > 0) {
-          setSignals(sigs);
-        }
-      } catch (e) {
-        console.warn("MonitoringView: Supabase fetch failed, using mock data", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+    setLoading(false);
   }, []);
 
   // ── Filter by time range ───────────────────────────────────────────────────

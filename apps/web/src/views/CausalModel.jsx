@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, RotateCcw, Undo2, RefreshCw, ChevronUp, ChevronDown, AlertTriangle, Ban, Info, Check, X, Circle, Network, GitFork, PenLine, Save, Send, MessageSquare } from "lucide-react";
-import { supabase } from "../supabase";
-import { TENANT_ID } from "../config";
+import { apiJson } from "../api";
+import { fetchCohort, isHighEngager } from "../workspace/cohortData";
 import { C, FONT, MONO } from "../theme";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -282,22 +282,16 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
   const [cohort, setCohort] = useState(null);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const client = supabase;
-    client.from("validation_members")
-      .select("member_id, engagement_group")
-      .eq("tenant_id", TENANT_ID)
-      .eq("cohort_name", selectedCohort)
-      .then(({ data: members }) => {
-        if (!members?.length) return;
-        const total  = members.length;
-        const highN  = members.filter(m => m.engagement_group === "High").length;
-        const restN  = total - highN;
-        setCohort({ total, highN, highPct: Math.round(highN / total * 100), restN });
-      });
-  }, []);
+    let alive = true;
+    fetchCohort(selectedCohort).then(({ members }) => {
+      if (!alive || !members.length) return;
+      const total  = members.length;
+      const highN  = members.filter(isHighEngager).length;
+      const restN  = total - highN;
+      setCohort({ total, highN, highPct: Math.round(highN / total * 100), restN });
+    });
+    return () => { alive = false; };
+  }, [selectedCohort]);
 
   const [dagData,     setDagDataLocal] = useState(dagCache);
   const [dagOriginal, setDagOriginal]  = useState(dagCache);
@@ -399,9 +393,8 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
     let detectedGaps = [];
     try {
       setGapLoadStep("gaps");
-      const gapRes = await window.fetch("/api/gap-detection", {
+      const gapData = await apiJson("/agents/gaps", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           intervention,
           outcome: outcomeLabel,
@@ -410,7 +403,6 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
           measured_variables: measuredVars,
         }),
       });
-      const gapData = await gapRes.json();
       detectedGaps = gapData.missing_variables || [];
       setGapVariables(detectedGaps);
     } catch {
@@ -420,24 +412,24 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
     // Step 2 — DAG construction (with gap context injected)
     try {
       setGapLoadStep("dag");
-      const dagRes = await window.fetch("/api/dag", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          intervention, outcome: outcomeLabel, population,
-          product_docs: productDocs, study_type: studyType,
-          selected_outcome: selectedOutcome,
-          candidate_outcomes: candidateOutcomes,
-          dataset_variables: datasetVariables,
-          gap_variables: detectedGaps,
-        }),
-      });
-      // Tolerate an empty / non-JSON response (e.g. no backend in dev/real mode):
-      // surface a clean message instead of the raw "Failed to execute 'json'" error.
-      const dagText = await dagRes.text();
+      // apiJson lève sur non-2xx (ex. backend sans clé LLM → 503) ; le catch ci-dessous
+      // surface un message propre au lieu d'une erreur JSON brute.
       let data;
-      try { data = dagText ? JSON.parse(dagText) : {}; }
-      catch { throw new Error("the DAG service isn't reachable — check the connection and try again"); }
+      try {
+        data = await apiJson("/agents/dag", {
+          method: "POST",
+          body: JSON.stringify({
+            intervention, outcome: outcomeLabel, population,
+            product_docs: productDocs, study_type: studyType,
+            selected_outcome: selectedOutcome,
+            candidate_outcomes: candidateOutcomes,
+            dataset_variables: datasetVariables,
+            gap_variables: detectedGaps,
+          }),
+        });
+      } catch {
+        throw new Error("the DAG service isn't reachable — check the connection and try again");
+      }
       if (data.error) throw new Error(data.error);
       if (!data.nodes?.length) throw new Error("the DAG service returned no graph — try again");
       const sanitized = sanitizeDag(data, selectedOutcome, candidateOutcomes);

@@ -14,7 +14,8 @@ export const TREAT_PROP  = 0.231;    // HIGH engagers = top quartile of engageme
 // Note: ~23.1% (190/824) — not exactly 25% because the engagement distribution is skewed
 // D1 decision: binary split HIGH vs REST (medium + low engagers combined)
 export const TRUE_EFFECT = -0.206;   // Observed ATT: HbA1c reduction for HIGH vs REST
-export const TENANT_ID   = "33cb3ba0-00fe-420b-a8c7-70736aaacc44";
+// (TENANT_ID retiré : le tenant est résolu côté backend depuis le JWT — plus de
+//  lecture PostgREST directe avec un tenant codé en dur. cf. workspace/cohortData.js)
 
 // ── Regulatory thresholds (ICH E9 / HAS PECAN / DiGA BfArM) ─────────────────
 export const POWER_THRESHOLD      = 80; // Minimum required power for regulatory submission

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { supabase } from "../supabase";
-import { TENANT_ID } from "../config";
+import { fetchCohort, isHighEngager } from "../workspace/cohortData";
 import { Card, InfoBar, Pill, Radar, IntelRow, IntelBlock, Tag, Btn } from "../ui/components";
 import InlineChatbot from "../components/InlineChatbot";
 
@@ -12,37 +11,20 @@ export default function StudyFeasibility({ onNext, onBack, product, users, outco
   const [cohort, setCohort] = useState(null); // live stats from validation tables
 
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const client = supabase;
-
-    console.log("[Feasibility] TENANT_ID:", TENANT_ID);
-    console.log("[Feasibility] VITE_SUPABASE_URL:", url);
-
-    Promise.all([
-      client.from("validation_members")
-        .select("engagement_group, country")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort),
-      client.from("validation_biomarkers")
-        .select("member_id, timepoint_months")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort),
-    ]).then(([{ data: members, error: e1 }, { data: bio, error: e2 }]) => {
-      console.log("[Feasibility] members:", members?.length, "| error:", e1);
-      console.log("[Feasibility] bio:", bio?.length, "| error:", e2);
-      if (!members?.length) return;
+    let alive = true;
+    fetchCohort(selectedCohort).then(({ members, biomarkers, name }) => {
+      if (!alive || !members.length) return;
 
       const total     = members.length;
-      const highN     = members.filter(m => m.engagement_group === "High").length;
+      const highN     = members.filter(isHighEngager).length;
       const countries = [...new Set(members.map(m => m.country))].sort();
-      const t12count  = new Set(bio?.filter(b => b.timepoint_months === 12).map(b => b.member_id)).size;
+      const t12count  = new Set(biomarkers.filter(b => b.timepoint_months === 12).map(b => b.member_id)).size;
       const dropout12 = Math.round((1 - t12count / total) * 100);
 
-      setCohort({ total, highN, highPct: Math.round(highN / total * 100), countries, dropout12, source: selectedCohort });
+      setCohort({ total, highN, highPct: Math.round(highN / total * 100), countries, dropout12, source: name });
     });
-  }, []);
+    return () => { alive = false; };
+  }, [selectedCohort]);
 
   return (
     <div className="flex flex-col gap-4">

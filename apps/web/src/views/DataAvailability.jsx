@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Check, X, AlertTriangle, ArrowLeft, ArrowRight, Users, Filter, Network } from "lucide-react";
-import { supabase } from "../supabase";
-import { TENANT_ID } from "../config";
+import { fetchCohort } from "../workspace/cohortData";
 import { InfoBar, Btn, Tag } from "../ui/components";
 import { Card } from "@/components/ui/card";
 import { SubTabs } from "@/cockpit/SubTabs";
@@ -116,28 +115,11 @@ export default function DataAvailability({ selectedOutcome = "hba1c", selectedCo
   const [sub, setSub] = useState("population");
 
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const client = supabase;
-
-    Promise.all([
-      client.from("validation_members")
-        .select("member_id, age, sex, bmi")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort),
-      client.from("validation_biomarkers")
-        .select("member_id, hba1c_pct, ldl_mgdl, hs_crp_mgl, adherence_pct")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort)
-        .eq("timepoint_months", 0),
-      client.from("validation_biomarkers")
-        .select("member_id, hba1c_pct, ldl_mgdl, hs_crp_mgl")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort)
-        .eq("timepoint_months", 12),
-    ]).then(([{ data: members }, { data: t0 }, { data: t12 }]) => {
-      if (!members?.length) return;
+    let alive = true;
+    fetchCohort(selectedCohort).then(({ members, biomarkers }) => {
+      if (!alive || !members.length) return;
+      const t0  = biomarkers.filter(b => b.timepoint_months === 0);
+      const t12 = biomarkers.filter(b => b.timepoint_months === 12);
       const N = members.length;
       const pct = (n) => Math.round(n / N * 100);
 
@@ -163,7 +145,8 @@ export default function DataAvailability({ selectedOutcome = "hba1c", selectedCo
         crpT12N,
       });
     });
-  }, []);
+    return () => { alive = false; };
+  }, [selectedCohort]);
 
   // ── Dynamic content driven by selected outcome ────────────────────────────
   const PRIMARY_OUTCOME_ROW = {

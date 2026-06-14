@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, Target, Activity, Users, CornerDownLeft, Check, Edit3, GitCompare } from "lucide-react";
-import { supabase } from "../supabase";
-import { TENANT_ID } from "../config";
+import { fetchCohort, engagementGroup } from "../workspace/cohortData";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InfoBar, Tag } from "../ui/components";
@@ -257,33 +256,20 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
   useEffect(() => { setSelectedOutcome?.(sel); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-    const client = supabase;
+    let alive = true;
+    fetchCohort(selectedCohort).then(({ members, biomarkers, name }) => {
+      if (!alive || !members.length || !biomarkers.length) return;
 
-    Promise.all([
-      client.from("validation_members")
-        .select("member_id, engagement_group")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort),
-      client.from("validation_biomarkers")
-        .select("member_id, timepoint_months, hba1c_pct, ldl_mgdl, hs_crp_mgl")
-        .eq("tenant_id", TENANT_ID)
-        .eq("cohort_name", selectedCohort)
-        .in("timepoint_months", [0, 12]),
-    ]).then(([{ data: members }, { data: bio }]) => {
-      if (!members?.length || !bio?.length) return;
-
-      const groupMap = Object.fromEntries(members.map(m => [m.member_id, m.engagement_group]));
+      const groupMap = Object.fromEntries(members.map(m => [m.member_id, engagementGroup(m)]));
       const t0map    = Object.fromEntries(
-        bio.filter(b => b.timepoint_months === 0).map(b => [b.member_id, b])
+        biomarkers.filter(b => b.timepoint_months === 0).map(b => [b.member_id, b])
       );
-      const t12rows  = bio.filter(b => b.timepoint_months === 12);
+      const t12rows  = biomarkers.filter(b => b.timepoint_months === 12);
 
       function computeEffect(col) {
         const out = {};
-        ["High","Medium","Low"].forEach(grp => {
+        // clés d'affichage capitalisées (contrat inchangé) ↔ groupe backend minuscule
+        [["High", "high"], ["Medium", "medium"], ["Low", "low"]].forEach(([outKey, grp]) => {
           const matched = t12rows.filter(b =>
             groupMap[b.member_id] === grp &&
             t0map[b.member_id]?.[col] != null &&
@@ -291,7 +277,7 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
           );
           if (matched.length) {
             const delta = matched.reduce((s, b) => s + (b[col] - t0map[b.member_id][col]), 0) / matched.length;
-            out[grp] = Math.round(delta * 100) / 100;
+            out[outKey] = Math.round(delta * 100) / 100;
           }
         });
         out.n = new Set(t12rows.filter(b => b[col] != null).map(b => b.member_id)).size;
@@ -300,13 +286,14 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
 
       setLiveStats({
         totalN:     members.length,
-        cohortName: selectedCohort,
+        cohortName: name,
         hba1c:      computeEffect("hba1c_pct"),
         ldl:        computeEffect("ldl_mgdl"),
         crp:        computeEffect("hs_crp_mgl"),
       });
     });
-  }, []);
+    return () => { alive = false; };
+  }, [selectedCohort]);
 
   const cqOutcome  = D1_OUTCOME_MAP[sel] || "HbA1c % change at 12 months";
   const cqPopStr   = cqPopulation.length ? cqPopulation.join(" · ") : "—";

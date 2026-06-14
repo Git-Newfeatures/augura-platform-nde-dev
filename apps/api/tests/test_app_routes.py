@@ -29,6 +29,9 @@ def test_openapi_exposes_routes() -> None:
         "/simulations/results",
         "/simulations",
         "/jobs/{job_id}",
+        "/documents",
+        "/documents/{document_id}",
+        "/analytics/admin",
     ):
         assert path in paths, path
 

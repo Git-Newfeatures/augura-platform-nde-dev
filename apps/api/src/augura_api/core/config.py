@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     log_level: str = "INFO"
 
+    # CORS — origines autorisées pour le front (apps/web). Liste séparée par des
+    # virgules : AUGURA_CORS_ORIGINS="https://app.augura.io,https://staging…".
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     # Infra — optionnels au boot (le healthcheck n'en a pas besoin) ; les
     # composants qui les consomment échouent franchement s'ils manquent.
     # Préfixe AUGURA_ : AUGURA_DATABASE_URL, AUGURA_SUPABASE_JWKS_URL, etc.
@@ -33,6 +37,10 @@ class Settings(BaseSettings):
     agent_model_dag: str = "claude-sonnet-4-6"
     agent_model_fast: str = "claude-haiku-4-5"
     agent_model_deep: str = "claude-opus-4-8"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 @lru_cache

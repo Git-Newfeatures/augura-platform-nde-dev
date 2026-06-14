@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from augura_api.core.config import Settings, get_settings
 from augura_api.core.errors import register_error_handlers
@@ -19,6 +20,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title=cfg.app_name, version=cfg.version)
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cfg.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     register_error_handlers(app)
 
     @app.get("/healthz")

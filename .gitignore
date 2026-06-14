@@ -6,10 +6,11 @@ __pycache__/
 .ruff_cache/
 dist/
 
-# Node (apps/web arrivera en phase 2)
+# Node
 node_modules/
 
 # Env & outils
 .env
 .env.*
+!.env.example
 .DS_Store

@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+
+  --background: #F6F4F1;
+  --foreground: #1C1C1A;
+  --card: #FFFFFF;
+  --card-foreground: #1C1C1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1C1A;
+  --primary: #047857;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E1F5EE;
+  --secondary-foreground: #085041;
+  --muted: #F9F8F5;
+  --muted-foreground: #5F5E5A;
+  --accent: #E1F5EE;
+  --accent-foreground: #085041;
+  --destructive: #C0392B;
+  --destructive-foreground: #FFFFFF;
+  --border: #D8D6CE;
+  --input: #D8D6CE;
+  --ring: #047857;
+
+  /* Brand tokens (Evidence Workspace) — for 2d/2e screens */
+  --bluecorn: #3172B0;
+  --soleil: #B98900;
+  --soleil-dot: #E8B800;
+  --carmine: #C0392B;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-bluecorn: var(--bluecorn);
+  --color-soleil: var(--soleil);
+  --color-soleil-dot: var(--soleil-dot);
+  --color-carmine: var(--carmine);
+
+  --font-sans: "Geist Variable", "Geist", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}
+
+/* ── Responsive utilities (shared by ScrollX + scrollable tab strips) ───────── */
+
+/* Thin, unobtrusive scrollbar for horizontal-scroll containers. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Fully hidden scrollbar for tab strips (the fade is the scroll affordance). */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fade affordance on the right edge of a horizontally-scrollable strip, so a
+   clipped nav/tab reads as "scroll for more" instead of looking broken. */
+.scroll-fade-x {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+@media (min-width: 1280px) {
+  /* On wide screens nothing overflows, so drop the fade. */
+  .scroll-fade-x {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}

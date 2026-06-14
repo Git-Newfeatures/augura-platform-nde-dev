@@ -23,6 +23,12 @@ class NotFoundError(AppError):
     title = "Resource not found"
 
 
+class UnauthorizedError(AppError):
+    code = "unauthorized"
+    http_status = 401
+    title = "Unauthorized"
+
+
 class ForbiddenError(AppError):
     code = "forbidden"
     http_status = 403

@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     log_level: str = "INFO"
 
+    # Infra — optionnels au boot (le healthcheck n'en a pas besoin) ; les
+    # composants qui les consomment échouent franchement s'ils manquent.
+    # Préfixe AUGURA_ : AUGURA_DATABASE_URL, AUGURA_SUPABASE_JWKS_URL, etc.
+    database_url: str | None = None
+    supabase_jwks_url: str | None = None
+    supabase_jwt_secret: str | None = None  # repli HS256 (projets Supabase legacy)
+    supabase_jwt_audience: str = "authenticated"
+    supabase_jwt_issuer: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

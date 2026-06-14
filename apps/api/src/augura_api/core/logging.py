@@ -38,9 +38,7 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send)
             return
 
-        incoming = {
-            k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]
-        }
+        incoming = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
         request_id = incoming.get("x-request-id") or uuid.uuid4().hex
         structlog.contextvars.bind_contextvars(request_id=request_id)
 

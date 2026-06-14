@@ -22,6 +22,31 @@ build-backend = "uv_build"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+# Les handlers FastAPI (@app.get, @app.exception_handler) et les fixtures pytest sont
+# enregistrés par décorateur : pyright les voit « non accédés ». Faux positif structurel,
+# pervasif dans tout codebase FastAPI — on désactive cette règle, le reste reste strict.
+reportUnusedFunction = false
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "TID252"]
+
+[tool.importlinter]
+root_package = "augura_api"
+
+[[tool.importlinter.contracts]]
+name = "core est indépendant des modules et des jobs"
+type = "forbidden"
+source_modules = ["augura_api.core"]
+forbidden_modules = ["augura_api.modules", "augura_api.jobs"]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",

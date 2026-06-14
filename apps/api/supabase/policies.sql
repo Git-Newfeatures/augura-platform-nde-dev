@@ -37,7 +37,7 @@ declare
     t text;
 begin
     foreach t in array array[
-        'memberships', 'studies', 'datasets', 'cohort_members', 'cohort_biomarkers',
+        'studies', 'datasets', 'cohort_members', 'cohort_biomarkers',
         'agent_runs', 'simulation_runs', 'simulation_results', 'jobs', 'generated_documents'
     ]
     loop
@@ -57,6 +57,15 @@ alter table orgs enable row level security;
 alter table orgs force row level security;
 create policy tenant_self on orgs
     using (id = nullif(current_setting('app.tenant_id', true), '')::uuid);
+
+-- ── memberships : un utilisateur ne voit que SES appartenances ───────────
+-- (scopé sur app.user_id, pas app.tenant_id : c'est le bootstrap qui résout
+-- justement le tenant à partir de l'utilisateur — cf. core/deps.py)
+alter table memberships enable row level security;
+alter table memberships force row level security;
+create policy member_self on memberships
+    using (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
+    with check (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
 
 -- ── Tables enfant scopées via leur parent ────────────────────────────────
 alter table study_members enable row level security;

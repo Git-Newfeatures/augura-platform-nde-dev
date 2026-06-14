@@ -63,6 +63,8 @@ jobs:
         run: uv run alembic upgrade head
       - name: Seed (donnée, hors migration)
         run: psql -v ON_ERROR_STOP=1 -f supabase/seed.sql
+      - name: Tests d'intégration (repos + RLS sous le rôle augura_app)
+        run: uv run pytest -m integration -q
       - name: Smoke — seed counts
         run: |
           set -euo pipefail

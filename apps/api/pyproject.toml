@@ -28,6 +28,9 @@ build-backend = "uv_build"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: nécessite un Postgres réel (AUGURA_DATABASE_URL) — tourne en CI",
+]
 
 [tool.pyright]
 include = ["src", "tests"]

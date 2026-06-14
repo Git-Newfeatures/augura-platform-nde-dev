@@ -17,6 +17,14 @@ insert into orgs (id, name, slug, cesl_profile) values (
     }'::jsonb
 ) on conflict (id) do nothing;
 
+-- ── Membre démo (user fictif rattaché à Lucis) ───────────────────────────
+-- user_id arbitraire : en prod il vient de auth.users (Supabase Auth).
+insert into memberships (org_id, user_id, role) values (
+    '33cb3ba0-00fe-420b-a8c7-70736aaacc44',
+    '11111111-1111-4111-8111-111111111111',
+    'owner'
+) on conflict (org_id, user_id) do nothing;
+
 -- ── Étude démo Lucis ─────────────────────────────────────────────────────
 insert into studies (id, org_id, name, slug, tagline, category, framework, n_subjects, lead, status)
 values (

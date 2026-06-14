@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from augura_api.core.config import Settings
-from augura_api.core.ids import TenantId
+from augura_api.core.ids import TenantId, UserId
 
 # Convention de nommage des contraintes/index → migrations Alembic déterministes.
 NAMING_CONVENTION = {
@@ -77,9 +77,25 @@ def set_tenant_stmt(tenant_id: TenantId) -> TextClause:
     return text("SELECT set_config('app.tenant_id', :tid, true)").bindparams(tid=str(tenant_id))
 
 
+def set_user_stmt(user_id: UserId) -> TextClause:
+    """Statement qui pose l'utilisateur courant (RLS de bootstrap sur memberships)."""
+    return text("SELECT set_config('app.user_id', :uid, true)").bindparams(uid=str(user_id))
+
+
 async def tenant_session(tenant_id: TenantId, settings: Settings) -> AsyncIterator[AsyncSession]:
     """Ouvre une transaction scopée au tenant (RLS active via app.tenant_id)."""
     sessionmaker = get_sessionmaker(settings)
     async with sessionmaker() as session, session.begin():
+        await session.execute(set_tenant_stmt(tenant_id))
+        yield session
+
+
+async def request_session(
+    settings: Settings, tenant_id: TenantId, user_id: UserId
+) -> AsyncIterator[AsyncSession]:
+    """Transaction de requête : pose user_id ET tenant_id (RLS complète)."""
+    sessionmaker = get_sessionmaker(settings)
+    async with sessionmaker() as session, session.begin():
+        await session.execute(set_user_stmt(user_id))
         await session.execute(set_tenant_stmt(tenant_id))
         yield session

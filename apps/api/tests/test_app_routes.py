@@ -24,6 +24,7 @@ def test_openapi_exposes_routes() -> None:
         "/agents/dag",
         "/agents/gaps",
         "/agents/variable-check",
+        "/agents/profiling/stream",
     ):
         assert path in paths, path
 

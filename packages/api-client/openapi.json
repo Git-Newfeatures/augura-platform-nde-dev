@@ -1470,6 +1470,48 @@
         "title": "MissingVariable",
         "type": "object"
       },
+      "ProfilingRequest": {
+        "properties": {
+          "messages": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "product_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Description"
+          },
+          "system": {
+            "title": "System",
+            "type": "string"
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "system",
+          "messages"
+        ],
+        "title": "ProfilingRequest",
+        "type": "object"
+      },
       "SearchHit": {
         "properties": {
           "content": {
@@ -2017,6 +2059,45 @@
           }
         },
         "summary": "Gaps",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/agents/profiling/stream": {
+      "post": {
+        "operationId": "profiling_stream_agents_profiling_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Profiling Stream",
         "tags": [
           "agents"
         ]

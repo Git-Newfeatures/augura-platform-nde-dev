@@ -133,3 +133,14 @@ class VariableCheckResponse(BaseModel):
     clinical_domain: str | None = None
     matches: list[ColumnMatch]
     dataset_questions: list[DatasetQuestion] | None = None
+
+
+# ── trace / E1 profiling (SSE) ─────────────────────────────────────────────
+
+
+class ProfilingRequest(BaseModel):
+    # system + tools + messages sont fournis par le front (comme api/trace.js).
+    system: str
+    tools: list[dict[str, Any]] = []
+    messages: list[dict[str, Any]]
+    product_description: str | None = None

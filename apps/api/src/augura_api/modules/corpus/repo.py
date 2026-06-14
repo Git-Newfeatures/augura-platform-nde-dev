@@ -1,12 +1,15 @@
 """Accès base du module corpus. RLS : la session voit le corpus global + le tenant."""
 
 import json
+from datetime import date
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from augura_api.modules.corpus.models import Document
+from augura_api.core.ids import TenantId
+from augura_api.modules.corpus.models import Chunk, Document
 
 
 class CorpusFilters:
@@ -83,3 +86,64 @@ class CorpusRepo:
             ).bindparams(emb=emb, n=match_count, filt=json.dumps(filt))
         )
         return [dict(m) for m in rows.mappings().all()]
+
+    # ── Ingestion (recherche de littérature) ─────────────────────────────────
+    # Les écritures sont scopées tenant (org_id = tenant) : la RLS WITH CHECK
+    # interdit la création de lignes globales (org_id NULL) depuis une session tenant.
+
+    async def find_document_by_url(self, tenant_id: TenantId, url: str) -> Document | None:
+        res = await self.session.execute(
+            select(Document).where(Document.org_id == tenant_id, Document.url == url).limit(1)
+        )
+        return res.scalar_one_or_none()
+
+    async def insert_document(
+        self,
+        tenant_id: TenantId,
+        *,
+        source_id: str,
+        title: str,
+        summary: str | None,
+        url: str | None,
+        evidence_type: str | None = None,
+        jurisdiction: str | None = None,
+        lifecycle: str | None = None,
+        published_at: date | None = None,
+        is_new: bool = True,
+    ) -> Document:
+        doc = Document(
+            org_id=tenant_id,
+            source_id=source_id,
+            evidence_type=evidence_type,
+            jurisdiction=jurisdiction,
+            lifecycle=lifecycle,
+            title=title,
+            summary=summary,
+            url=url,
+            published_at=published_at,
+            is_new=is_new,
+        )
+        self.session.add(doc)
+        await self.session.flush()
+        await self.session.refresh(doc)
+        return doc
+
+    async def add_chunk(
+        self,
+        document_id: UUID,
+        tenant_id: TenantId,
+        *,
+        content: str,
+        embedding: list[float] | None,
+        token_count: int | None = None,
+    ) -> Chunk:
+        chunk = Chunk(
+            document_id=document_id,
+            org_id=tenant_id,
+            content=content,
+            embedding=embedding,
+            token_count=token_count,
+        )
+        self.session.add(chunk)
+        await self.session.flush()
+        return chunk

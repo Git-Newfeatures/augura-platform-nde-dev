@@ -123,6 +123,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/corpus/literature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Literature
+         * @description Agent de recherche de littérature : cherche sur PubMed (E-utilities NCBI) et
+         *     ingère les articles dans le corpus du tenant (Document + Chunk). Embedder/LLM
+         *     optionnels (sans clé : ingestion sans vecteur, requête non élargie).
+         */
+        post: operations["literature_corpus_literature_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/search": {
         parameters: {
             query?: never;
@@ -947,6 +969,36 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** LiteratureSearchRequest */
+        LiteratureSearchRequest: {
+            /**
+             * Expand
+             * @default false
+             */
+            expand: boolean;
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /** Query */
+            query: string;
+        };
+        /** LiteratureSearchResult */
+        LiteratureSearchResult: {
+            /** Documents */
+            documents: components["schemas"]["FeedDocument"][];
+            /** Effective Query */
+            effective_query: string;
+            /** Embedded */
+            embedded: boolean;
+            /** Found */
+            found: number;
+            /** Ingested */
+            ingested: number;
+            /** Query */
+            query: string;
+        };
         /** MeasuredVariable */
         MeasuredVariable: {
             /** Column */
@@ -1460,6 +1512,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    literature_corpus_literature_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiteratureSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiteratureSearchResult"];
                 };
             };
             /** @description Validation Error */

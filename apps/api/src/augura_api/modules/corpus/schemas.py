@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FeedDocument(BaseModel):
@@ -80,3 +80,20 @@ class SearchHit(BaseModel):
     similarity: float
     source_id: str | None = None
     title: str | None = None
+
+
+class LiteratureSearchRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=400)
+    max_results: int = Field(default=10, ge=1, le=50)
+    # Élargit la requête en syntaxe PubMed (MeSH) via le LLM avant la recherche.
+    # Sans clé Anthropic, on retombe sur la requête brute.
+    expand: bool = False
+
+
+class LiteratureSearchResult(BaseModel):
+    query: str
+    effective_query: str
+    found: int
+    ingested: int
+    embedded: bool
+    documents: list[FeedDocument]

@@ -1663,6 +1663,74 @@
         "title": "JobOut",
         "type": "object"
       },
+      "LiteratureSearchRequest": {
+        "properties": {
+          "expand": {
+            "default": false,
+            "title": "Expand",
+            "type": "boolean"
+          },
+          "max_results": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "query": {
+            "maxLength": 400,
+            "minLength": 2,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "LiteratureSearchRequest",
+        "type": "object"
+      },
+      "LiteratureSearchResult": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/FeedDocument"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "effective_query": {
+            "title": "Effective Query",
+            "type": "string"
+          },
+          "embedded": {
+            "title": "Embedded",
+            "type": "boolean"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
+          "ingested": {
+            "title": "Ingested",
+            "type": "integer"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "effective_query",
+          "found",
+          "ingested",
+          "embedded",
+          "documents"
+        ],
+        "title": "LiteratureSearchResult",
+        "type": "object"
+      },
       "MeasuredVariable": {
         "properties": {
           "column": {
@@ -2843,6 +2911,48 @@
           }
         },
         "summary": "Feed",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/literature": {
+      "post": {
+        "description": "Agent de recherche de littérature : cherche sur PubMed (E-utilities NCBI) et\ningère les articles dans le corpus du tenant (Document + Chunk). Embedder/LLM\noptionnels (sans clé : ingestion sans vecteur, requête non élargie).",
+        "operationId": "literature_corpus_literature_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiteratureSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiteratureSearchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Literature",
         "tags": [
           "corpus"
         ]

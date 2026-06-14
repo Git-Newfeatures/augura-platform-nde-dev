@@ -12,7 +12,8 @@ import { useCollection } from '@/workspace/dataClient'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { openSearch } from '@/shell/searchBus'
 import { AddItemModal } from '@/workspace/AddItemModal'
-import { addLocalItem } from '@/workspace/localData'
+import { addLocalItem, DATA_CHANGED_EVENT } from '@/workspace/localData'
+import { apiJson } from '@/api'
 
 const CORPUS_ICON = {
   book:   BookOpen,
@@ -230,23 +231,38 @@ function MatchCard({ s, onOpen }) {
   )
 }
 
-// ── Ad-hoc query (demo) ───────────────────────────────────────────────────────
-const ADHOC_RESULTS = [
-  { score: 0.93, tone: 'g', cite: 'CGM in prediabetes: behavior change cohort', src: 'RWE · 2024',   pill: 'EMA' },
-  { score: 0.89, tone: 'g', cite: 'SaMD guidance · biomarker-driven lifestyle intervention', src: 'Guidance · 2024', pill: 'FDA' },
-  { score: 0.81, tone: 'a', cite: 'Continuous monitoring & HbA1c trajectory: meta-analysis', src: 'Cochrane · 2023', pill: 'Global' },
-  { score: 0.77, tone: 'a', cite: 'Digital coaching adherence & glycemic control', src: 'RWE · 2022', pill: 'MHRA' },
-]
-
+// ── Recherche de littérature PubMed (réelle) ──────────────────────────────────
+// Interroge le backend POST /corpus/literature → PubMed (E-utilities NCBI) → ingestion
+// dans le corpus du tenant (Document + Chunk). Rafraîchit les compteurs de sources.
 function AdHocQuery() {
   const [q, setQ] = useState('')
-  const [ran, setRan] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  async function run() {
+    if (!q.trim() || running) return
+    setRunning(true); setError(null); setResult(null)
+    try {
+      const res = await apiJson('/corpus/literature', {
+        method: 'POST',
+        body: JSON.stringify({ query: q.trim(), max_results: 10 }),
+      })
+      setResult(res)
+      window.dispatchEvent(new Event(DATA_CHANGED_EVENT)) // rafraîchit les cartes sources
+    } catch (e) {
+      setError(e?.message || 'La recherche a échoué.')
+    } finally {
+      setRunning(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-border bg-muted/40 p-4 text-[12px] leading-[1.55] text-muted-foreground">
-        <strong className="text-foreground">Explore the corpus without a study.</strong>{' '}
-        Describe a product or question — the same matching logic that runs inside a study's profiling step runs here, untethered. Demo only.
+        <strong className="text-foreground">Search PubMed and index it.</strong>{' '}
+        Describe an indication, intervention, and outcome — the agent queries PubMed (NCBI
+        E-utilities) and ingests matching articles into your evidence base.
       </div>
 
       <Card className="gap-0 rounded-xl border p-5">
@@ -256,52 +272,59 @@ function AdHocQuery() {
           rows={3}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="e.g. Wearable continuous glucose monitoring for prediabetes prevention; want regulatory precedents and comparable evidence."
+          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') run() }}
+          placeholder="e.g. digital engagement and glycemic control (HbA1c) in type 2 diabetes, randomized trials"
           className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         />
         <div className="mt-3 flex justify-end gap-2">
-          <Button variant="outline" onClick={() => { setQ(''); setRan(false) }}>Clear</Button>
-          <Button onClick={() => setRan(true)}>
-            <SearchIcon className="h-3.5 w-3.5" /> Run query
+          <Button variant="outline" onClick={() => { setQ(''); setResult(null); setError(null) }}>Clear</Button>
+          <Button onClick={run} disabled={running || !q.trim()}>
+            <SearchIcon className="h-3.5 w-3.5" /> {running ? 'Searching PubMed…' : 'Search PubMed'}
           </Button>
         </div>
       </Card>
 
-      {ran && (
+      {error && (
+        <Card className="gap-0 rounded-xl border p-4 text-[12.5px] text-[#C0392B]" style={{ borderLeft: '3px solid #C0392B' }}>
+          {error}
+        </Card>
+      )}
+
+      {result && (
         <Card className="gap-0 rounded-xl border p-5" style={{ borderLeft: '3px solid #047857' }}>
           <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[13.5px] font-semibold text-foreground">
-                {q.trim() || 'Wearable continuous glucose monitoring for prediabetes prevention'}
-              </div>
+              <div className="text-[13.5px] font-semibold text-foreground">{result.query}</div>
               <div className="mt-0.5 text-[12px] text-muted-foreground">
-                98 matches · cardiometabolic · FDA + EMA · last 5 years
+                {result.ingested} indexed · {result.found} found on PubMed
+                {result.embedded ? ' · embedded for semantic search' : ''}
               </div>
             </div>
-            <Badge variant="secondary" className="font-mono text-[11px] text-primary">98 results</Badge>
+            <Badge variant="secondary" className="font-mono text-[11px] text-primary">
+              {result.ingested} new
+            </Badge>
           </div>
-          <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-            {ADHOC_RESULTS.map((m) => {
-              const t = SCORE_TONE[m.tone]
-              return (
-                <div key={m.cite} className="flex items-start gap-2 text-[12px] leading-snug">
-                  <span
-                    className="mt-px flex-shrink-0 rounded px-1.5 py-px font-mono text-[10.5px] font-semibold"
-                    style={{ background: t.bg, color: t.fg }}
-                  >
-                    {Math.round(m.score * 100)}%
-                  </span>
+          {result.documents.length === 0 ? (
+            <div className="border-t border-border pt-3 text-[12px] text-muted-foreground">
+              All matching articles were already in your corpus.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 border-t border-border pt-3">
+              {result.documents.map((d) => (
+                <div key={d.id} className="flex items-start gap-2 text-[12px] leading-snug">
                   <Badge variant="outline" className="mt-px flex-shrink-0 text-[10px] font-normal text-muted-foreground">
-                    {m.pill}
+                    {d.evidence_type || 'study'}
                   </Badge>
                   <span className="min-w-0 text-foreground/85">
-                    {m.cite} <span className="text-muted-foreground">· {m.src}</span>
+                    <a href={d.url} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+                      {d.title}
+                    </a>
+                    {d.age_label ? <span className="text-muted-foreground"> · {d.age_label}</span> : null}
                   </span>
                 </div>
-              )
-            })}
-            <div className="text-[11px] text-muted-foreground/80">+94 more</div>
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
       )}
     </div>
@@ -333,7 +356,7 @@ export function CorpusPage() {
         </div>
       }
     >
-      {loading ? (
+      {loading && sources.length === 0 ? (
         <Loading />
       ) : sources.length === 0 ? (
         <EmptyState

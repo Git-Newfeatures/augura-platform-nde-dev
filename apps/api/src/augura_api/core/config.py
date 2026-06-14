@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # validés à LLM mocké. Modèles par défaut = équivalents courants des choix JS.
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    # PubMed E-utilities (NCBI). Clé optionnelle : relève la limite de débit
+    # (3→10 req/s). La recherche de littérature marche sans clé.
+    ncbi_api_key: str | None = None
     agent_model_dag: str = "claude-sonnet-4-6"
     agent_model_fast: str = "claude-haiku-4-5"
     agent_model_deep: str = "claude-opus-4-8"

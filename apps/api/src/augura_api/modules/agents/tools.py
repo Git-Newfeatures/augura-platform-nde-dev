@@ -1,4 +1,6 @@
-"""Outil forcé + prompts de l'agent DAG (port de lucis-dashboard/api/dag.js)."""
+"""Outils forcés + prompts des agents (ports de lucis-dashboard/api/*.js)."""
+
+from typing import Any
 
 from anthropic.types import ToolParam
 
@@ -201,3 +203,273 @@ def _gap_block(gaps: list[dict[str, object]]) -> str:
     for g in gaps:
         lines.append(f"  - {g.get('name')} | role: {g.get('role')} | severity: {g.get('severity')}")
     return "\n".join(lines) + "\n"
+
+
+# ── gap-detection (port de api/gap-detection.js) ────────────────────────────
+
+GAP_TOOL: ToolParam = {
+    "name": "identify_data_gaps",
+    "description": (
+        "For a given intervention-outcome pair, identify clinically important "
+        "variables the literature expects that are absent from the dataset."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["missing_variables"],
+        "properties": {
+            "missing_variables": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "role", "category", "rationale", "severity"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "column_hint": {"type": "string"},
+                        "role": {
+                            "type": "string",
+                            "enum": [
+                                "unmeasured_confounder",
+                                "unmeasured_mediator",
+                                "effect_modifier",
+                            ],
+                        },
+                        "category": {
+                            "type": "string",
+                            "enum": ["user", "environment", "engagement"],
+                        },
+                        "rationale": {"type": "string"},
+                        "severity": {
+                            "type": "string",
+                            "enum": ["critical", "moderate", "low"],
+                        },
+                    },
+                },
+            }
+        },
+    },
+}
+
+GAP_SYSTEM_PROMPT = (
+    "You are a causal inference expert performing a data gap analysis for a "
+    "real-world evidence study. Given an intervention-outcome pair and the list of "
+    "variables already measured, identify which clinically important variables the "
+    "published literature would expect for this causal question but are ABSENT from "
+    "the dataset. Focus on variables that are well-established confounders, mediators, "
+    "or effect modifiers; not already present; and would materially affect the "
+    "estimate. For digital-health / cardiometabolic RWE always consider: concomitant "
+    "medication changes (statins, metformin, GLP-1, antihypertensives — often critical "
+    "unmeasured confounders); health motivation / self-efficacy (healthy-user bias); "
+    "health literacy; SES / income; concurrent clinical care; acute illness at "
+    "measurement (esp. hs-CRP); disease duration (HbA1c). Only return variables "
+    "structurally absent (not captured by any proxy column). Keep it parsimonious: "
+    "3–6 variables maximum, prioritised by severity."
+)
+
+
+def build_gap_user_message(
+    *,
+    intervention: str,
+    outcome: str,
+    population: str | None,
+    selected_outcome: str | None,
+    measured: list[tuple[str, str | None]],
+) -> str:
+    if measured:
+        measured_list = "\n".join(f"  - {col} (role: {role or '?'})" for col, role in measured)
+    else:
+        measured_list = "  (no confirmed variables from dataset)"
+    return (
+        "Identify data gaps for this causal question:\n\n"
+        f"**Intervention:** {intervention}\n"
+        f"**Outcome:** {outcome}\n"
+        f"**Population:** {population or 'Not specified'}\n"
+        f"**Selected outcome key:** {selected_outcome or 'unspecified'}\n\n"
+        f"**Variables already measured (DO NOT flag these):**\n{measured_list}\n\n"
+        "Return the clinically important variables the literature expects for this "
+        "intervention-outcome pair but absent from the dataset above."
+    )
+
+
+# ── variable-check 1b (port de api/variable-check.js) ───────────────────────
+
+VARIABLE_CHECK_TOOL: ToolParam = {
+    "name": "classify_columns",
+    "description": (
+        "Classify each uploaded column by its causal role and display group in a "
+        "real-world evidence study, and where applicable match it to a canonical outcome."
+    ),
+    "input_schema": {
+        "type": "object",
+        "required": ["columns"],
+        "properties": {
+            "columns": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "sheet",
+                        "column",
+                        "proposed_role",
+                        "proposed_group",
+                        "confidence",
+                        "rationale",
+                    ],
+                    "properties": {
+                        "sheet": {"type": "string"},
+                        "column": {"type": "string"},
+                        "proposed_role": {
+                            "type": "string",
+                            "enum": [
+                                "outcome",
+                                "exposure",
+                                "exposure_component",
+                                "measured_confounder",
+                                "unmeasured_confounder",
+                                "mediator",
+                                "effect_modifier",
+                                "collider",
+                                "id",
+                                "time",
+                                "unused",
+                                "other",
+                            ],
+                        },
+                        "proposed_group": {
+                            "type": "string",
+                            "enum": [
+                                "outcomes",
+                                "exposure",
+                                "engagement",
+                                "user_variables",
+                                "environment",
+                                "mediators",
+                                "identifiers",
+                                "time",
+                                "unused",
+                                "other",
+                            ],
+                        },
+                        "proposed_canonical_id": {"type": ["string", "null"]},
+                        "confidence": {"type": "number"},
+                        "rationale": {"type": "string"},
+                        "alternatives": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            }
+        },
+    },
+}
+
+VARCHECK_SYSTEM_PROMPT = (
+    "You are the Augura variable-classification agent. For each column in an uploaded "
+    "dataset, classify its causal role in a planned real-world evidence study.\n\n"
+    "ROLES (proposed_role): outcome (dependent variable at follow-up); exposure (primary "
+    "intervention/treatment, e.g. composite engagement score); exposure_component "
+    "(sub-signal of a composite exposure — NOT in the adjustment set); measured_confounder "
+    "(causes both exposure and outcome AND present); unmeasured_confounder (clinically "
+    "important but structurally absent — flag for data gap / E-value); mediator (on the "
+    "pathway exposure→outcome, never adjusted for total effect); effect_modifier (modifies "
+    "effect magnitude); collider (caused by ≥2 variables, NEVER adjust for); id; time; "
+    "unused (present but irrelevant); other.\n\n"
+    "DISPLAY GROUPS (proposed_group, independent of role): outcomes; exposure; engagement "
+    "(app usage/adherence/logins/completion — regardless of role); user_variables (age, sex, "
+    "BMI, ethnicity, country, baseline biomarkers, comorbidities, medications, clinical "
+    "scores); environment (geography, SES, healthcare access, HDI, urban/rural, digital "
+    "literacy); mediators; identifiers; time; unused; other.\n\n"
+    "DATA QUALITY SIGNALS — use them: value_kind='string' with n_distinct≈n_non_null → id; "
+    "date/visit/timepoint names → time; binary (n_distinct=2) → flag/binary exposure; high "
+    "null_pct → lower confidence; free text → likely unused.\n\n"
+    "RULES: every input column gets exactly one entry, preserving sheet+column exactly; "
+    "proposed_canonical_id only when role=outcome and a canonical match exists, else null; "
+    "confidence 0.9+ unambiguous, 0.6–0.8 plausible, <0.5 uncertain; cite DQ signals in "
+    "rationale when they affect the classification."
+)
+
+
+def build_varcheck_user_message(*, product_description: str, sheets: list[dict[str, Any]]) -> str:
+    parts = [
+        f"PRODUCT / STUDY CONTEXT:\n{product_description or '(not provided)'}",
+        "\nCOLUMNS TO CLASSIFY:",
+    ]
+    for sheet in sheets:
+        parts.append(f"\nSheet: {sheet['name']}")
+        headers: list[str] = sheet.get("headers", [])
+        sample: list[list[Any]] = sheet.get("sample", [])
+        for stat in sheet.get("column_stats", []):
+            col = stat["column"]
+            kind = stat.get("value_kind", "?")
+            null_pct = stat.get("null_pct")
+            null_str = f"{null_pct * 100:.1f}%" if isinstance(null_pct, (int, float)) else "?"
+            n_distinct = stat.get("n_distinct")
+            distinct = f" | n_distinct: {n_distinct}" if n_distinct is not None else ""
+            rng = ""
+            if kind == "numeric" and stat.get("min") is not None:
+                rng = f" | range: {stat.get('min')}–{stat.get('max')}"
+            sample_vals: list[Any] = []
+            if headers and col in headers:
+                idx = headers.index(col)
+                sample_vals = [r[idx] for r in sample if idx < len(r) and r[idx] not in ("", None)][
+                    :5
+                ]
+            sample_str = f" | sample: {sample_vals}" if sample_vals else ""
+            parts.append(f"  - {col} | kind: {kind} | null%: {null_str}{rng}{distinct}{sample_str}")
+    return "\n".join(parts)
+
+
+DATASET_QUESTIONS_TOOL: ToolParam = {
+    "name": "answer_dataset_questions",
+    "description": "Answer four data-generating-mechanism questions about the uploaded dataset.",
+    "input_schema": {
+        "type": "object",
+        "required": ["questions"],
+        "properties": {
+            "questions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["question_code", "answer", "rationale", "confidence"],
+                    "properties": {
+                        "question_code": {
+                            "type": "string",
+                            "enum": [
+                                "study_type",
+                                "temporal_structure",
+                                "exposure_assignment",
+                                "control_group",
+                            ],
+                        },
+                        "answer": {"type": "string"},
+                        "options": {"type": "array", "items": {"type": "string"}},
+                        "rationale": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "evidence_columns": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            }
+        },
+    },
+}
+
+DATASET_QUESTIONS_SYSTEM_PROMPT = (
+    "You are the Augura dataset-structure agent. Given a product description and an "
+    "uploaded dataset's column inventory with inferred roles, answer four canonical "
+    "data-generating-mechanism questions: study_type (Retrospective | Prospective | "
+    "Prospective observational | Hybrid); temporal_structure (Cross-sectional | "
+    "Longitudinal panel | Repeated cross-section | Event-driven); exposure_assignment "
+    "(Randomised | Quasi-randomised | Self-selected/observational | Administratively "
+    "assigned); control_group (defined unexposed group | low-engagement comparator | "
+    "external comparator | no unexposed group). Use the inventory as evidence (repeated "
+    "timepoint columns ⇒ longitudinal panel; no control/arm/group column ⇒ no unexposed "
+    "control). Cite specific columns in evidence_columns; offer options the user can pick."
+)
+
+
+def build_dataset_questions_user_message(
+    *, product_description: str, matches: list[tuple[str, str, str]]
+) -> str:
+    inventory = "; ".join(f"{sheet}.{col} ({role})" for sheet, col, role in matches)
+    return (
+        f"PRODUCT CONTEXT:\n{product_description or '(not provided)'}\n\n"
+        f"COLUMN INVENTORY ({len(matches)} columns):\n{inventory}\n\n"
+        "Answer all four questions with options the user can choose from if they disagree."
+    )

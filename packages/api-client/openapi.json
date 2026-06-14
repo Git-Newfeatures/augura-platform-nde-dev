@@ -338,6 +338,63 @@
         "title": "ColumnIn",
         "type": "object"
       },
+      "ColumnMatch": {
+        "properties": {
+          "alternatives": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "proposed_canonical_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Canonical Id"
+          },
+          "proposed_group": {
+            "title": "Proposed Group",
+            "type": "string"
+          },
+          "proposed_role": {
+            "title": "Proposed Role",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sheet",
+          "column",
+          "proposed_role",
+          "proposed_group",
+          "confidence",
+          "rationale"
+        ],
+        "title": "ColumnMatch",
+        "type": "object"
+      },
       "ColumnOut": {
         "properties": {
           "confidence": {
@@ -531,6 +588,108 @@
           "user_decision"
         ],
         "title": "ColumnOut",
+        "type": "object"
+      },
+      "ColumnStat": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "n_distinct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Distinct"
+          },
+          "n_non_null": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Non Null"
+          },
+          "n_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Total"
+          },
+          "null_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Null Pct"
+          },
+          "top_values": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Values"
+          },
+          "value_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Kind"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "title": "ColumnStat",
         "type": "object"
       },
       "ColumnsPut": {
@@ -943,6 +1102,56 @@
         "title": "DatasetOut",
         "type": "object"
       },
+      "DatasetQuestion": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "evidence_columns": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Columns",
+            "type": "array"
+          },
+          "options": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "question_code": {
+            "title": "Question Code",
+            "type": "string"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          }
+        },
+        "required": [
+          "question_code",
+          "answer",
+          "confidence"
+        ],
+        "title": "DatasetQuestion",
+        "type": "object"
+      },
       "FeedDocument": {
         "properties": {
           "age_label": {
@@ -1116,6 +1325,70 @@
         "title": "GapPill",
         "type": "object"
       },
+      "GapRequest": {
+        "properties": {
+          "intervention": {
+            "title": "Intervention",
+            "type": "string"
+          },
+          "measured_variables": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MeasuredVariable"
+            },
+            "title": "Measured Variables",
+            "type": "array"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "population": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population"
+          },
+          "selected_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Outcome"
+          }
+        },
+        "required": [
+          "intervention",
+          "outcome"
+        ],
+        "title": "GapRequest",
+        "type": "object"
+      },
+      "GapResponse": {
+        "properties": {
+          "missing_variables": {
+            "items": {
+              "$ref": "#/components/schemas/MissingVariable"
+            },
+            "title": "Missing Variables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "missing_variables"
+        ],
+        "title": "GapResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1127,6 +1400,74 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MeasuredVariable": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "column"
+        ],
+        "title": "MeasuredVariable",
+        "type": "object"
+      },
+      "MissingVariable": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "column_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Hint"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "category",
+          "rationale",
+          "severity"
+        ],
+        "title": "MissingVariable",
         "type": "object"
       },
       "SearchHit": {
@@ -1208,6 +1549,44 @@
           "query_embedding"
         ],
         "title": "SearchRequest",
+        "type": "object"
+      },
+      "Sheet": {
+        "properties": {
+          "column_stats": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ColumnStat"
+            },
+            "title": "Column Stats",
+            "type": "array"
+          },
+          "headers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sample": {
+            "default": [],
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "title": "Sample",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "Sheet",
         "type": "object"
       },
       "SourceCount": {
@@ -1479,6 +1858,79 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VariableCheckRequest": {
+        "properties": {
+          "product_description": {
+            "default": "",
+            "title": "Product Description",
+            "type": "string"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projectid"
+          },
+          "sheets": {
+            "items": {
+              "$ref": "#/components/schemas/Sheet"
+            },
+            "title": "Sheets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sheets"
+        ],
+        "title": "VariableCheckRequest",
+        "type": "object"
+      },
+      "VariableCheckResponse": {
+        "properties": {
+          "clinical_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Domain"
+          },
+          "dataset_questions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DatasetQuestion"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Questions"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnMatch"
+            },
+            "title": "Matches",
+            "type": "array"
+          }
+        },
+        "required": [
+          "matches"
+        ],
+        "title": "VariableCheckResponse",
+        "type": "object"
       }
     }
   },
@@ -1524,6 +1976,88 @@
           }
         },
         "summary": "Dag",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/agents/gaps": {
+      "post": {
+        "operationId": "gaps_agents_gaps_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gaps",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/agents/variable-check": {
+      "post": {
+        "operationId": "variable_check_agents_variable_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariableCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariableCheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Variable Check",
         "tags": [
           "agents"
         ]

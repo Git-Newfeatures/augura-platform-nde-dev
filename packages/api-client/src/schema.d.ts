@@ -21,6 +21,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gaps */
+        post: operations["gaps_agents_gaps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agents/variable-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Variable Check */
+        post: operations["variable_check_agents_variable_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/coverage": {
         parameters: {
             query?: never;
@@ -346,6 +380,28 @@ export interface components {
             /** Value Kind */
             value_kind?: string | null;
         };
+        /** ColumnMatch */
+        ColumnMatch: {
+            /**
+             * Alternatives
+             * @default []
+             */
+            alternatives: string[];
+            /** Column */
+            column: string;
+            /** Confidence */
+            confidence: number;
+            /** Proposed Canonical Id */
+            proposed_canonical_id?: string | null;
+            /** Proposed Group */
+            proposed_group: string;
+            /** Proposed Role */
+            proposed_role: string;
+            /** Rationale */
+            rationale: string;
+            /** Sheet */
+            sheet: string;
+        };
         /** ColumnOut */
         ColumnOut: {
             /** Confidence */
@@ -387,6 +443,27 @@ export interface components {
             top_values?: unknown[] | null;
             /** User Decision */
             user_decision: string;
+            /** Value Kind */
+            value_kind?: string | null;
+        };
+        /** ColumnStat */
+        ColumnStat: {
+            /** Column */
+            column: string;
+            /** Max */
+            max?: number | null;
+            /** Min */
+            min?: number | null;
+            /** N Distinct */
+            n_distinct?: number | null;
+            /** N Non Null */
+            n_non_null?: number | null;
+            /** N Total */
+            n_total?: number | null;
+            /** Null Pct */
+            null_pct?: number | null;
+            /** Top Values */
+            top_values?: unknown[] | null;
             /** Value Kind */
             value_kind?: string | null;
         };
@@ -526,6 +603,27 @@ export interface components {
             /** Study Id */
             study_id?: string | null;
         };
+        /** DatasetQuestion */
+        DatasetQuestion: {
+            /** Answer */
+            answer: string;
+            /** Confidence */
+            confidence: number;
+            /**
+             * Evidence Columns
+             * @default []
+             */
+            evidence_columns: string[];
+            /**
+             * Options
+             * @default []
+             */
+            options: string[];
+            /** Question Code */
+            question_code: string;
+            /** Rationale */
+            rationale?: string | null;
+        };
         /** FeedDocument */
         FeedDocument: {
             /** Age Label */
@@ -581,10 +679,53 @@ export interface components {
             /** Jurisdiction */
             jurisdiction: string;
         };
+        /** GapRequest */
+        GapRequest: {
+            /** Intervention */
+            intervention: string;
+            /**
+             * Measured Variables
+             * @default []
+             */
+            measured_variables: components["schemas"]["MeasuredVariable"][];
+            /** Outcome */
+            outcome: string;
+            /** Population */
+            population?: string | null;
+            /** Selected Outcome */
+            selected_outcome?: string | null;
+        };
+        /** GapResponse */
+        GapResponse: {
+            /** Missing Variables */
+            missing_variables: components["schemas"]["MissingVariable"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** MeasuredVariable */
+        MeasuredVariable: {
+            /** Column */
+            column: string;
+            /** Role */
+            role?: string | null;
+        };
+        /** MissingVariable */
+        MissingVariable: {
+            /** Category */
+            category: string;
+            /** Column Hint */
+            column_hint?: string | null;
+            /** Name */
+            name: string;
+            /** Rationale */
+            rationale: string;
+            /** Role */
+            role: string;
+            /** Severity */
+            severity: string;
         };
         /** SearchHit */
         SearchHit: {
@@ -623,6 +764,26 @@ export interface components {
             match_count: number;
             /** Query Embedding */
             query_embedding: number[];
+        };
+        /** Sheet */
+        Sheet: {
+            /**
+             * Column Stats
+             * @default []
+             */
+            column_stats: components["schemas"]["ColumnStat"][];
+            /**
+             * Headers
+             * @default []
+             */
+            headers: string[];
+            /** Name */
+            name: string;
+            /**
+             * Sample
+             * @default []
+             */
+            sample: unknown[][];
         };
         /** SourceCount */
         SourceCount: {
@@ -716,6 +877,27 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VariableCheckRequest */
+        VariableCheckRequest: {
+            /**
+             * Product Description
+             * @default
+             */
+            product_description: string;
+            /** Projectid */
+            projectId?: string | null;
+            /** Sheets */
+            sheets: components["schemas"]["Sheet"][];
+        };
+        /** VariableCheckResponse */
+        VariableCheckResponse: {
+            /** Clinical Domain */
+            clinical_domain?: string | null;
+            /** Dataset Questions */
+            dataset_questions?: components["schemas"]["DatasetQuestion"][] | null;
+            /** Matches */
+            matches: components["schemas"]["ColumnMatch"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -745,6 +927,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DagResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gaps_agents_gaps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GapRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    variable_check_agents_variable_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VariableCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableCheckResponse"];
                 };
             };
             /** @description Validation Error */

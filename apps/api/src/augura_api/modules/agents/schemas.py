@@ -40,3 +40,96 @@ class DagResponse(BaseModel):
     adjustment_set: list[str]
     collider_ids: list[str] = []
     rationale: str
+
+
+# ── gap-detection ──────────────────────────────────────────────────────────
+
+
+class MeasuredVariable(BaseModel):
+    column: str
+    role: str | None = None
+
+
+class GapRequest(BaseModel):
+    intervention: str
+    outcome: str
+    population: str | None = None
+    selected_outcome: str | None = None
+    measured_variables: list[MeasuredVariable] = []
+
+
+class MissingVariable(BaseModel):
+    name: str
+    column_hint: str | None = None
+    role: str
+    category: str
+    rationale: str
+    severity: str
+
+
+class GapResponse(BaseModel):
+    missing_variables: list[MissingVariable]
+
+
+# ── variable-check (1b) ────────────────────────────────────────────────────
+
+
+class ColumnStat(BaseModel):
+    column: str
+    n_total: int | None = None
+    n_non_null: int | None = None
+    null_pct: float | None = None
+    value_kind: str | None = None
+    n_distinct: int | None = None
+    min: float | None = None
+    max: float | None = None
+    top_values: list[Any] | None = None
+
+
+class Sheet(BaseModel):
+    name: str
+    headers: list[str] = []
+    sample: list[list[Any]] = []
+    column_stats: list[ColumnStat] = []
+
+
+class VariableCheckRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    project_id: str | None = Field(default=None, validation_alias="projectId")
+    product_description: str = ""
+    sheets: list[Sheet]
+
+
+class ColumnMatch(BaseModel):
+    sheet: str
+    column: str
+    proposed_role: str
+    proposed_group: str
+    proposed_canonical_id: str | None = None
+    confidence: float
+    rationale: str
+    alternatives: list[str] = []
+
+
+class ClassifyColumnsResponse(BaseModel):
+    columns: list[ColumnMatch]
+
+
+class DatasetQuestion(BaseModel):
+    question_code: str
+    answer: str
+    options: list[str] = []
+    rationale: str | None = None
+    confidence: float
+    evidence_columns: list[str] = []
+
+
+class DatasetQuestionsResponse(BaseModel):
+    questions: list[DatasetQuestion]
+
+
+class VariableCheckResponse(BaseModel):
+    clinical_domain: str | None = None
+    matches: list[ColumnMatch]
+    dataset_questions: list[DatasetQuestion] | None = None

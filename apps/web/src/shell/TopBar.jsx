@@ -1,28 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
-import { useMockMode } from '@/mocks/mockMode'
 import { supabase } from '@/supabase'
 import AuguraAdminDashboard from '@/AuguraAdminDashboard'
 
-const DEMO_NOTIFS = [
-  { title: 'Triage 2 soft flags on the Lucis cohort', sub: 'Step 5 · Verification gate', to: '/studies/lucis' },
-  { title: 'Resolve 2 unmeasured confounders in the DAG', sub: 'Step 4 · Causal model', to: '/studies/lucis' },
-  { title: 'Bloomlife profiling run in progress', sub: 'Step 2 · Profiling', to: '/studies/bloomlife' },
-]
-
 // Evidence Workspace top bar: brand cluster + center ⌘K search pill + right cluster
-// (Demo-data switch, bell, user pill). Full-bleed sticky frosted 58px header.
+// (bell, user pill). Full-bleed sticky frosted 58px header.
 export function TopBar({ email = '', onSearch }) {
   const navigate = useNavigate()
   const initial = email ? email[0].toUpperCase() : '·'
   const name = email ? email.split('@')[0] : 'Account'
-  const [mockOn, toggleMock] = useMockMode()
   const [showAdmin, setShowAdmin] = useState(false)
   const [menu, setMenu] = useState(null) // null | 'bell' | 'account'
   const isAdmin = email.endsWith('@augura.health')
-  const notifs = mockOn ? DEMO_NOTIFS : []
+  const notifs = []
 
   function signOut() {
     setMenu(null)
@@ -35,10 +26,9 @@ export function TopBar({ email = '', onSearch }) {
   return (
     <>
     <header className="sticky top-0 z-40 flex h-[58px] items-center gap-3 border-b border-[rgba(0,0,0,0.07)] bg-[rgba(246,244,241,0.85)] px-4 backdrop-blur-[10px] md:gap-[18px] md:px-[22px]">
-      {/* Brand — wordmark hides <sm, module tag hides <lg to free width */}
+      {/* Brand — wordmark always visible, module tag hides <lg to free width */}
       <button onClick={() => navigate('/studies')} className="flex shrink-0 cursor-pointer items-center gap-2.5">
-        <img src="/augura-A-disc-emerald.png" alt="" className="h-[26px] w-[26px] rounded-md" />
-        <img src="/augura-wordmark-emerald.svg" alt="Augura" className="hidden h-[17px] sm:block" />
+        <img src="/augura-wordmark-emerald.svg" alt="Augura" className="h-[17px]" />
         <span className="mx-0.5 hidden h-[18px] w-px bg-[rgba(0,0,0,0.10)] lg:inline-block" />
         <span className="hidden font-mono text-[10.5px] uppercase tracking-[.1em] text-[rgba(0,0,0,0.40)] lg:inline">Module 1 · EGDI</span>
       </button>
@@ -65,10 +55,6 @@ export function TopBar({ email = '', onSearch }) {
         >
           <Search className="h-[17px] w-[17px]" />
         </button>
-        <label title="On = demo data (no login) · Off = real data (login required)" className="hidden cursor-pointer items-center gap-2 text-[11px] text-[rgba(0,0,0,0.40)] sm:flex">
-          <Switch checked={mockOn} onCheckedChange={toggleMock} aria-label="Toggle demo data" />
-          <span className="hidden md:inline">Demo data</span>
-        </label>
         {isAdmin && (
           <button
             onClick={() => setShowAdmin(true)}

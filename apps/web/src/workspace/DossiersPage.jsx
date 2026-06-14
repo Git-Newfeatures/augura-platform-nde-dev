@@ -29,7 +29,7 @@ export function DossiersPage() {
         <EmptyState
           icon={FileText}
           title="No dossiers yet"
-          subtitle="Add a dossier, or switch on Demo data to explore samples."
+          subtitle="Generate a dossier from one of your studies to get started."
           cta={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> Add dossier</Button>}
         />
       ) : (

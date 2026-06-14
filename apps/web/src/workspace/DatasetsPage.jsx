@@ -405,7 +405,7 @@ export function DatasetsPage() {
         <EmptyState
           icon={Database}
           title="No datasets yet"
-          subtitle="Add a dataset, or switch on Demo data to explore a sample library."
+          subtitle="Add a dataset to start building your cohort library."
           cta={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> Add dataset</Button>}
         />
       ) : (

@@ -261,7 +261,7 @@ export function VariablesPage() {
           <EmptyState
             icon={Variable}
             title="No variables yet"
-            subtitle="Add a variable, or switch on Demo data to explore a sample registry."
+            subtitle="Add a variable to start building your registry."
             cta={
               <Button onClick={() => setAdding(true)}>
                 <Plus className="h-3.5 w-3.5" /> Add variable

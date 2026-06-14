@@ -46,7 +46,6 @@ export default function AuguraLogin() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <div className="flex h-12 flex-shrink-0 items-center gap-2.5 border-b border-border px-5">
-        <img src="/augura-A-disc-emerald.png" alt="" className="h-[22px] w-[22px] rounded-md" />
         <img src="/augura-wordmark-emerald.svg" alt="Augura" className="h-[15px]" />
       </div>
 
@@ -56,19 +55,14 @@ export default function AuguraLogin() {
             mounted ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
           }`}
         >
-          <Card className="mb-3 flex-row items-start gap-3 rounded-lg border-border p-[14px_16px]">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-primary text-sm font-medium text-white">
-              A
+          <Card className="mb-3 rounded-lg border-border p-[14px_16px]">
+            <div className="mb-[3px] flex items-center gap-2 text-[13px] font-medium text-foreground">
+              Augura
+              <span className="rounded-[3px] border border-primary/30 bg-secondary px-1.5 py-px font-mono text-[9px] tracking-[0.06em] text-primary">
+                SECURE
+              </span>
             </div>
-            <div className="flex-1">
-              <div className="mb-[3px] flex items-center gap-2 text-[13px] font-medium text-foreground">
-                Augura
-                <span className="rounded-[3px] border border-primary/30 bg-secondary px-1.5 py-px font-mono text-[9px] tracking-[0.06em] text-primary">
-                  SECURE
-                </span>
-              </div>
-              <div className="text-[11px] text-muted-foreground">Clinical Evidence Intelligence</div>
-            </div>
+            <div className="text-[11px] text-muted-foreground">Clinical Evidence Intelligence</div>
           </Card>
 
           <Card className="gap-0 rounded-lg border-border p-6">

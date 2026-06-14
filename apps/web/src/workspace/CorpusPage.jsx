@@ -339,7 +339,7 @@ export function CorpusPage() {
         <EmptyState
           icon={Library}
           title="No corpus indexed yet"
-          subtitle="Add an evidence source (PubMed, ClinicalTrials.gov, MAUDE, FDA guidance) — or switch on Demo data to explore a sample corpus."
+          subtitle="Add an evidence source (PubMed, ClinicalTrials.gov, MAUDE, FDA guidance) to index your corpus."
           cta={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> Add source</Button>}
         />
       ) : (

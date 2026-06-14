@@ -256,8 +256,7 @@ export function HomePage() {
               Welcome
             </h1>
             <p className="mt-1.5 text-[15px] text-muted-foreground">
-              No studies yet — create your first study, or switch on{' '}
-              <span className="font-medium text-foreground">Demo data</span> to explore a sample workspace.
+              No studies yet — create your first study to get started.
             </p>
           </div>
           <Button onClick={() => navigate('/studies/new')}>

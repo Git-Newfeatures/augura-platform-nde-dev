@@ -29,7 +29,7 @@ export function RunsPage() {
         <EmptyState
           icon={Settings2}
           title="No runs yet"
-          subtitle="Add a run, or switch on Demo data to explore samples."
+          subtitle="Simulation and profiling runs from your studies will appear here."
           cta={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> New run</Button>}
         />
       ) : (

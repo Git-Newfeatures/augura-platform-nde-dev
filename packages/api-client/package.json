@@ -1,0 +1,19 @@
+{
+  "name": "@augura/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client TypeScript généré depuis l'OpenAPI d'Augura — ne jamais éditer schema.d.ts à la main.",
+  "main": "src/client.ts",
+  "types": "src/client.ts",
+  "scripts": {
+    "generate": "openapi-typescript ./openapi.json -o ./src/schema.d.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.5"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.6.1",
+    "typescript": "^5.7.2"
+  }
+}

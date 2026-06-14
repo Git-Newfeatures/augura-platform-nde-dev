@@ -99,3 +99,32 @@ jobs:
             end if;
           end $$;
           SQL
+
+  client-drift:
+    # Le client TS commité doit correspondre au contrat OpenAPI du backend.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: uv sync --dev
+        working-directory: apps/api
+      - run: npm install --no-audit --no-fund
+        working-directory: packages/api-client
+      - name: Régénérer le contrat + le client
+        env:
+          AUGURA_ENV: dev
+        run: |
+          set -euo pipefail
+          uv run --directory apps/api python scripts/dump_openapi.py \
+            > packages/api-client/openapi.json
+          ( cd packages/api-client && npm run generate )
+      - name: Vérifier l'absence de drift
+        run: git diff --exit-code packages/api-client/openapi.json packages/api-client/src/schema.d.ts
+      - name: Typecheck du client
+        run: npx tsc --noEmit
+        working-directory: packages/api-client

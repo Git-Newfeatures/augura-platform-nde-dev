@@ -5,17 +5,25 @@ import httpx
 from augura_api.main import create_app
 
 
-def test_openapi_exposes_studies_routes() -> None:
+def test_openapi_exposes_routes() -> None:
     paths = create_app().openapi()["paths"]
-    assert "/studies" in paths
-    assert "/studies/{study_id}" in paths
-    assert "/studies/{study_id}/state" in paths
+    for path in (
+        "/studies",
+        "/studies/{study_id}",
+        "/studies/{study_id}/state",
+        "/corpus/feed",
+        "/corpus/coverage",
+        "/corpus/sources",
+        "/corpus/search",
+    ):
+        assert path in paths, path
 
 
-async def test_studies_requires_auth() -> None:
+async def test_protected_routes_require_auth() -> None:
     transport = httpx.ASGITransport(app=create_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        r = await client.get("/studies")
-    assert r.status_code == 401
-    assert r.headers["content-type"] == "application/problem+json"
-    assert r.json()["code"] == "unauthorized"
+        for path in ("/studies", "/corpus/feed", "/corpus/coverage", "/corpus/sources"):
+            r = await client.get(path)
+            assert r.status_code == 401, path
+            assert r.headers["content-type"] == "application/problem+json"
+            assert r.json()["code"] == "unauthorized"

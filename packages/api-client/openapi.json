@@ -1,6 +1,269 @@
 {
   "components": {
     "schemas": {
+      "CoverageCell": {
+        "properties": {
+          "doc_count": {
+            "title": "Doc Count",
+            "type": "integer"
+          },
+          "evidence_type": {
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "gap_score": {
+            "title": "Gap Score",
+            "type": "number"
+          },
+          "gap_severity": {
+            "title": "Gap Severity",
+            "type": "string"
+          },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jurisdiction",
+          "evidence_type",
+          "doc_count",
+          "gap_score",
+          "gap_severity"
+        ],
+        "title": "CoverageCell",
+        "type": "object"
+      },
+      "CoverageMeta": {
+        "properties": {
+          "evidence_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Types",
+            "type": "array"
+          },
+          "jurisdictions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Jurisdictions",
+            "type": "array"
+          },
+          "total_docs": {
+            "title": "Total Docs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_docs",
+          "jurisdictions",
+          "evidence_types"
+        ],
+        "title": "CoverageMeta",
+        "type": "object"
+      },
+      "CoverageResponse": {
+        "properties": {
+          "gap_pills": {
+            "items": {
+              "$ref": "#/components/schemas/GapPill"
+            },
+            "title": "Gap Pills",
+            "type": "array"
+          },
+          "matrix": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageCell"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CoverageMeta"
+          }
+        },
+        "required": [
+          "meta",
+          "matrix",
+          "gap_pills"
+        ],
+        "title": "CoverageResponse",
+        "type": "object"
+      },
+      "FeedDocument": {
+        "properties": {
+          "age_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Label"
+          },
+          "evidence_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Type"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_new": {
+            "default": false,
+            "title": "Is New",
+            "type": "boolean"
+          },
+          "jurisdiction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jurisdiction"
+          },
+          "lifecycle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifecycle"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "source_id",
+          "title"
+        ],
+        "title": "FeedDocument",
+        "type": "object"
+      },
+      "FeedMeta": {
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "FeedMeta",
+        "type": "object"
+      },
+      "FeedResponse": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/FeedDocument"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/FeedMeta"
+          }
+        },
+        "required": [
+          "meta",
+          "documents"
+        ],
+        "title": "FeedResponse",
+        "type": "object"
+      },
+      "GapPill": {
+        "properties": {
+          "doc_count": {
+            "title": "Doc Count",
+            "type": "integer"
+          },
+          "evidence_type": {
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "gap_score": {
+            "title": "Gap Score",
+            "type": "number"
+          },
+          "gap_severity": {
+            "title": "Gap Severity",
+            "type": "string"
+          },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jurisdiction",
+          "evidence_type",
+          "gap_severity",
+          "gap_score",
+          "doc_count"
+        ],
+        "title": "GapPill",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -12,6 +275,126 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "SearchHit": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "similarity": {
+            "title": "Similarity",
+            "type": "number"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id",
+          "document_id",
+          "content",
+          "similarity"
+        ],
+        "title": "SearchHit",
+        "type": "object"
+      },
+      "SearchRequest": {
+        "properties": {
+          "filter": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Filter",
+            "type": "object"
+          },
+          "match_count": {
+            "default": 20,
+            "title": "Match Count",
+            "type": "integer"
+          },
+          "query_embedding": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Query Embedding",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query_embedding"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      },
+      "SourceCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "count"
+        ],
+        "title": "SourceCount",
+        "type": "object"
+      },
+      "SourcesResponse": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceCount"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "sources"
+        ],
+        "title": "SourcesResponse",
         "type": "object"
       },
       "StudyCreate": {
@@ -253,6 +636,210 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/corpus/coverage": {
+      "get": {
+        "operationId": "coverage_corpus_coverage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Coverage",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/feed": {
+      "get": {
+        "operationId": "feed_corpus_feed_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "jurisdiction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jurisdiction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "evidence_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Evidence Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lifecycle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lifecycle"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Feed",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/search": {
+      "post": {
+        "operationId": "search_corpus_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SearchHit"
+                  },
+                  "title": "Response Search Corpus Search Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/sources": {
+      "get": {
+        "operationId": "sources_corpus_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sources",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "healthz_healthz_get",

@@ -57,6 +57,11 @@ type = "forbidden"
 source_modules = ["augura_api.core"]
 forbidden_modules = ["augura_api.modules", "augura_api.jobs"]
 
+[[tool.importlinter.contracts]]
+name = "les modules ne s'importent pas entre eux"
+type = "independence"
+modules = ["augura_api.modules.studies", "augura_api.modules.corpus"]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",

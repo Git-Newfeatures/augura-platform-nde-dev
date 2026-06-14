@@ -23,6 +23,12 @@ class NotFoundError(AppError):
     title = "Resource not found"
 
 
+class BadRequestError(AppError):
+    code = "bad_request"
+    http_status = 400
+    title = "Bad request"
+
+
 class UnauthorizedError(AppError):
     code = "unauthorized"
     http_status = 401

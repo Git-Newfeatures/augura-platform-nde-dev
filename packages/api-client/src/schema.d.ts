@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/corpus/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coverage */
+        get: operations["coverage_corpus_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Feed */
+        get: operations["feed_corpus_feed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search */
+        post: operations["search_corpus_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sources */
+        get: operations["sources_corpus_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -78,10 +146,147 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CoverageCell */
+        CoverageCell: {
+            /** Doc Count */
+            doc_count: number;
+            /** Evidence Type */
+            evidence_type: string;
+            /** Gap Score */
+            gap_score: number;
+            /** Gap Severity */
+            gap_severity: string;
+            /** Jurisdiction */
+            jurisdiction: string;
+        };
+        /** CoverageMeta */
+        CoverageMeta: {
+            /** Evidence Types */
+            evidence_types: string[];
+            /** Jurisdictions */
+            jurisdictions: string[];
+            /** Total Docs */
+            total_docs: number;
+        };
+        /** CoverageResponse */
+        CoverageResponse: {
+            /** Gap Pills */
+            gap_pills: components["schemas"]["GapPill"][];
+            /** Matrix */
+            matrix: components["schemas"]["CoverageCell"][];
+            meta: components["schemas"]["CoverageMeta"];
+        };
+        /** FeedDocument */
+        FeedDocument: {
+            /** Age Label */
+            age_label?: string | null;
+            /** Evidence Type */
+            evidence_type?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Is New
+             * @default false
+             */
+            is_new: boolean;
+            /** Jurisdiction */
+            jurisdiction?: string | null;
+            /** Lifecycle */
+            lifecycle?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            /** Source Id */
+            source_id: string;
+            /** Summary */
+            summary?: string | null;
+            /** Title */
+            title: string;
+            /** Url */
+            url?: string | null;
+        };
+        /** FeedMeta */
+        FeedMeta: {
+            /** Total */
+            total: number;
+        };
+        /** FeedResponse */
+        FeedResponse: {
+            /** Documents */
+            documents: components["schemas"]["FeedDocument"][];
+            meta: components["schemas"]["FeedMeta"];
+        };
+        /** GapPill */
+        GapPill: {
+            /** Doc Count */
+            doc_count: number;
+            /** Evidence Type */
+            evidence_type: string;
+            /** Gap Score */
+            gap_score: number;
+            /** Gap Severity */
+            gap_severity: string;
+            /** Jurisdiction */
+            jurisdiction: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** SearchHit */
+        SearchHit: {
+            /** Content */
+            content: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Similarity */
+            similarity: number;
+            /** Source Id */
+            source_id?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** SearchRequest */
+        SearchRequest: {
+            /**
+             * Filter
+             * @default {}
+             */
+            filter: {
+                [key: string]: string;
+            };
+            /**
+             * Match Count
+             * @default 20
+             */
+            match_count: number;
+            /** Query Embedding */
+            query_embedding: number[];
+        };
+        /** SourceCount */
+        SourceCount: {
+            /** Count */
+            count: number;
+            /** Source Id */
+            source_id: string;
+        };
+        /** SourcesResponse */
+        SourcesResponse: {
+            /** Sources */
+            sources: components["schemas"]["SourceCount"][];
+            /** Total */
+            total: number;
         };
         /** StudyCreate */
         StudyCreate: {
@@ -170,6 +375,115 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    coverage_corpus_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageResponse"];
+                };
+            };
+        };
+    };
+    feed_corpus_feed_get: {
+        parameters: {
+            query?: {
+                jurisdiction?: string | null;
+                evidence_type?: string | null;
+                source_id?: string | null;
+                lifecycle?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_corpus_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchHit"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sources_corpus_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourcesResponse"];
+                };
+            };
+        };
+    };
     healthz_healthz_get: {
         parameters: {
             query?: never;

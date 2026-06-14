@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Integer, Numeric, Text, text
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -61,6 +61,29 @@ class AgentRun(Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     cost_usd: Mapped[float | None] = mapped_column(Numeric)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class Artifact(Base):
+    """Artefact versionné & hashé — colonne vertébrale reproductibilité (spec §2)."""
+
+    __tablename__ = "artifacts"
+
+    id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    org_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True))
+    study_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True))
+    kind: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    sha256: Mapped[str] = mapped_column(Text)
+    content: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    storage_ref: Mapped[str | None] = mapped_column(Text)
+    provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    locked: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    created_by: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

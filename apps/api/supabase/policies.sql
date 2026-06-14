@@ -79,7 +79,8 @@ declare
 begin
     foreach t in array array[
         'studies', 'datasets', 'cohort_members', 'cohort_biomarkers',
-        'agent_runs', 'simulation_runs', 'simulation_results', 'jobs', 'generated_documents'
+        'agent_runs', 'simulation_runs', 'simulation_results', 'jobs',
+        'generated_documents', 'artifacts'
     ]
     loop
         execute format('alter table %I enable row level security;', t);

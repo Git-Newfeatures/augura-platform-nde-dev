@@ -329,4 +329,27 @@ create table if not exists outbox_events (
 create index if not exists ix_outbox_unprocessed
     on outbox_events(created_at) where processed_at is null;
 
+-- Artefacts versionnés & hashés — colonne vertébrale reproductibilité (spec §2).
+-- Tout objet reproductible (snapshot dataset, rapport QC, mapping, DAG, SAP, run)
+-- y est stocké : contenu canonique + SHA-256 + provenance + lock de pré-spécification.
+create table if not exists artifacts (
+    id          uuid primary key default gen_random_uuid(),
+    org_id      uuid not null references orgs(id) on delete cascade,
+    study_id    uuid references studies(id) on delete set null,
+    kind        text not null
+                check (kind in ('dataset_snapshot', 'qc_report', 'mapping', 'dag',
+                                'sap', 'run_manifest')),
+    version     integer not null default 0,        -- v0 = machine-proposé, v1 = humain-approuvé…
+    sha256      text not null,                     -- hash du contenu canonique
+    content     jsonb,                             -- corps inline (edge list, SAP, manifest…)
+    storage_ref text,                              -- ou pointeur Storage si volumineux
+    provenance  jsonb not null default '{}'::jsonb, -- {source, prompt_hash, model_id, parent_version, diff…}
+    locked      boolean not null default false,    -- artefact figé (DAG/SAP approuvé)
+    created_by  uuid,
+    created_at  timestamptz not null default now(),
+    unique (study_id, kind, version)
+);
+create index if not exists ix_artifacts_org on artifacts(org_id);
+create index if not exists ix_artifacts_study_kind on artifacts(study_id, kind);
+
 commit;

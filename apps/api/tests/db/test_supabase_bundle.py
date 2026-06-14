@@ -29,6 +29,7 @@ EXPECTED_TABLES = {
     "generated_documents",
     "usage_events",
     "outbox_events",
+    "artifacts",
 }
 
 # Tables tenant-scopées qui DOIVENT porter une policy RLS.
@@ -50,6 +51,7 @@ RLS_REQUIRED = {
     "jobs",
     "generated_documents",
     "usage_events",
+    "artifacts",
 }
 
 LUCIS_ORG_ID = "33cb3ba0-00fe-420b-a8c7-70736aaacc44"

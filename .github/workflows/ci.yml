@@ -46,18 +46,23 @@ jobs:
       PGHOST: localhost
       PGUSER: postgres
       PGDATABASE: augura
+      AUGURA_ENV: dev
+      AUGURA_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/augura
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Apply bundle (schema → functions → seed → policies)
-        working-directory: apps/api/supabase
-        run: |
-          set -euo pipefail
-          psql -v ON_ERROR_STOP=1 -f schema.sql
-          psql -v ON_ERROR_STOP=1 -f functions.sql
-          psql -v ON_ERROR_STOP=1 -f seed.sql
-          psql -v ON_ERROR_STOP=1 -f policies.sql
+      - name: Migrate (schéma trigger par le backend — alembic upgrade head)
+        run: uv run alembic upgrade head
+      - name: Seed (donnée, hors migration)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/seed.sql
       - name: Smoke — seed counts
         run: |
           set -euo pipefail

@@ -22,6 +22,7 @@ returns table (
 )
 language sql
 stable
+set search_path = public, pg_temp
 as $$
     select
         c.id,
@@ -46,7 +47,7 @@ $$;
 -- Matrice de couverture (jurisdiction × evidence_type → doc_count).
 -- Les cellules à zéro sont complétées côté service (corpus). gap_score/severity
 -- sont dérivés dans le service à partir de doc_count.
-create or replace view v_coverage_map as
+create or replace view v_coverage_map with (security_invoker = on) as
     select
         coalesce(jurisdiction, 'unknown') as jurisdiction,
         coalesce(evidence_type, 'other')  as evidence_type,

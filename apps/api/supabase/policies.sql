@@ -6,8 +6,9 @@
 -- et se connecte avec un rôle Postgres NON exempt de RLS (pas service_role).
 -- Les policies lisent current_setting('app.tenant_id').
 --
--- Tables d'infrastructure NON tenant-scopées (pas de RLS) : agent_cache (cache
--- déterministe partagé, clé = hash d'entrée), outbox_events (audit système).
+-- Tables d'infrastructure NON tenant-scopées : agent_cache (cache déterministe
+-- partagé) et outbox_events (audit système) — RLS activée avec un gate « session
+-- backend » (refus PostgREST anon, accès backend) au lieu d'un scoping tenant.
 
 begin;
 
@@ -130,6 +131,31 @@ create policy tenant_or_system on usage_events
         org_id is null
         or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     )
-    with check (true);
+    with check (
+        org_id is null
+        or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+    );
+
+-- ── Tables infra (non tenant) : RLS « gate session backend » ─────────────
+-- agent_cache (cache déterministe partagé) et outbox_events (audit système) ne
+-- sont pas scopés tenant, mais ne doivent JAMAIS être atteignables via PostgREST
+-- (anon/authenticated, sans app.tenant_id). RLS activée + gate sur la présence
+-- du contexte backend : anon refusé, backend (contexte posé) autorisé.
+do $$
+declare
+    t text;
+begin
+    foreach t in array array['agent_cache', 'outbox_events']
+    loop
+        execute format('alter table %I enable row level security;', t);
+        execute format('alter table %I force row level security;', t);
+        execute format($f$
+            create policy backend_session on %I
+            using (nullif(current_setting('app.tenant_id', true), '') is not null)
+            with check (nullif(current_setting('app.tenant_id', true), '') is not null);
+        $f$, t);
+    end loop;
+end
+$$;
 
 commit;

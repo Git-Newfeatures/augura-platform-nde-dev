@@ -46,14 +46,24 @@ grant augura_app to augura_api;
 -- lire/écrire les tables directement. On retire les privilèges par défaut puis on
 -- re-grante l'unique écriture directe légitime : l'INSERT des events de login par
 -- le front (App.jsx) en rôle authenticated.
-revoke all on all tables in schema public from anon;
-revoke insert, update, delete, truncate, references, trigger
-    on all tables in schema public from authenticated;
-alter default privileges in schema public revoke all on tables from anon;
-alter default privileges in schema public
-    revoke insert, update, delete, truncate, references, trigger on tables from authenticated;
-grant insert on usage_events to authenticated;
-revoke all on v_coverage_map from anon;
+-- Gardé par existence : anon/authenticated sont propres à Supabase ; sur un Postgres
+-- nu (CI pgvector, alembic upgrade head) ces rôles n'existent pas → no-op.
+do $$
+begin
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+        revoke all on all tables in schema public from anon;
+        alter default privileges in schema public revoke all on tables from anon;
+        revoke all on v_coverage_map from anon;
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+        revoke insert, update, delete, truncate, references, trigger
+            on all tables in schema public from authenticated;
+        alter default privileges in schema public
+            revoke insert, update, delete, truncate, references, trigger on tables from authenticated;
+        grant insert on usage_events to authenticated;
+    end if;
+end
+$$;
 -- NOTE: authenticated conserve SELECT pour l'instant — quelques vues cockpit lisent
 -- encore via PostgREST direct (migration backend = P7). À révoquer une fois ces vues
 -- branchées sur le backend, pour que TOUT l'accès données passe par augura_app.

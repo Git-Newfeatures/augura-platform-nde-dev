@@ -1152,6 +1152,54 @@
         "title": "DatasetQuestion",
         "type": "object"
       },
+      "EstimatorPowerOut": {
+        "properties": {
+          "bias": {
+            "title": "Bias",
+            "type": "number"
+          },
+          "ci_lower": {
+            "title": "Ci Lower",
+            "type": "number"
+          },
+          "ci_upper": {
+            "title": "Ci Upper",
+            "type": "number"
+          },
+          "effect": {
+            "title": "Effect",
+            "type": "number"
+          },
+          "estimator": {
+            "title": "Estimator",
+            "type": "string"
+          },
+          "mse": {
+            "title": "Mse",
+            "type": "number"
+          },
+          "power": {
+            "title": "Power",
+            "type": "number"
+          },
+          "variance": {
+            "title": "Variance",
+            "type": "number"
+          }
+        },
+        "required": [
+          "estimator",
+          "power",
+          "bias",
+          "variance",
+          "mse",
+          "effect",
+          "ci_lower",
+          "ci_upper"
+        ],
+        "title": "EstimatorPowerOut",
+        "type": "object"
+      },
       "FeedDocument": {
         "properties": {
           "age_label": {
@@ -1402,6 +1450,57 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "JobOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "result_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Ref"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "progress"
+        ],
+        "title": "JobOut",
+        "type": "object"
+      },
       "MeasuredVariable": {
         "properties": {
           "column": {
@@ -1468,6 +1567,110 @@
           "severity"
         ],
         "title": "MissingVariable",
+        "type": "object"
+      },
+      "PowerRequest": {
+        "properties": {
+          "dropout": {
+            "default": 0.2,
+            "title": "Dropout",
+            "type": "number"
+          },
+          "effect": {
+            "default": 0.3,
+            "title": "Effect",
+            "type": "number"
+          },
+          "estimators": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimators"
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "sigma": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma"
+          }
+        },
+        "title": "PowerRequest",
+        "type": "object"
+      },
+      "PowerResponse": {
+        "properties": {
+          "dropout": {
+            "title": "Dropout",
+            "type": "number"
+          },
+          "effect": {
+            "title": "Effect",
+            "type": "number"
+          },
+          "estimators": {
+            "items": {
+              "$ref": "#/components/schemas/EstimatorPowerOut"
+            },
+            "title": "Estimators",
+            "type": "array"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "power_threshold": {
+            "title": "Power Threshold",
+            "type": "number"
+          },
+          "sigma": {
+            "title": "Sigma",
+            "type": "number"
+          }
+        },
+        "required": [
+          "n",
+          "dropout",
+          "effect",
+          "sigma",
+          "power_threshold",
+          "estimators"
+        ],
+        "title": "PowerResponse",
         "type": "object"
       },
       "ProfilingRequest": {
@@ -1629,6 +1832,144 @@
           "name"
         ],
         "title": "Sheet",
+        "type": "object"
+      },
+      "SimulationRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "params": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Params",
+            "type": "object"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          }
+        },
+        "title": "SimulationRequest",
+        "type": "object"
+      },
+      "SimulationResultOut": {
+        "properties": {
+          "ci_lower": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Lower"
+          },
+          "ci_upper": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Upper"
+          },
+          "cohort_name": {
+            "title": "Cohort Name",
+            "type": "string"
+          },
+          "effect_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effect Size"
+          },
+          "estimator": {
+            "title": "Estimator",
+            "type": "string"
+          },
+          "p_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Value"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cohort_name",
+          "scenario",
+          "estimator"
+        ],
+        "title": "SimulationResultOut",
+        "type": "object"
+      },
+      "SimulationRunCreated": {
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "run_id",
+          "status"
+        ],
+        "title": "SimulationRunCreated",
         "type": "object"
       },
       "SourceCount": {
@@ -2694,6 +3035,184 @@
           }
         },
         "summary": "Healthz"
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_status_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Status",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/simulations": {
+      "post": {
+        "operationId": "create_simulation_simulations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationRunCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Simulation",
+        "tags": [
+          "simulation"
+        ]
+      }
+    },
+    "/simulations/power": {
+      "post": {
+        "operationId": "power_simulations_power_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PowerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PowerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Power",
+        "tags": [
+          "simulation"
+        ]
+      }
+    },
+    "/simulations/results": {
+      "get": {
+        "operationId": "results_simulations_results_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cohort_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cohort Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SimulationResultOut"
+                  },
+                  "title": "Response Results Simulations Results Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Results",
+        "tags": [
+          "simulation"
+        ]
       }
     },
     "/studies": {

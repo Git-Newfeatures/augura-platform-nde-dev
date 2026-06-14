@@ -25,6 +25,10 @@ def test_openapi_exposes_routes() -> None:
         "/agents/gaps",
         "/agents/variable-check",
         "/agents/profiling/stream",
+        "/simulations/power",
+        "/simulations/results",
+        "/simulations",
+        "/jobs/{job_id}",
     ):
         assert path in paths, path
 

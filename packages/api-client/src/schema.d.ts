@@ -261,6 +261,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job Status */
+        get: operations["get_job_status_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/simulations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Simulation */
+        post: operations["create_simulation_simulations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/simulations/power": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Power */
+        post: operations["power_simulations_power_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/simulations/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Results */
+        get: operations["results_simulations_results_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/studies": {
         parameters: {
             query?: never;
@@ -641,6 +709,25 @@ export interface components {
             /** Rationale */
             rationale?: string | null;
         };
+        /** EstimatorPowerOut */
+        EstimatorPowerOut: {
+            /** Bias */
+            bias: number;
+            /** Ci Lower */
+            ci_lower: number;
+            /** Ci Upper */
+            ci_upper: number;
+            /** Effect */
+            effect: number;
+            /** Estimator */
+            estimator: string;
+            /** Mse */
+            mse: number;
+            /** Power */
+            power: number;
+            /** Variance */
+            variance: number;
+        };
         /** FeedDocument */
         FeedDocument: {
             /** Age Label */
@@ -722,6 +809,24 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** JobOut */
+        JobOut: {
+            /** Error */
+            error?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Progress */
+            progress: number;
+            /** Result Ref */
+            result_ref?: string | null;
+            /** Status */
+            status: string;
+            /** Type */
+            type: string;
+        };
         /** MeasuredVariable */
         MeasuredVariable: {
             /** Column */
@@ -743,6 +848,42 @@ export interface components {
             role: string;
             /** Severity */
             severity: string;
+        };
+        /** PowerRequest */
+        PowerRequest: {
+            /**
+             * Dropout
+             * @default 0.2
+             */
+            dropout: number;
+            /**
+             * Effect
+             * @default 0.3
+             */
+            effect: number;
+            /** Estimators */
+            estimators?: string[] | null;
+            /** N */
+            n?: number | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Sigma */
+            sigma?: number | null;
+        };
+        /** PowerResponse */
+        PowerResponse: {
+            /** Dropout */
+            dropout: number;
+            /** Effect */
+            effect: number;
+            /** Estimators */
+            estimators: components["schemas"]["EstimatorPowerOut"][];
+            /** N */
+            n: number;
+            /** Power Threshold */
+            power_threshold: number;
+            /** Sigma */
+            sigma: number;
         };
         /** ProfilingRequest */
         ProfilingRequest: {
@@ -819,6 +960,54 @@ export interface components {
              * @default []
              */
             sample: unknown[][];
+        };
+        /** SimulationRequest */
+        SimulationRequest: {
+            /** Idempotency Key */
+            idempotency_key?: string | null;
+            /**
+             * Params
+             * @default {}
+             */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Study Id */
+            study_id?: string | null;
+        };
+        /** SimulationResultOut */
+        SimulationResultOut: {
+            /** Ci Lower */
+            ci_lower?: number | null;
+            /** Ci Upper */
+            ci_upper?: number | null;
+            /** Cohort Name */
+            cohort_name: string;
+            /** Effect Size */
+            effect_size?: number | null;
+            /** Estimator */
+            estimator: string;
+            /** P Value */
+            p_value?: number | null;
+            /** Power */
+            power?: number | null;
+            /** Scenario */
+            scenario: string;
+        };
+        /** SimulationRunCreated */
+        SimulationRunCreated: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
         };
         /** SourceCount */
         SourceCount: {
@@ -1433,6 +1622,134 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    get_job_status_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_simulation_simulations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRunCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    power_simulations_power_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PowerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PowerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    results_simulations_results_get: {
+        parameters: {
+            query?: {
+                cohort_name?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationResultOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_issuer: str | None = None
 
+    # LLM (agents). Clés requises pour un run live ; absentes en local ⇒ agents
+    # validés à LLM mocké. Modèles par défaut = équivalents courants des choix JS.
+    anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
+    agent_model_dag: str = "claude-sonnet-4-6"
+    agent_model_fast: str = "claude-haiku-4-5"
+    agent_model_deep: str = "claude-opus-4-8"
+
 
 @lru_cache
 def get_settings() -> Settings:

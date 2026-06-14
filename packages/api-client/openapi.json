@@ -639,6 +639,199 @@
         "title": "CoverageResponse",
         "type": "object"
       },
+      "DagEdge": {
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "DagEdge",
+        "type": "object"
+      },
+      "DagNode": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "measured": {
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "role",
+          "measured"
+        ],
+        "title": "DagNode",
+        "type": "object"
+      },
+      "DagRequest": {
+        "properties": {
+          "candidate_outcomes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Candidate Outcomes",
+            "type": "array"
+          },
+          "dataset_variables": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Variables"
+          },
+          "gap_variables": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Gap Variables",
+            "type": "array"
+          },
+          "intervention": {
+            "title": "Intervention",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "population": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population"
+          },
+          "product_docs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Docs"
+          },
+          "selected_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Outcome"
+          },
+          "study_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Type"
+          }
+        },
+        "required": [
+          "intervention",
+          "outcome"
+        ],
+        "title": "DagRequest",
+        "type": "object"
+      },
+      "DagResponse": {
+        "properties": {
+          "adjustment_set": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Adjustment Set",
+            "type": "array"
+          },
+          "collider_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Collider Ids",
+            "type": "array"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/DagEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/DagNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "adjustment_set",
+          "rationale"
+        ],
+        "title": "DagResponse",
+        "type": "object"
+      },
       "DatasetCreate": {
         "properties": {
           "name": {
@@ -1295,6 +1488,47 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/agents/dag": {
+      "post": {
+        "operationId": "dag_agents_dag_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DagResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dag",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/corpus/coverage": {
       "get": {
         "operationId": "coverage_corpus_coverage_get",

@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/agents/dag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dag */
+        post: operations["dag_agents_dag_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/coverage": {
         parameters: {
             query?: never;
@@ -408,6 +425,73 @@ export interface components {
             matrix: components["schemas"]["CoverageCell"][];
             meta: components["schemas"]["CoverageMeta"];
         };
+        /** DagEdge */
+        DagEdge: {
+            /** From */
+            from: string;
+            /** To */
+            to: string;
+        };
+        /** DagNode */
+        DagNode: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Measured */
+            measured: boolean;
+            /** Rationale */
+            rationale?: string | null;
+            /** Role */
+            role: string;
+        };
+        /** DagRequest */
+        DagRequest: {
+            /**
+             * Candidate Outcomes
+             * @default []
+             */
+            candidate_outcomes: string[];
+            /** Dataset Variables */
+            dataset_variables?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Gap Variables
+             * @default []
+             */
+            gap_variables: {
+                [key: string]: unknown;
+            }[];
+            /** Intervention */
+            intervention: string;
+            /** Outcome */
+            outcome: string;
+            /** Population */
+            population?: string | null;
+            /** Product Docs */
+            product_docs?: string | null;
+            /** Selected Outcome */
+            selected_outcome?: string | null;
+            /** Study Type */
+            study_type?: string | null;
+        };
+        /** DagResponse */
+        DagResponse: {
+            /** Adjustment Set */
+            adjustment_set: string[];
+            /**
+             * Collider Ids
+             * @default []
+             */
+            collider_ids: string[];
+            /** Edges */
+            edges: components["schemas"]["DagEdge"][];
+            /** Nodes */
+            nodes: components["schemas"]["DagNode"][];
+            /** Rationale */
+            rationale: string;
+        };
         /** DatasetCreate */
         DatasetCreate: {
             /** Name */
@@ -641,6 +725,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    dag_agents_dag_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DagRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DagResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     coverage_corpus_coverage_get: {
         parameters: {
             query?: never;

@@ -21,6 +21,7 @@ def test_openapi_exposes_routes() -> None:
         "/datasets/cohorts",
         "/datasets/cohorts/{cohort_name}/members",
         "/datasets/cohorts/{cohort_name}/biomarkers",
+        "/agents/dag",
     ):
         assert path in paths, path
 

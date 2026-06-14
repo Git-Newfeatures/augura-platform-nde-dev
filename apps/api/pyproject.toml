@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.4",
+    "anthropic>=0.109.1",
     "asyncpg>=0.31.0",
     "cryptography>=49.0.0",
     "fastapi>=0.136.3",
@@ -64,6 +65,7 @@ modules = [
     "augura_api.modules.studies",
     "augura_api.modules.corpus",
     "augura_api.modules.datasets",
+    "augura_api.modules.agents",
 ]
 
 [dependency-groups]

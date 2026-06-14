@@ -98,6 +98,11 @@ create policy tenant_via_dataset on dataset_columns
         select 1 from datasets d
         where d.id = dataset_columns.dataset_id
           and d.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+    ))
+    with check (exists (
+        select 1 from datasets d
+        where d.id = dataset_columns.dataset_id
+          and d.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     ));
 
 -- ── Corpus : org_id NULL ⇒ global lisible par tous ───────────────────────

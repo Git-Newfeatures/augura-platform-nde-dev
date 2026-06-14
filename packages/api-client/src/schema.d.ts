@@ -72,6 +72,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Datasets */
+        get: operations["list_datasets_datasets_get"];
+        put?: never;
+        /** Create Dataset */
+        post: operations["create_dataset_datasets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/cohorts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cohorts */
+        get: operations["list_cohorts_datasets_cohorts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/cohorts/{cohort_name}/biomarkers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cohort Biomarkers */
+        get: operations["cohort_biomarkers_datasets_cohorts__cohort_name__biomarkers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/cohorts/{cohort_name}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cohort Members */
+        get: operations["cohort_members_datasets_cohorts__cohort_name__members_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/{dataset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dataset */
+        get: operations["get_dataset_datasets__dataset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/{dataset_id}/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Columns */
+        get: operations["list_columns_datasets__dataset_id__columns_get"];
+        /** Replace Columns */
+        put: operations["replace_columns_datasets__dataset_id__columns_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -146,6 +250,134 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CohortBiomarkerOut */
+        CohortBiomarkerOut: {
+            /** Adherence Pct */
+            adherence_pct?: number | null;
+            /** Hba1C Pct */
+            hba1c_pct?: number | null;
+            /** Hs Crp Mgl */
+            hs_crp_mgl?: number | null;
+            /** Ldl Mgdl */
+            ldl_mgdl?: number | null;
+            /** Member Id */
+            member_id: string;
+            /** Timepoint Months */
+            timepoint_months: number;
+        };
+        /** CohortMemberOut */
+        CohortMemberOut: {
+            /** Age */
+            age?: number | null;
+            /** Bmi */
+            bmi?: number | null;
+            /** Country */
+            country?: string | null;
+            /** Engagement Group */
+            engagement_group?: string | null;
+            /** Member Id */
+            member_id: string;
+            /** Sex */
+            sex?: string | null;
+        };
+        /** CohortSummary */
+        CohortSummary: {
+            /** Cohort Name */
+            cohort_name: string;
+            /** N Members */
+            n_members: number;
+        };
+        /** ColumnIn */
+        ColumnIn: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Final Canonical Id */
+            final_canonical_id?: string | null;
+            /** Final Role */
+            final_role?: string | null;
+            /** Max */
+            max?: number | null;
+            /** Min */
+            min?: number | null;
+            /** N Distinct */
+            n_distinct?: number | null;
+            /** N Non Null */
+            n_non_null?: number | null;
+            /** N Total */
+            n_total?: number | null;
+            /** Name */
+            name: string;
+            /** Null Pct */
+            null_pct?: number | null;
+            /** Proposed Canonical Id */
+            proposed_canonical_id?: string | null;
+            /** Proposed Group */
+            proposed_group?: string | null;
+            /** Proposed Role */
+            proposed_role?: string | null;
+            /** Rationale */
+            rationale?: string | null;
+            /** Sheet */
+            sheet: string;
+            /** Top Values */
+            top_values?: unknown[] | null;
+            /**
+             * User Decision
+             * @default pending
+             */
+            user_decision: string;
+            /** Value Kind */
+            value_kind?: string | null;
+        };
+        /** ColumnOut */
+        ColumnOut: {
+            /** Confidence */
+            confidence?: number | null;
+            /** Final Canonical Id */
+            final_canonical_id?: string | null;
+            /** Final Role */
+            final_role?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Max */
+            max?: number | null;
+            /** Min */
+            min?: number | null;
+            /** N Distinct */
+            n_distinct?: number | null;
+            /** N Non Null */
+            n_non_null?: number | null;
+            /** N Total */
+            n_total?: number | null;
+            /** Name */
+            name: string;
+            /** Null Pct */
+            null_pct?: number | null;
+            /** Proposed Canonical Id */
+            proposed_canonical_id?: string | null;
+            /** Proposed Group */
+            proposed_group?: string | null;
+            /** Proposed Role */
+            proposed_role?: string | null;
+            /** Rationale */
+            rationale?: string | null;
+            /** Sheet */
+            sheet: string;
+            /** Top Values */
+            top_values?: unknown[] | null;
+            /** User Decision */
+            user_decision: string;
+            /** Value Kind */
+            value_kind?: string | null;
+        };
+        /** ColumnsPut */
+        ColumnsPut: {
+            /** Columns */
+            columns: components["schemas"]["ColumnIn"][];
+        };
         /** CoverageCell */
         CoverageCell: {
             /** Doc Count */
@@ -175,6 +407,40 @@ export interface components {
             /** Matrix */
             matrix: components["schemas"]["CoverageCell"][];
             meta: components["schemas"]["CoverageMeta"];
+        };
+        /** DatasetCreate */
+        DatasetCreate: {
+            /** Name */
+            name: string;
+            /** Row Count */
+            row_count?: number | null;
+            /** Storage Path */
+            storage_path?: string | null;
+            /** Study Id */
+            study_id?: string | null;
+        };
+        /** DatasetOut */
+        DatasetOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Row Count */
+            row_count?: number | null;
+            /** Status */
+            status: string;
+            /** Storage Path */
+            storage_path?: string | null;
+            /** Study Id */
+            study_id?: string | null;
         };
         /** FeedDocument */
         FeedDocument: {
@@ -480,6 +746,238 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourcesResponse"];
+                };
+            };
+        };
+    };
+    list_datasets_datasets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetOut"][];
+                };
+            };
+        };
+    };
+    create_dataset_datasets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatasetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cohorts_datasets_cohorts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortSummary"][];
+                };
+            };
+        };
+    };
+    cohort_biomarkers_datasets_cohorts__cohort_name__biomarkers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cohort_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortBiomarkerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cohort_members_datasets_cohorts__cohort_name__members_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cohort_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortMemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dataset_datasets__dataset_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_columns_datasets__dataset_id__columns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_columns_datasets__dataset_id__columns_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnsPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -4,6 +4,7 @@ from augura_api.core.config import Settings, get_settings
 from augura_api.core.errors import register_error_handlers
 from augura_api.core.logging import RequestIdMiddleware, configure_logging
 from augura_api.modules.corpus import router as corpus_router
+from augura_api.modules.datasets import router as datasets_router
 from augura_api.modules.studies import router as studies_router
 
 
@@ -21,5 +22,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(studies_router)
     app.include_router(corpus_router)
+    app.include_router(datasets_router)
 
     return app

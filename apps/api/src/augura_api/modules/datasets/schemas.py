@@ -16,6 +16,10 @@ class DatasetOut(BaseModel):
     study_id: UUID | None = None
     storage_path: str | None = None
     row_count: int | None = None
+    # Nombre de colonnes profilées (table dataset_columns, même module). Le libellé
+    # d'étude est résolu côté front via study_id : l'indépendance datasets↔studies
+    # (import-linter) interdit un JOIN sur studies ici.
+    column_count: int = 0
     created_at: datetime
 
 

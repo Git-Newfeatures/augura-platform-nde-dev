@@ -735,6 +735,11 @@ export interface components {
         /** DatasetOut */
         DatasetOut: {
             /**
+             * Column Count
+             * @default 0
+             */
+            column_count: number;
+            /**
              * Created At
              * Format: date-time
              */

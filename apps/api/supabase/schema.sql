@@ -275,6 +275,17 @@ create table if not exists jobs (
 );
 create index if not exists ix_jobs_org_status on jobs(org_id, status);
 
+-- FK simulation_runs.job_id -> jobs(id) : posée ici car jobs est créé APRÈS
+-- simulation_runs. Idempotente (re-run du bundle sans erreur).
+do $$ begin
+    if not exists (select 1 from pg_constraint where conname = 'simulation_runs_job_id_fkey') then
+        alter table simulation_runs
+            add constraint simulation_runs_job_id_fkey
+            foreign key (job_id) references jobs(id) on delete set null;
+    end if;
+end $$;
+create index if not exists ix_simulation_runs_job on simulation_runs(job_id);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Module : documents générés
 -- ─────────────────────────────────────────────────────────────────────────
@@ -289,6 +300,7 @@ create table if not exists generated_documents (
                  check (status in ('pending', 'generating', 'ready', 'failed')),
     created_at   timestamptz not null default now()
 );
+create index if not exists ix_generated_documents_org on generated_documents(org_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Module : analytics / observabilité

@@ -1079,6 +1079,11 @@
       },
       "DatasetOut": {
         "properties": {
+          "column_count": {
+            "default": 0,
+            "title": "Column Count",
+            "type": "integer"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",

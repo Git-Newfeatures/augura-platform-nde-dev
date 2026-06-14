@@ -5,6 +5,7 @@ from uuid import UUID
 from augura_api.core.errors import NotFoundError
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.datasets import schemas
+from augura_api.modules.datasets.models import Dataset
 from augura_api.modules.datasets.repo import DatasetRepo
 
 
@@ -12,9 +13,21 @@ class DatasetService:
     def __init__(self, repo: DatasetRepo) -> None:
         self.repo = repo
 
+    async def _require_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> Dataset:
+        dataset = await self.repo.get_dataset(tenant.tenant_id, dataset_id)
+        if dataset is None:
+            raise NotFoundError("dataset introuvable", dataset_id=str(dataset_id))
+        return dataset
+
+    @staticmethod
+    def _to_out(dataset: Dataset, column_count: int) -> schemas.DatasetOut:
+        return schemas.DatasetOut.model_validate(dataset).model_copy(
+            update={"column_count": column_count}
+        )
+
     async def list_datasets(self, tenant: CurrentTenant) -> list[schemas.DatasetOut]:
         rows = await self.repo.list_datasets(tenant.tenant_id)
-        return [schemas.DatasetOut.model_validate(r) for r in rows]
+        return [self._to_out(dataset, count) for dataset, count in rows]
 
     async def create_dataset(
         self, tenant: CurrentTenant, data: schemas.DatasetCreate
@@ -26,25 +39,23 @@ class DatasetService:
             storage_path=data.storage_path,
             row_count=data.row_count,
         )
-        return schemas.DatasetOut.model_validate(dataset)
+        return self._to_out(dataset, 0)
 
     async def get_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.DatasetOut:
-        dataset = await self.repo.get_dataset(tenant.tenant_id, dataset_id)
-        if dataset is None:
-            raise NotFoundError("dataset introuvable", dataset_id=str(dataset_id))
-        return schemas.DatasetOut.model_validate(dataset)
+        dataset = await self._require_dataset(tenant, dataset_id)
+        return self._to_out(dataset, await self.repo.count_columns(dataset_id))
 
     async def list_columns(
         self, tenant: CurrentTenant, dataset_id: UUID
     ) -> list[schemas.ColumnOut]:
-        await self.get_dataset(tenant, dataset_id)
+        await self._require_dataset(tenant, dataset_id)
         rows = await self.repo.list_columns(dataset_id)
         return [schemas.ColumnOut.model_validate(r) for r in rows]
 
     async def replace_columns(
         self, tenant: CurrentTenant, dataset_id: UUID, payload: schemas.ColumnsPut
     ) -> list[schemas.ColumnOut]:
-        await self.get_dataset(tenant, dataset_id)
+        await self._require_dataset(tenant, dataset_id)
         rows = await self.repo.replace_columns(dataset_id, payload.columns)
         return [schemas.ColumnOut.model_validate(r) for r in rows]
 

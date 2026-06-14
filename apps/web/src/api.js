@@ -9,6 +9,15 @@ import { supabase } from './supabase'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
+// Sans VITE_API_URL, les appels deviennent relatifs (mêmes origines) — un oubli de
+// config en build, pas un mode voulu. On le signale au lieu de l'avaler en silence.
+if (!API_BASE) {
+  console.warn(
+    '[augura] VITE_API_URL is empty — API calls will be relative to the web origin. ' +
+      'Set VITE_API_URL (e.g. http://localhost:8000 in dev, the Modal domain in prod).',
+  )
+}
+
 export async function getAccessToken() {
   try {
     const { data } = await supabase.auth.getSession()

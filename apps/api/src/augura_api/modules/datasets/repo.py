@@ -19,17 +19,33 @@ class DatasetRepo:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_datasets(self, tenant_id: TenantId) -> list[Dataset]:
-        res = await self.session.execute(
-            select(Dataset).where(Dataset.org_id == tenant_id).order_by(Dataset.created_at.desc())
+    async def list_datasets(self, tenant_id: TenantId) -> list[tuple[Dataset, int]]:
+        """Datasets du tenant + leur nombre de colonnes (sous-requête corrélée
+        sur dataset_columns, intra-module)."""
+        col_count = (
+            select(func.count(DatasetColumn.id))
+            .where(DatasetColumn.dataset_id == Dataset.id)
+            .correlate(Dataset)
+            .scalar_subquery()
         )
-        return list(res.scalars().all())
+        res = await self.session.execute(
+            select(Dataset, col_count.label("column_count"))
+            .where(Dataset.org_id == tenant_id)
+            .order_by(Dataset.created_at.desc())
+        )
+        return [(row[0], int(row[1])) for row in res.all()]
 
     async def get_dataset(self, tenant_id: TenantId, dataset_id: UUID) -> Dataset | None:
         res = await self.session.execute(
             select(Dataset).where(Dataset.org_id == tenant_id, Dataset.id == dataset_id)
         )
         return res.scalar_one_or_none()
+
+    async def count_columns(self, dataset_id: UUID) -> int:
+        res = await self.session.execute(
+            select(func.count(DatasetColumn.id)).where(DatasetColumn.dataset_id == dataset_id)
+        )
+        return int(res.scalar_one())
 
     async def create_dataset(
         self,

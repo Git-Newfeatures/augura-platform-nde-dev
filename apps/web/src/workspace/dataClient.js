@@ -54,13 +54,15 @@ const relTime = (iso) => {
 const normStudies = (rows) =>
   (rows ?? []).map((r) => studyFromRow({ ...r, n: r.n_subjects ?? r.n }))
 
-const normDatasets = (rows) =>
+// study label resolved from the studies collection (backend keeps datasets↔studies
+// independent, so /datasets carries study_id, not study_name).
+const normDatasets = (rows, studyNameById = new Map()) =>
   (rows ?? []).map((d) => ({
     id: d.id,
     name: d.name,
     rows: d.row_count != null ? d.row_count.toLocaleString() : '—',
     cols: d.column_count ?? '—',
-    study: d.study_name ?? '',
+    study: studyNameById.get(d.study_id) ?? '',
     state: d.status ?? 'pending',
     when: relTime(d.created_at),
   }))
@@ -109,7 +111,14 @@ const normCoverage = (resp) => {
 // `runs` and `variables` have no backend list endpoint yet → [] (EmptyState).
 const FETCHERS = {
   studies:         async () => normStudies(await apiJson('/studies')),
-  datasets:        async () => normDatasets(await apiJson('/datasets')),
+  datasets:        async () => {
+    const [rows, studies] = await Promise.all([
+      apiJson('/datasets'),
+      apiJson('/studies').catch(() => []),
+    ])
+    const nameById = new Map((studies ?? []).map((s) => [s.id, s.name]))
+    return normDatasets(rows, nameById)
+  },
   dossiers:        async () => normDossiers(await apiJson('/documents')),
   corpus_sources:  async () => normSources(await apiJson('/corpus/sources')),
   corpus_coverage: async () => normCoverage(await apiJson('/corpus/coverage')),

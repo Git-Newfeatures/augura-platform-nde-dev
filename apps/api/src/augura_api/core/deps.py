@@ -5,7 +5,7 @@ Chaîne : Bearer → `authenticate` (JWT) → `Principal` → résolution `membe
 (user_id + tenant_id posés, RLS complète active).
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -19,7 +19,7 @@ from augura_api.core.db import (
     set_tenant_stmt,
     set_user_stmt,
 )
-from augura_api.core.errors import UnauthorizedError
+from augura_api.core.errors import ForbiddenError, UnauthorizedError
 from augura_api.core.ids import TenantId, UserId
 from augura_api.core.tenancy import CurrentTenant, Membership, resolve_tenant
 
@@ -68,6 +68,22 @@ async def get_current_tenant(principal: PrincipalDep, settings: SettingsDep) -> 
 
 
 CurrentTenantDep = Annotated[CurrentTenant, Depends(get_current_tenant)]
+
+
+def require_role(*allowed: str) -> Callable[[CurrentTenant], Awaitable[CurrentTenant]]:
+    """Dépendance d'autorisation : exige que le rôle du tenant courant soit dans
+    `allowed`, sinon 403. Utilisée pour gater les routes sensibles (ex. analytics)."""
+
+    async def _require(tenant: CurrentTenantDep) -> CurrentTenant:
+        if tenant.role not in allowed:
+            raise ForbiddenError(
+                "rôle insuffisant pour cette ressource",
+                required=list(allowed),
+                role=tenant.role,
+            )
+        return tenant
+
+    return _require
 
 
 async def get_session(

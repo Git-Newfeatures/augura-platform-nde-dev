@@ -75,9 +75,9 @@ class StudyRepo:
         created_by: UserId,
     ) -> StudyState:
         res = await self.session.execute(
-            select(func.coalesce(func.max(StudyState.version), 0)).where(
-                StudyState.study_id == study_id
-            )
+            select(func.coalesce(func.max(StudyState.version), 0))
+            .join(Study, Study.id == StudyState.study_id)
+            .where(Study.org_id == tenant_id, StudyState.study_id == study_id)
         )
         next_version = int(res.scalar_one()) + 1
         row = StudyState(

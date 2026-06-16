@@ -5,6 +5,7 @@ import { TopBar } from './TopBar'
 import { WorkspaceNav } from './WorkspaceNav'
 import { SearchOverlay } from './SearchOverlay'
 import { onOpenSearch } from './searchBus'
+import AuguraAssistant from '@/components/AuguraAssistant'
 
 export function AppShell() {
   const [email, setEmail] = useState('')
@@ -48,6 +49,7 @@ export function AppShell() {
         </div>
       )}
       {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
+      <AuguraAssistant />
     </div>
   )
 }

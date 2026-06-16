@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# Node
+node_modules/
+
+# Env & outils
+.env
+.env.*
+!.env.example
+.DS_Store

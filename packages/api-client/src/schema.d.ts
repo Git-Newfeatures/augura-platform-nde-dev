@@ -400,6 +400,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets/{dataset_id}/dq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest Dq */
+        get: operations["latest_dq_datasets__dataset_id__dq_get"];
+        put?: never;
+        /** Run Dq */
+        post: operations["run_dq_datasets__dataset_id__dq_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/documents": {
         parameters: {
             query?: never;
@@ -1220,6 +1238,48 @@ export interface components {
             question_code: string;
             /** Rationale */
             rationale?: string | null;
+        };
+        /** DqBundleOut */
+        DqBundleOut: {
+            /** Bundle */
+            bundle: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Dataset Id
+             * Format: uuid
+             */
+            dataset_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Overall Score */
+            overall_score?: number | null;
+            /** Requires Resolution */
+            requires_resolution: boolean;
+            /** Score Profile */
+            score_profile: string;
+            /** Status */
+            status: string;
+        };
+        /** DqRunResult */
+        DqRunResult: {
+            /**
+             * Bundle Id
+             * Format: uuid
+             */
+            bundle_id: string;
+            /** Overall Score */
+            overall_score?: number | null;
+            /** Status */
+            status: string;
         };
         /** EstimatorPowerOut */
         EstimatorPowerOut: {
@@ -2547,6 +2607,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ColumnOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_dq_datasets__dataset_id__dq_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DqBundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_dq_datasets__dataset_id__dq_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DqRunResult"];
                 };
             };
             /** @description Validation Error */

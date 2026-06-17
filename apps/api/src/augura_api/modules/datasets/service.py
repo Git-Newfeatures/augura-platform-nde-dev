@@ -1,7 +1,8 @@
 """Logique du module datasets : CRUD, colonnes (profiling), lecture cohortes."""
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from augura_api.core.config import Settings
 from augura_api.core.errors import NotFoundError
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules import analytics
@@ -77,6 +78,60 @@ class DatasetService:
     ) -> list[schemas.CohortBiomarkerOut]:
         rows = await self.repo.cohort_biomarkers(tenant.tenant_id, cohort_name)
         return [schemas.CohortBiomarkerOut.model_validate(r) for r in rows]
+
+    async def upload_dataset(
+        self,
+        tenant: CurrentTenant,
+        settings: Settings,
+        *,
+        filename: str,
+        data: bytes,
+        name: str | None,
+        study_id: UUID | None,
+    ) -> schemas.UploadResult:
+        from augura_api.core.storage import save_bytes
+        from augura_api.modules.datasets.parsing import parse_upload
+        from augura_api.modules.datasets.profiling import profile_column
+
+        sheets = parse_upload(filename, data)  # raises 413/415/400
+        ref = save_bytes(
+            settings,
+            org_id=str(tenant.tenant_id),
+            name=f"{uuid4()}-{filename}",
+            data=data,
+        )
+        row_count = sum(len(s.rows) for s in sheets)
+        dataset = await self.repo.create_dataset(
+            tenant.tenant_id,
+            name=name or filename,
+            study_id=study_id,
+            storage_path=ref,
+            row_count=row_count,
+        )
+        cols: list[schemas.ColumnIn] = []
+        for sheet in sheets:
+            for idx, header in enumerate(sheet.headers):
+                values = [row[idx] if idx < len(row) else "" for row in sheet.rows]
+                p = profile_column(header, values)
+                cols.append(
+                    schemas.ColumnIn(
+                        sheet=sheet.name,
+                        name=header,
+                        value_kind=p.value_kind,
+                        n_total=p.n_total,
+                        n_non_null=p.n_non_null,
+                        null_pct=p.null_pct,
+                        n_distinct=p.n_distinct,
+                        min=p.value_min,
+                        max=p.value_max,
+                        top_values=p.top_values,
+                    )
+                )
+        column_rows = await self.repo.replace_columns(dataset.id, cols)
+        return schemas.UploadResult(
+            dataset=DatasetService._to_out(dataset, len(column_rows)),
+            columns=[schemas.ColumnOut.model_validate(c) for c in column_rows],
+        )
 
     async def import_cohort(
         self, tenant: CurrentTenant, payload: schemas.CohortImportRequest

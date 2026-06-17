@@ -79,6 +79,11 @@ class ColumnsPut(BaseModel):
     columns: list[ColumnIn]
 
 
+class UploadResult(BaseModel):
+    dataset: DatasetOut
+    columns: list[ColumnOut]
+
+
 class CohortMemberOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

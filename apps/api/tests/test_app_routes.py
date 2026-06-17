@@ -16,6 +16,7 @@ def test_openapi_exposes_routes() -> None:
         "/corpus/sources",
         "/corpus/search",
         "/datasets",
+        "/datasets/upload",
         "/datasets/{dataset_id}",
         "/datasets/{dataset_id}/columns",
         "/datasets/cohorts",

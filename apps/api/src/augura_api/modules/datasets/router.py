@@ -6,9 +6,9 @@ pour ne pas être capturées comme un identifiant.
 
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Form, UploadFile, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
 from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.repo import DatasetRepo
 from augura_api.modules.datasets.service import DatasetService
@@ -64,6 +64,26 @@ async def cohort_biomarkers(
     cohort_name: str, tenant: CurrentTenantDep, session: SessionDep
 ) -> list[schemas.CohortBiomarkerOut]:
     return await _service(session).cohort_biomarkers(tenant, cohort_name)
+
+
+@router.post("/upload", response_model=schemas.UploadResult, status_code=status.HTTP_201_CREATED)
+async def upload_dataset(
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    file: UploadFile,
+    name: str | None = Form(default=None),  # noqa: B008
+    study_id: UUID | None = Form(default=None),  # noqa: B008
+) -> schemas.UploadResult:
+    data = await file.read()
+    return await _service(session).upload_dataset(
+        tenant,
+        settings,
+        filename=file.filename or "upload.csv",
+        data=data,
+        name=name,
+        study_id=study_id,
+    )
 
 
 @router.get("/{dataset_id}", response_model=schemas.DatasetOut)

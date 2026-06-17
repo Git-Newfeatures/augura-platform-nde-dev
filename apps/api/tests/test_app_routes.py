@@ -32,6 +32,9 @@ def test_openapi_exposes_routes() -> None:
         "/documents",
         "/documents/{document_id}",
         "/analytics/admin",
+        "/reference/tenant",
+        "/reference/cesl-sources",
+        "/reference/study-designs",
     ):
         assert path in paths, path
 
@@ -39,7 +42,9 @@ def test_openapi_exposes_routes() -> None:
 async def test_protected_routes_require_auth() -> None:
     transport = httpx.ASGITransport(app=create_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        for path in ("/studies", "/corpus/feed", "/datasets", "/datasets/cohorts"):
+        for path in (
+            "/studies", "/corpus/feed", "/datasets", "/datasets/cohorts", "/reference/tenant"
+        ):
             r = await client.get(path)
             assert r.status_code == 401, path
             assert r.headers["content-type"] == "application/problem+json"

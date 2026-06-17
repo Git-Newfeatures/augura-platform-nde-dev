@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 _MISSING = {"", "na", "n/a"}
@@ -70,7 +70,7 @@ def _is_date_like(s: str) -> bool:
     )
 
 
-def profile_column(col_name: str, values: list[str | None]) -> ColumnDQProfile:
+def profile_column(col_name: str, values: Sequence[str | None]) -> ColumnDQProfile:
     vals = [("" if v is None else str(v)) for v in values]
     total = len(vals)
     sample = vals[:_SAMPLE]

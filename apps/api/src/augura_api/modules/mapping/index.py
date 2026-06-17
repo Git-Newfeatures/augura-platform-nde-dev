@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -30,7 +31,7 @@ class ConceptIndex:
     synonym_lookup: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
 
 
-def build_index(concepts: list[_ConceptRow], synonyms: list[_SynonymRow]) -> ConceptIndex:
+def build_index(concepts: Sequence[_ConceptRow], synonyms: Sequence[_SynonymRow]) -> ConceptIndex:
     syn_by: dict[str, list[str]] = defaultdict(list)
     for s in synonyms:
         syn_by[s.local_concept_id].append(s.synonym)

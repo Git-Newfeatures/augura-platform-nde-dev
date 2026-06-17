@@ -57,6 +57,9 @@ class MappingService:
             )
         avg = sum(confidences) / len(confidences) if confidences else None
         return schemas.MapResult(
-            dataset_id=dataset_id, mapped_count=mapped, total_count=len(columns),
-            avg_confidence=(round(avg, 3) if avg is not None else None), columns=out,
+            dataset_id=dataset_id,
+            mapped_count=mapped,
+            total_count=len(columns),
+            avg_confidence=(round(avg, 3) if avg is not None else None),
+            columns=out,
         )

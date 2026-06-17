@@ -118,6 +118,8 @@ def _parse_article(article_el: ET.Element) -> PubMedArticle | None:
 class PubMedClient(Protocol):
     async def search(self, query: str, max_results: int) -> list[PubMedArticle]: ...
 
+    async def fetch_by_ids(self, pmids: list[str]) -> list[PubMedArticle]: ...
+
 
 class NCBIPubMedClient:
     """Implémentation réelle : esearch (JSON) → PMIDs, efetch (XML) → articles."""
@@ -132,21 +134,35 @@ class NCBIPubMedClient:
             params["api_key"] = self._api_key
         return params
 
-    async def search(self, query: str, max_results: int) -> list[PubMedArticle]:
-        n = max(1, min(50, max_results))
+    async def _esearch(self, term: str, retmax: int) -> list[str]:
         esearch = await self._http.get(
             f"{EUTILS_BASE}/esearch.fcgi",
-            params=self._params(term=query, retmax=str(n), retmode="json", sort="relevance"),
+            params=self._params(term=term, retmax=str(retmax), retmode="json", sort="relevance"),
         )
         esearch.raise_for_status()
-        pmids: list[str] = esearch.json().get("esearchresult", {}).get("idlist", [])
-        if not pmids:
+        idlist: list[str] = esearch.json().get("esearchresult", {}).get("idlist", [])
+        return idlist
+
+    async def fetch_by_ids(self, pmids: list[str]) -> list[PubMedArticle]:
+        """Efetch direct par PMID — aucun esearch. C'est le chemin known-item PMID :
+        en s'adressant à efetch avec `id=`, il est structurellement insensible au bug
+        de qualificateur de champ (un PMID n'est jamais réinterprété comme un terme).
+        Réutilise le même parseur efetch que `search`."""
+        clean = [p.strip() for p in pmids if p.strip()]
+        if not clean:
             return []
         efetch = await self._http.get(
             f"{EUTILS_BASE}/efetch.fcgi",
-            params=self._params(id=",".join(pmids), retmode="xml", rettype="abstract"),
+            params=self._params(id=",".join(clean), retmode="xml", rettype="abstract"),
         )
         efetch.raise_for_status()
         root = ET.fromstring(efetch.text)
         articles = [_parse_article(a) for a in root.findall(".//PubmedArticle")]
         return [a for a in articles if a is not None]
+
+    async def search(self, query: str, max_results: int) -> list[PubMedArticle]:
+        n = max(1, min(50, max_results))
+        pmids = await self._esearch(query, n)
+        if not pmids:
+            return []
+        return await self.fetch_by_ids(pmids)

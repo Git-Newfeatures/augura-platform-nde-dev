@@ -1,21 +1,51 @@
 """Adaptateur HTTP du module corpus."""
 
+import json
+from collections.abc import AsyncIterator
+from typing import Any
+from uuid import UUID
+
 import httpx
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.core.errors import BadRequestError
 from augura_api.core.llm.embeddings import Embedder, get_embedder
 from augura_api.core.llm.runtime import AgentUpstreamError, get_anthropic_client
 from augura_api.modules.corpus import schemas
+from augura_api.modules.corpus.ctgov import CTGovApiClient
+from augura_api.modules.corpus.live_repo import LiveRepo
 from augura_api.modules.corpus.pubmed import NCBIPubMedClient
 from augura_api.modules.corpus.repo import CorpusRepo
+from augura_api.modules.corpus.retrieval import LiteratureRetriever
 from augura_api.modules.corpus.service import (
     CorpusService,
     LiteratureService,
     expand_pubmed_query,
 )
+from augura_api.modules.corpus.snapshot_service import (
+    LiteratureSnapshotService,
+    to_retrieve_response,
+)
 
 router = APIRouter(prefix="/corpus", tags=["corpus"])
+
+
+def _ndjson(event_type: str, **data: Any) -> str:
+    return json.dumps({"type": event_type, **data}) + "\n"
+
+
+def _validate_sources(sources: list[str] | None) -> None:
+    if not sources:
+        return
+    unknown = [s for s in sources if s not in schemas.VALID_RETRIEVE_SOURCES]
+    if unknown:
+        raise BadRequestError("source inconnue", value=unknown)
+
+
+def _live_service(session: SessionDep) -> LiteratureSnapshotService:
+    return LiteratureSnapshotService(LiveRepo(session))
 
 
 def _service(session: SessionDep) -> CorpusService:
@@ -95,3 +125,92 @@ async def literature(
             max_results=req.max_results,
             effective_query=effective_query,
         )
+
+
+# ── Recherche live (retrieve-and-freeze) — verbe distinct de l'ingestion ──────
+
+
+@router.post("/literature/retrieve")
+async def literature_retrieve(
+    req: schemas.LiteratureRetrieveRequest,
+    tenant: CurrentTenantDep,
+    settings: SettingsDep,
+) -> StreamingResponse:
+    """Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.
+    Ne touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique
+    ⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel."""
+    _validate_sources(req.sources)  # 400 avant le stream si source inconnue
+    sources = set(req.sources) if req.sources else None
+
+    async def gen() -> AsyncIterator[str]:
+        async with httpx.AsyncClient(timeout=20.0) as http:
+            retriever = LiteratureRetriever(
+                NCBIPubMedClient(http, api_key=settings.ncbi_api_key), CTGovApiClient(http)
+            )
+            result = await retriever.retrieve(
+                req.query, sources=sources, max_results=req.max_results
+            )
+        resp = to_retrieve_response(result)
+        yield _ndjson(
+            "meta",
+            query=resp.query,
+            sources=resp.sources,
+            known_item=resp.known_item,
+            kind=resp.kind,
+        )
+        for group in resp.groups:
+            yield _ndjson("group", **group.model_dump(mode="json"))
+        yield _ndjson("done")
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@router.post("/literature/snapshots", response_model=schemas.LiteratureSnapshot)
+async def create_snapshot(
+    req: schemas.SnapshotWriteRequest, tenant: CurrentTenantDep, session: SessionDep
+) -> schemas.LiteratureSnapshot:
+    """Gèle le jeu de résultats + annotations : calcule le content_hash, épingle
+    model/prompt version, persiste. La réponse porte le hash (auto-vérifiable)."""
+    return await _live_service(session).freeze(tenant, req)
+
+
+@router.get("/literature/snapshots/{snapshot_id}", response_model=schemas.LiteratureSnapshot)
+async def read_snapshot(
+    snapshot_id: UUID, tenant: CurrentTenantDep, session: SessionDep
+) -> schemas.LiteratureSnapshot:
+    """Relit un snapshot et VÉRIFIE le content_hash (erreur dure si divergence).
+    Lecture base pure : zéro appel PubMed/CT.gov (rejeu reproductible)."""
+    return await _live_service(session).read_snapshot(tenant, snapshot_id)
+
+
+@router.post("/literature/sessions", response_model=schemas.SearchSession)
+async def create_session(
+    req: schemas.SessionCreateRequest, tenant: CurrentTenantDep, session: SessionDep
+) -> schemas.SearchSession:
+    return await _live_service(session).create_session(tenant, req)
+
+
+@router.get("/literature/sessions", response_model=list[schemas.SearchSession])
+async def list_sessions(
+    tenant: CurrentTenantDep, session: SessionDep, status: str | None = None
+) -> list[schemas.SearchSession]:
+    return await _live_service(session).list_sessions(tenant, status=status)
+
+
+@router.get("/literature/sessions/{session_id}", response_model=schemas.SearchSession)
+async def get_session(
+    session_id: UUID, tenant: CurrentTenantDep, session: SessionDep
+) -> schemas.SearchSession:
+    return await _live_service(session).get_session(tenant, session_id)
+
+
+@router.post(
+    "/literature/sessions/{session_id}/events", response_model=schemas.LiteratureEvent
+)
+async def append_event(
+    session_id: UUID,
+    req: schemas.EventAppendRequest,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+) -> schemas.LiteratureEvent:
+    return await _live_service(session).append_event(tenant, session_id, req)

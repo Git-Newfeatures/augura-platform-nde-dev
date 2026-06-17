@@ -221,6 +221,24 @@ create policy backend_read on cesl_study_designs
     for select
     using (nullif(current_setting('app.tenant_id', true), '') is not null);
 
+-- ── Reference catalogs (frontend real-only cleanup) : global, lecture seule ──
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'outcome_catalog','estimand_catalog','estimator_catalog','framework_catalog',
+    'evidence_type_catalog','domain_catalog','jurisdiction_catalog',
+    'literature_design_catalog','pii_pattern_catalog','biomarker_range_catalog',
+    'variable_group_catalog','variable_role_catalog'
+  ] loop
+    execute format('alter table %I enable row level security;', t);
+    execute format('alter table %I force row level security;', t);
+    execute format('drop policy if exists backend_read on %I;', t);
+    execute format($f$create policy backend_read on %I for select
+        using (nullif(current_setting('app.tenant_id', true), '') is not null);$f$, t);
+  end loop;
+end $$;
+
 -- ── Taxonomie sémantique (A1) : globale, lecture seule (FOR SELECT) ───────
 alter table taxonomy_concepts enable row level security;
 alter table taxonomy_concepts force row level security;

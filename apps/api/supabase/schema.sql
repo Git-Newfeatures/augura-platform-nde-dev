@@ -399,6 +399,99 @@ create table if not exists cesl_study_designs (
     active     boolean not null default true
 );
 
+-- Reference catalogs (config — frontend real-only cleanup). All global,
+-- read-only for tenant sessions (RLS backend_read in policies.sql).
+alter table cesl_sources       add column if not exists default_evidence_type text;
+alter table cesl_study_designs add column if not exists description text;
+alter table cesl_study_designs add column if not exists tags       jsonb not null default '[]'::jsonb;
+alter table cesl_study_designs add column if not exists estimands  jsonb not null default '[]'::jsonb;
+
+create table if not exists outcome_catalog (
+    code            text primary key,
+    short_key       text not null,
+    label           text not null,
+    unit            text,
+    is_primary      boolean not null default false,
+    description     text,
+    regulatory_tags jsonb   not null default '[]'::jsonb,
+    verdict         text,
+    verdict_label   text,
+    sort_order      int     not null default 0,
+    active          boolean not null default true
+);
+
+create table if not exists estimand_catalog (
+    key         text primary key,
+    name        text not null,
+    description text,
+    regulatory  text,
+    recommended boolean not null default false,
+    tag         text,
+    sort_order  int     not null default 0,
+    active      boolean not null default true
+);
+
+create table if not exists estimator_catalog (
+    key                  text primary key,
+    label                text not null,
+    short                text not null,
+    recommended          boolean not null default false,
+    bootstrap_pending    boolean not null default false,
+    interpretability     int     not null default 0,
+    stability            boolean not null default true,
+    tooltip              text,
+    eligible_study_types jsonb   not null default '[]'::jsonb,
+    sort_order           int     not null default 0,
+    active               boolean not null default true
+);
+
+create table if not exists framework_catalog (
+    code text primary key, label text not null,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists evidence_type_catalog (
+    code text primary key, label text not null, description text,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists domain_catalog (
+    code text primary key, label text not null,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists jurisdiction_catalog (
+    code text primary key, label text not null,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists literature_design_catalog (
+    code text primary key, label text not null,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists pii_pattern_catalog (
+    key text primary key, label text not null, pattern text not null,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists biomarker_range_catalog (
+    code text primary key, pattern text not null,
+    value_min numeric, value_max numeric, unit text,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists variable_group_catalog (
+    code text primary key, label text, description text, alias_of text,
+    sort_order int not null default 0, active boolean not null default true
+);
+
+create table if not exists variable_role_catalog (
+    code text primary key, label text not null, group_code text,
+    selectable boolean not null default true,
+    sort_order int not null default 0, active boolean not null default true
+);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Module : semantic (A1) — taxonomie DQ globale (lecture seule). DDL porté de
 -- l'MVP semantic schema → public. Versioning/ontologie causale = subsystem B.

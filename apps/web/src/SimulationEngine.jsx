@@ -26,7 +26,7 @@ import { apiJson } from "@/api";
 import {
   POWER_THRESHOLD, POWER_MARGINAL_FLOOR,
 } from "./config";
-import { useReference, normEstimators, estimatorFilter } from "@/workspace/dataClient";
+import { useReference, normEstimators, estimatorFilter, normOutcomeCatalog } from "@/workspace/dataClient";
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 // Layout/containers use Tailwind tokens; C is retained for values consumed inside
@@ -252,13 +252,6 @@ function ScatterChart({ rows, estimators, activeKey, onSelect }) {
   );
 }
 
-// ── Outcome label map (mirrors Outcome Selection in E1) ───────────────────────
-const OUTCOME_LABELS = {
-  hba1c: "HbA1c change · 12 months",
-  ldl:   "LDL cholesterol · 12 months",
-  crp:   "hs-CRP (inflammation) · 12 months",
-};
-
 // ── Study-type label ──────────────────────────────────────────────────────────
 const STUDY_TYPE_LABELS = {
   retro: "Retrospective observational",
@@ -297,6 +290,20 @@ export default function SimulationEngine({
   const { data: estimatorRows, loading: estimatorsLoading } = useReference('estimators');
   const ESTIMATORS = useMemo(() => normEstimators(estimatorRows), [estimatorRows]);
   const ESTIMATOR_FILTER = useMemo(() => estimatorFilter(ESTIMATORS), [ESTIMATORS]);
+
+  // ── Outcome labels — live from /reference/outcomes ────────────────────────────
+  // Re-keyed by short_key (e.g. "hba1c") so it matches the E1 selectedOutcome key.
+  const { data: outcomeRows } = useReference('outcomes');
+  const outcomeByShort = useMemo(() => {
+    const cat = normOutcomeCatalog(outcomeRows);              // keyed by column code e.g. hba1c_pct
+    return Object.fromEntries(Object.values(cat).map((o) => [o.key, o]));  // re-key by short_key
+  }, [outcomeRows]);
+  const OUTCOME_LABELS = useMemo(
+    () => Object.fromEntries(
+      Object.entries(outcomeByShort).map(([k, o]) => [k, `${o.label} · 12 months`])
+    ),
+    [outcomeByShort]
+  );
 
   // ── Cohort — live from the validation dataset (fetchCohort) only ──────────────
   // No COHORT_N fallback: when the backend returns no cohort, liveCohort stays
@@ -348,7 +355,7 @@ export default function SimulationEngine({
 
   const outcomeLabel = OUTCOME_LABELS[selectedOutcome]
     ?? e1Profile?.primary_outcome_label
-    ?? "HbA1c change · 12 months";
+    ?? (selectedOutcome ? selectedOutcome : "—");
 
   // ── Estimator filtering ───────────────────────────────────────────────────────
   const allowedKeys        = ESTIMATOR_FILTER[studyType] || ESTIMATOR_FILTER.retro;

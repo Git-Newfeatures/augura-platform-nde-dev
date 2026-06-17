@@ -492,7 +492,7 @@ SOURCE COUNTS:
           {view==="monitoring"  && <MonitoringView   simResults={simResults} onBack={()=>go("report")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
           {view==="history"     && <StudyHistory  study={getCockpitStudy(projectId)} />}
           {view==="lineage"     && <StudyLineage  study={getCockpitStudy(projectId)} />}
-          {view==="settings"    && <StudySettings study={getCockpitStudy(projectId)} />}
+          {view==="settings"    && <StudySettings study={getCockpitStudy(projectId)} projectId={projectId} />}
         </>}
         </div>
       </StudyShell>

@@ -1,7 +1,8 @@
 // Study-level surfaces that sit alongside the Workflow (per the navigation sketch's
 // study tab bar: Workflow / History / Lineage / Settings). Demo content — these are
 // cross-cutting views of a single study, not workflow steps.
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   History, GitBranch, Settings as SettingsIcon, FlaskConical, Brain, Network,
   FileText, Upload, RotateCcw, Users, Shield, Archive,
@@ -10,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/EmptyState";
+import { apiJson } from "@/api";
 
 function PageHead({ icon, title, sub }) {
   return (
@@ -62,9 +64,62 @@ export function StudyLineage() {
 // ── Settings — study configuration ────────────────────────────────────────────
 const fieldCls = "w-full rounded-lg border border-border bg-white px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15";
 
-export function StudySettings({ study }) {
+// UUID v4-ish check: only real backend studies (created via POST /studies) have a
+// UUID id; legacy slug routes can't be persisted (GET/PATCH expect a UUID).
+const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s || "");
+
+export function StudySettings({ study, projectId }) {
+  const navigate = useNavigate();
+  const persistable = isUuid(projectId);
   const [name, setName] = useState(study?.name ?? "Study");
   const [framework, setFramework] = useState((study?.framework ?? "DiGA").split(" · ")[0]);
+  const [category, setCategory] = useState(study?.category && study.category !== "—" ? study.category : "");
+  const [lead, setLead] = useState(study?.lead && study.lead !== "—" ? study.lead : "");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  // Hydrate from the real study record when we have a UUID route.
+  useEffect(() => {
+    if (!persistable) return;
+    let alive = true;
+    apiJson(`/studies/${projectId}`)
+      .then((s) => {
+        if (!alive) return;
+        setName(s.name ?? "");
+        if (s.framework) setFramework(s.framework);
+        setCategory(s.category ?? "");
+        setLead(s.lead ?? "");
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [projectId, persistable]);
+
+  async function save() {
+    if (!persistable) return;
+    setBusy(true); setMsg(null);
+    try {
+      await apiJson(`/studies/${projectId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, framework, category: category || null, lead: lead || null }),
+      });
+      setMsg("Saved.");
+    } catch {
+      setMsg("Could not save changes.");
+    } finally { setBusy(false); }
+  }
+
+  async function archive() {
+    if (!persistable) return;
+    setBusy(true); setMsg(null);
+    try {
+      await apiJson(`/studies/${projectId}`, { method: "PATCH", body: JSON.stringify({ status: "archived" }) });
+      navigate("/studies");
+    } catch {
+      setBusy(false);
+      setMsg("Could not archive the study.");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <PageHead icon={<><SettingsIcon size={13} /> Study · Configuration</>} title="Settings"
@@ -80,9 +135,16 @@ export function StudySettings({ study }) {
               {["DiGA", "CONSORT-AI", "EU MDR", "NICE DSP", "EUnetHTA", "FDA SaMD"].map((f) => <option key={f}>{f}</option>)}
             </select></label>
           <label className="block"><div className="mb-1.5 text-[12.5px] font-medium text-foreground">Category</div>
-            <input className={fieldCls} defaultValue={study?.category ?? "—"} /></label>
+            <input className={fieldCls} value={category} onChange={(e) => setCategory(e.target.value)} placeholder="—" /></label>
           <label className="block"><div className="mb-1.5 text-[12.5px] font-medium text-foreground">Study lead</div>
-            <input className={fieldCls} defaultValue={study?.lead ?? "—"} /></label>
+            <input className={fieldCls} value={lead} onChange={(e) => setLead(e.target.value)} placeholder="—" /></label>
+        </div>
+        <div className="mt-4 flex items-center gap-3 border-t border-border pt-4">
+          <Button onClick={save} disabled={busy || !persistable}>
+            {busy ? "Saving…" : "Save changes"}
+          </Button>
+          {msg && <span className="text-[12.5px] text-muted-foreground">{msg}</span>}
+          {!persistable && <span className="text-[12px] text-muted-foreground">Create the study first to edit its settings.</span>}
         </div>
       </Card>
 
@@ -90,9 +152,8 @@ export function StudySettings({ study }) {
         <div className="mb-1 flex items-center gap-2 text-[15px] font-semibold text-foreground"><Users size={15} className="text-primary" /> Collaborators</div>
         <p className="mb-3 text-[12px] text-muted-foreground">People with access to this study.</p>
         <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12.5px] text-muted-foreground">
-          No collaborators yet — invite teammates to share access to this study.
+          Collaborator management isn't enabled yet — access follows your organisation membership.
         </div>
-        <Button variant="outline" size="sm" className="mt-3 w-fit text-xs">+ Invite collaborator</Button>
       </Card>
 
       <Card className="gap-0 rounded-xl border p-5">
@@ -107,7 +168,8 @@ export function StudySettings({ study }) {
       <Card className="gap-0 rounded-xl p-5" style={{ borderColor: "rgba(192,57,43,0.3)" }}>
         <div className="mb-1 flex items-center gap-2 text-[15px] font-semibold text-[#C0392B]"><Archive size={15} /> Archive study</div>
         <p className="mb-3 text-[12px] text-muted-foreground">Archiving hides the study from the dashboard. It can be restored later.</p>
-        <Button variant="outline" size="sm" className="w-fit border-[#C0392B]/30 text-[#C0392B] text-xs hover:bg-[#C0392B]/[0.06]">Archive this study</Button>
+        <Button onClick={archive} variant="outline" size="sm" disabled={busy || !persistable}
+          className="w-fit border-[#C0392B]/30 text-[#C0392B] text-xs hover:bg-[#C0392B]/[0.06]">Archive this study</Button>
       </Card>
     </div>
   );

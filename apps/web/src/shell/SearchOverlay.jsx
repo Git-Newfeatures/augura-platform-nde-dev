@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ArrowRight } from 'lucide-react'
-import { getSearchGroups } from './searchData'
+import { fetchSearchGroups } from './searchData'
 
 // ⌘K search overlay: scrim + card, autofocus input, grouped results, live filter,
 // navigate-on-click. Closes on scrim click (Esc is handled by AppShell).
@@ -9,10 +9,15 @@ export function SearchOverlay({ onClose }) {
   const navigate = useNavigate()
   const inputRef = useRef(null)
   const [q, setQ] = useState('')
+  const [groups, setGroups] = useState([])
 
   useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => {
+    let alive = true
+    fetchSearchGroups().then((g) => { if (alive) setGroups(g) })
+    return () => { alive = false }
+  }, [])
 
-  const groups = getSearchGroups()
   const ql = q.toLowerCase()
   const filtered = groups
     .map((g) => ({ ...g, items: g.items.filter((it) => !q || (it.title + it.sub).toLowerCase().includes(ql)) }))

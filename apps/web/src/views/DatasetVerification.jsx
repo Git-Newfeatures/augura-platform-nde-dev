@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Check, AlertTriangle, ChevronDown, ChevronUp, Database, Sparkles } from "lucide-react";
 import { Card, Tag } from "../ui/components";
 import { Button } from "@/components/ui/button";
@@ -353,6 +353,74 @@ export default function DatasetVerification({
   const result = variableCheckResult;
   function setResult(data) { setVariableCheckResult(data); }
 
+  // Persist the verified dataset to the library (existing endpoints). Idempotent per
+  // upload via savedDatasetId; non-blocking so profiling proceeds even if it fails.
+  const savedDatasetId = useRef(null);
+  const isUuid = (s) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s || "");
+
+  async function persistDataset() {
+    if (!uploadedData) return;
+    try {
+      const name = (uploadedData.filename || "cohort").replace(/\.(xlsx?|csv)$/i, "");
+      const rowCount = uploadedData.sheets.reduce(
+        (a, s) => a + (s.totalRowCount ?? s.data?.length ?? 0), 0,
+      );
+      const columns = [];
+      for (const sheet of uploadedData.sheets || []) {
+        for (const st of (sheet.column_stats || [])) {
+          const key = `${sheet.name}::${st.column}`;
+          const dec = variableMappings?.[key] || {};
+          const match = result?.matches?.find(
+            (m) => m.sheet === sheet.name && m.column === st.column,
+          );
+          columns.push({
+            sheet: sheet.name,
+            name: st.column,
+            value_kind: st.value_kind ?? null,
+            n_total: st.n_total ?? null,
+            n_non_null: st.n_non_null ?? null,
+            null_pct: st.null_pct ?? null,
+            n_distinct: st.n_distinct ?? null,
+            min: st.min ?? null,
+            max: st.max ?? null,
+            top_values: st.top_values ?? null,
+            proposed_role: match?.proposed_role ?? null,
+            proposed_group: match?.proposed_group ?? null,
+            proposed_canonical_id: match?.proposed_canonical_id ?? null,
+            confidence: match?.confidence ?? null,
+            rationale: match?.rationale ?? null,
+            user_decision: dec.user_decision ?? "pending",
+            final_role: dec.final_role ?? null,
+            final_canonical_id: dec.final_canonical_id ?? null,
+          });
+        }
+      }
+      let id = savedDatasetId.current;
+      if (!id) {
+        const ds = await apiJson("/datasets", {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            study_id: isUuid(tenantSlug) ? tenantSlug : null,
+            row_count: rowCount,
+          }),
+        });
+        id = ds.id;
+        savedDatasetId.current = id;
+      }
+      if (columns.length) {
+        await apiJson(`/datasets/${id}/columns`, {
+          method: "PUT",
+          body: JSON.stringify({ columns }),
+        });
+      }
+    } catch (e) {
+      // Non-blocking — the profiling run continues regardless.
+      console.warn("[dataset persist]", e?.message);
+    }
+  }
+
   const piiScan = uploadedData ? scanForPII(uploadedData.sheets) : null;
 
   const productDescription = [
@@ -425,6 +493,7 @@ export default function DatasetVerification({
   // Reset cached results when a freshly uploaded file replaces the prior one.
   function handleUploadAndReset(data) {
     setResult(null); setError(null); setAutoRan(false);
+    savedDatasetId.current = null; // a new file → a new library entry on next save
     handleUpload(data);
   }
 
@@ -686,7 +755,7 @@ export default function DatasetVerification({
                   {nTotal - nDecided} column{nTotal - nDecided===1?"":"s"} still pending
                 </span>
               )}
-              <Button className="text-xs font-medium" disabled={nDecided !== nTotal} onClick={() => onRunProfiling?.()}>
+              <Button className="text-xs font-medium" disabled={nDecided !== nTotal} onClick={() => { persistDataset(); onRunProfiling?.(); }}>
                 {nDecided === nTotal ? "Run profiling →" : "Confirm all columns first"}
               </Button>
             </div>

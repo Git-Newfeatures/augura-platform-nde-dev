@@ -1,29 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Check, AlertTriangle, ChevronDown, ChevronUp, Database, Sparkles } from "lucide-react";
 import { Card, Tag } from "../ui/components";
 import { Button } from "@/components/ui/button";
 import ExcelUpload from "@/components/ExcelUpload";
 import { apiJson } from "@/api";
+import { useReference } from "@/workspace/dataClient";
 
 // ── PII column-name scan ──────────────────────────────────────────────────────
-const PII_PATTERNS = [
-  { rx: /\b(first_?name|last_?name|full_?name|given_?name|family_?name)\b/i, reason: "name field" },
-  { rx: /\bemail|e_mail|e-mail\b/i,                                           reason: "email" },
-  { rx: /\bphone|mobile|telephone\b/i,                                        reason: "phone" },
-  { rx: /\baddress|street|postal|zip_?code|postcode\b/i,                      reason: "postal address" },
-  { rx: /\b(dob|date_?of_?birth|birth_?date|birthday)\b/i,                   reason: "date of birth" },
-  { rx: /\b(ssn|social_?security|national_?id|nhs_?number|nin)\b/i,          reason: "government ID" },
-  { rx: /\bpassport\b/i,                                                      reason: "passport" },
-  { rx: /\bip_?address\b/i,                                                   reason: "IP address" },
-  { rx: /\bdevice_?id\b/i,                                                    reason: "device ID" },
-];
-function scanForPII(sheets) {
+// Patterns are sourced from /reference/dq-rules; passed in from the component.
+function scanForPII(sheets, piiPatterns) {
   const flagged = [];
   for (const sheet of sheets || []) {
     for (const h of sheet.headers || []) {
       const name = String(h || "").toLowerCase().trim();
       if (!name) continue;
-      for (const p of PII_PATTERNS) {
+      for (const p of piiPatterns || []) {
         if (p.rx.test(name)) { flagged.push({ sheet: sheet.name, column: h, reason: p.reason }); break; }
       }
     }
@@ -31,37 +22,12 @@ function scanForPII(sheets) {
   return { status: flagged.length ? "error" : "ok", flagged };
 }
 
-// ── Group definitions (aligned with Augura spec Q5–Q8) ────────────────────────
-const GROUPS = [
-  { id: "outcomes",       label: "Outcomes",                 tagColor: "b", description: "Dependent variables measured at follow-up" },
-  { id: "exposure",       label: "Exposure / intervention",  tagColor: "g", description: "Primary treatment or intervention variable" },
-  { id: "engagement",     label: "Engagement & environment", tagColor: "p", description: "App usage, adherence, login, recommendation completion; geography, socioeconomic context, and healthcare system variables" },
-  { id: "administrative", label: "Administrative",           tagColor: "b", description: "Patient / member IDs, record keys, visit dates, timepoints, and columns not relevant to this study" },
-  { id: "other",          label: "Other / unclassified",     tagColor: "r", description: "Cannot be confidently classified" },
-];
-
-// Remap legacy / API-returned group IDs to the consolidated set above.
-// Confounders, colliders, and mediators are intentionally excluded from 1b —
-// they are handled at the DAG stage.
-const GROUP_REMAP = {
-  environment:    "engagement",      // merged into Engagement & environment
-  user_variables: "other",           // no longer a separate causal group
-  mediators:      "other",           // causal role decided at DAG stage
-  measured_confounder:   "other",
-  unmeasured_confounder: "other",
-  collider:       "other",
-  identifiers:    "administrative",
-  time:           "administrative",
-  unused:         "administrative",
+// Presentation-only group colors (the API carries no per-group color). Reused by
+// the GROUPS memo in the component; falls back to ROLE_TAG / 'b' when absent.
+const GROUP_TAG = {
+  outcomes: "b", exposure: "g", engagement: "p", administrative: "b", other: "r",
 };
 
-const ROLES = ["outcome", "exposure", "exposure_component", "effect_modifier", "id", "time", "unused", "other"];
-const ROLE_LABEL = {
-  outcome: "Outcome", exposure: "Exposure", exposure_component: "Exposure component",
-  measured_confounder: "Measured confounder", unmeasured_confounder: "Unmeasured confounder",
-  mediator: "Mediator", effect_modifier: "Effect modifier", collider: "Collider",
-  id: "ID", time: "Time", unused: "Unused", other: "Other",
-};
 const ROLE_TAG = {
   outcome: "b", exposure: "g", exposure_component: "g",
   measured_confounder: "a", unmeasured_confounder: "r",
@@ -120,7 +86,7 @@ function ConfBar({ value }) {
 }
 
 // ── Single column row (inside an expanded group) ──────────────────────────────
-function ColumnRow({ match, stat, decision, onDecide }) {
+function ColumnRow({ match, stat, decision, onDecide, roles, roleLabel }) {
   const [expanded, setExpanded] = useState(false);
   const role = decision?.final_role || match.proposed_role;
   const status = decision?.user_decision;
@@ -141,7 +107,7 @@ function ColumnRow({ match, stat, decision, onDecide }) {
           {match.column}
         </span>
         {/* Role tag */}
-        <Tag color={ROLE_TAG[role]}>{ROLE_LABEL[role]}</Tag>
+        <Tag color={ROLE_TAG[role]}>{roleLabel[role]}</Tag>
         {match.proposed_canonical_label && (
           <span className="max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-muted-foreground">
             → {match.proposed_canonical_label}
@@ -174,8 +140,8 @@ function ColumnRow({ match, stat, decision, onDecide }) {
               onChange={e => e.target.value && onDecide({ user_decision:"corrected", final_role:e.target.value, final_canonical_id: e.target.value === "outcome" ? match.proposed_canonical_id : null })}
               className="cursor-pointer rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground">
               <option value="">Reassign role…</option>
-              {ROLES.filter(r => r !== match.proposed_role).map(r => (
-                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+              {roles.filter(r => r !== match.proposed_role).map(r => (
+                <option key={r} value={r}>{roleLabel[r]}</option>
               ))}
             </select>
             <Button size="sm" variant="outline" className="text-xs font-medium"
@@ -195,7 +161,7 @@ function ColumnRow({ match, stat, decision, onDecide }) {
 }
 
 // ── Group accordion ───────────────────────────────────────────────────────────
-function GroupAccordion({ group, matches, statFor, variableMappings, onDecide, onAgreeAll, defaultOpen }) {
+function GroupAccordion({ group, matches, statFor, variableMappings, onDecide, onAgreeAll, defaultOpen, roles, roleLabel }) {
   const [open, setOpen] = useState(defaultOpen);
   if (!matches.length) return null;
 
@@ -250,6 +216,8 @@ function GroupAccordion({ group, matches, statFor, variableMappings, onDecide, o
                 stat={statFor(m.sheet, m.column)}
                 decision={variableMappings?.[key]}
                 onDecide={patch => onDecide(m, patch)}
+                roles={roles}
+                roleLabel={roleLabel}
               />
             );
           })}
@@ -332,6 +300,22 @@ export default function DatasetVerification({
   variableCheckResult, setVariableCheckResult,
   onRunProfiling,
 }) {
+  const { data: dqRules } = useReference("dq_rules");
+  const { data: varRoles } = useReference("variable_roles");
+
+  const PII_PATTERNS = useMemo(
+    () => (dqRules?.pii_patterns ?? []).map((p) => ({ rx: new RegExp(p.pattern, "i"), reason: p.label })),
+    [dqRules]);
+  const GROUPS = useMemo(
+    () => (varRoles?.groups ?? []).map((g) => ({
+      id: g.code, label: g.label, description: g.description, tagColor: GROUP_TAG[g.code] ?? ROLE_TAG[g.code] ?? "b",
+    })), [varRoles]);
+  const GROUP_REMAP = useMemo(() => varRoles?.group_aliases ?? {}, [varRoles]);
+  const ROLES = useMemo(
+    () => (varRoles?.roles ?? []).filter((r) => r.selectable).map((r) => r.code), [varRoles]);
+  const ROLE_LABEL = useMemo(
+    () => Object.fromEntries((varRoles?.roles ?? []).map((r) => [r.code, r.label])), [varRoles]);
+
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -421,7 +405,9 @@ export default function DatasetVerification({
     }
   }
 
-  const piiScan = uploadedData ? scanForPII(uploadedData.sheets) : null;
+  // Gate the PII scan on the dq-rules catalog so the auto-run below never fires
+  // (status "ok") before the real PII patterns have loaded.
+  const piiScan = (uploadedData && dqRules) ? scanForPII(uploadedData.sheets, PII_PATTERNS) : null;
 
   const productDescription = [
     product  && `PRODUCT:\n${product}`,
@@ -726,6 +712,8 @@ export default function DatasetVerification({
                       key={key} match={m} stat={statFor(m.sheet, m.column)}
                       decision={variableMappings?.[key]}
                       onDecide={patch => onDecide(m, patch)}
+                      roles={ROLES}
+                      roleLabel={ROLE_LABEL}
                     />
                   );
                 })}
@@ -744,6 +732,8 @@ export default function DatasetVerification({
               onDecide={onDecide}
               onAgreeAll={onAgreeAll}
               defaultOpen={false}
+              roles={ROLES}
+              roleLabel={ROLE_LABEL}
             />
           ))}
 

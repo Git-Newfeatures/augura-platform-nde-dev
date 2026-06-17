@@ -8,40 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiJson } from "@/api";
-
-const ET_LABELS = {
-  guidance:       "Guidance",
-  rwe_study:      "RWE study",
-  rct:            "RCT",
-  preprint:       "Preprint",
-  trial_record:   "Trial record",
-  meta_analysis:  "Meta-analysis",
-  adverse_events: "Adverse events",
-  other:          "Other",
-};
-
-// Long-form descriptions surfaced as hover tooltips on the coverage matrix
-// row/column labels. Targeted at clinical reviewers who asked what each tag means.
-const ET_DESCRIPTIONS = {
-  guidance:       "Regulatory guidance documents (FDA, EMA, HAS, etc.) describing how a device or therapy should be evaluated, classified, or submitted.",
-  rwe_study:      "Real-world evidence studies — observational research using routinely collected data (claims, EHR, registries, digital cohorts), not protocolised trials.",
-  rct:            "Randomised controlled trials — protocolised interventional studies with random assignment to treatment groups.",
-  preprint:       "Pre-publication manuscripts (e.g. medRxiv, bioRxiv) — not yet peer-reviewed.",
-  trial_record:   "ClinicalTrials.gov or similar registry entries describing trial protocols, recruitment status, and primary endpoints.",
-  meta_analysis:  "Systematic reviews and meta-analyses aggregating evidence across multiple primary studies.",
-  adverse_events: "Post-market safety reports submitted to regulators (e.g. MAUDE) describing device-related incidents or failures.",
-  other:          "Documents not classified into a primary evidence type.",
-};
-
-const SOURCE_DESCRIPTIONS = {
-  pubmed:         "Peer-reviewed biomedical literature indexed in PubMed.",
-  clinicaltrials: "Trial protocols and registry entries from ClinicalTrials.gov.",
-  maude:          "FDA's adverse event database for medical devices.",
-  fda_guidance:   "FDA regulatory guidance documents — frameworks and submission requirements.",
-  guidance:       "FDA regulatory guidance documents — frameworks and submission requirements.",
-  "510k":         "FDA 510(k) premarket notifications — substantial equivalence submissions for medical devices.",
-  semantic_scholar: "AI/ML literature indexed by Semantic Scholar (complements PubMed for compsci-leaning publications).",
-};
+import { useReference, codeLabelMap } from "@/workspace/dataClient";
 
 // Data-driven badge colors for the latest-evidence feed — kept inline.
 const ET_COLORS = {
@@ -51,32 +18,6 @@ const ET_COLORS = {
   preprint:      { bg:"#EEEDFE", text:"#3C3489" },
   trial_record:  { bg:"#FAEEDA", text:"#633806" },
   meta_analysis: { bg:"#FCE7F3", text:"#831843" },
-};
-
-const DOMAIN_LABELS = {
-  cardiometabolic:    "Cardiometabolic",
-  womens_health:      "Women's health",
-  preventive_health:  "Preventive health",
-  patient_monitoring: "Patient monitoring",
-  oncology_dx:        "Oncology DX",
-  neurology:          "Neurology",
-  respiratory:        "Respiratory",
-  infectious_disease: "Infectious disease",
-  ophthalmology:      "Ophthalmology",
-  radiology_ai:       "Radiology AI",
-  mental_health:      "Mental health",
-  gastroenterology:   "Gastroenterology",
-  samd_general:       "SaMD general",
-  samd_biomarker:     "SaMD biomarker",
-  regulatory_general: "Regulatory general",
-  adverse_events:     "Adverse events",
-  other:              "Other",
-};
-
-const JUR_LABELS = {
-  fda:"FDA 🇺🇸", ema:"EMA 🇪🇺", mhra:"MHRA 🇬🇧",
-  health_ca:"Health CA 🇨🇦", tga:"TGA 🇦🇺",
-  imdrf:"IMDRF 🌐", global:"Global 🌐",
 };
 
 // Coverage map columns — all declared sources, ordered by volume descending.
@@ -109,30 +50,14 @@ const COL_LABELS = {
 // Prevents near-empty sources (1–2 docs) from wasting heatmap real estate.
 const MIN_COL_DOCS = 10;
 
-const SOURCE_LABEL_FALLBACK = {
-  pubmed:        "PubMed",
-  clinicaltrials:"CT.gov",
-  maude:         "MAUDE",
-  fda_guidance:  "FDA Guidance",
-  guidance:      "FDA Guidance",
-};
-
 // Module-level — called from AgentMiniMap and CorpusPanelEmbed alike.
-// agentSources is passed in; falls back to COL_LABELS then SOURCE_LABEL_FALLBACK.
+// agentSources is the fetched cesl_sources (or agent-provided sources); resolves
+// label from those, then the COL_LABELS heatmap abbreviations, then the raw code.
 function sourceLabel(code, agentSources = []) {
   return (agentSources ?? []).find(s => s.code === code)?.label
     ?? COL_LABELS[code]
-    ?? SOURCE_LABEL_FALLBACK[code]
     ?? code;
 }
-
-// Fallback evidence_type when cesl_tags classification is absent
-const SOURCE_ET_DEFAULTS = {
-  clinicaltrials: "trial_record",
-  maude:          "adverse_events",
-  guidance:       "guidance",
-  pubmed:         "rwe_study",
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -210,7 +135,7 @@ function docUrl(doc) {
 
 
 // ── Feed Filter Bar ───────────────────────────────────────────────────────────
-function FeedFilterBar({ etFilter, onEtFilter, srcFilter, onSrcFilter, availableEts, sourceTotals, agentSources = [] }) {
+function FeedFilterBar({ etFilter, onEtFilter, srcFilter, onSrcFilter, availableEts, sourceTotals, agentSources = [], etLabels = {} }) {
   const PillBtn = ({ active, disabled, onClick, children }) => (
     <button
       onClick={disabled ? undefined : onClick}
@@ -237,7 +162,7 @@ function FeedFilterBar({ etFilter, onEtFilter, srcFilter, onSrcFilter, available
       <PillBtn active={etFilter === null} onClick={() => onEtFilter(null)}>All types</PillBtn>
       {availableEts.map(et => (
         <PillBtn key={et} active={etFilter === et} onClick={() => onEtFilter(et)}>
-          {ET_LABELS[et] ?? et}
+          {etLabels[et] ?? et}
         </PillBtn>
       ))}
       <div className="my-0.5 mx-1 w-px self-stretch bg-border" />
@@ -259,7 +184,7 @@ function FeedFilterBar({ etFilter, onEtFilter, srcFilter, onSrcFilter, available
 }
 
 // ── Latest Evidence Feed ──────────────────────────────────────────────────────
-function MiniPulseFeed({ documents, loading }) {
+function MiniPulseFeed({ documents, loading, etLabels = {} }) {
   if (loading) return (
     <div className="py-4 text-center text-[11px] text-muted-foreground">
       Loading…
@@ -276,6 +201,7 @@ function MiniPulseFeed({ documents, loading }) {
     <div className="flex flex-col">
       {documents.map((doc, i) => {
         const etCol    = ET_COLORS[doc.evidence_type] ?? { bg: "#E6F1FB", text: "#0C447C" };
+        const etLabel  = etLabels[doc.evidence_type] ?? doc.evidence_type;
         const srcStyle = sourceBadgeStyle(doc.source_id);
         const srcLabel = formatSourceId(doc.source_id);
         const url      = docUrl(doc);
@@ -288,7 +214,7 @@ function MiniPulseFeed({ documents, loading }) {
                 className="rounded-full px-[7px] py-[1.5px] text-[9.5px] font-medium"
                 style={{ background: etCol.bg, color: etCol.text }}
               >
-                {ET_LABELS[doc.evidence_type] ?? doc.evidence_type}
+                {etLabel}
               </Badge>
               {srcLabel && (
                 url ? (
@@ -363,7 +289,7 @@ function cleanRefTitle(title) {
 // ── Agent Mini Map — built from referencedDocs ────────────────────────────────
 // Rows: distinct evidence_types; Columns: distinct source_ids.
 // Clicking a cell filters the document list on the right.
-function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [] }) {
+function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [], etLabels = {}, etDescriptions = {}, sourceDescriptions = {}, sourceEtDefaults = {} }) {
   const sources = useMemo(() => {
     const s = new Set();
     for (const d of docs) if (d.source_id) s.add(d.source_id);
@@ -374,21 +300,21 @@ function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [] }) {
     const s = new Set();
     for (const d of docs) {
       if (!d.source_id) continue;
-      s.add(d.evidence_type || SOURCE_ET_DEFAULTS[d.source_id] || "other");
+      s.add(d.evidence_type || sourceEtDefaults[d.source_id] || "other");
     }
     return [...s].sort();
-  }, [docs]);
+  }, [docs, sourceEtDefaults]);
 
   const counts = useMemo(() => {
     const map = {};
     for (const d of docs) {
       if (!d.source_id) continue;
-      const et = d.evidence_type || SOURCE_ET_DEFAULTS[d.source_id] || "other";
+      const et = d.evidence_type || sourceEtDefaults[d.source_id] || "other";
       const k  = `${d.source_id}::${et}`;
       map[k] = (map[k] || 0) + 1;
     }
     return map;
-  }, [docs]);
+  }, [docs, sourceEtDefaults]);
 
   const maxCount = useMemo(() =>
     Math.max(...Object.values(counts), 1)
@@ -405,7 +331,7 @@ function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [] }) {
               <th className="w-20" />
               {sources.map(src => (
                 <th key={src}
-                  title={SOURCE_DESCRIPTIONS[src] ? `${sourceLabel(src, agentSources)} — ${SOURCE_DESCRIPTIONS[src]}` : sourceLabel(src, agentSources)}
+                  title={sourceDescriptions[src] ? `${sourceLabel(src, agentSources)} — ${sourceDescriptions[src]}` : sourceLabel(src, agentSources)}
                   className="max-w-[44px] cursor-help overflow-hidden text-ellipsis whitespace-nowrap px-px pb-1.5 text-center font-mono text-[10px] font-medium text-muted-foreground">
                   {sourceLabel(src, agentSources)}
                 </th>
@@ -416,9 +342,9 @@ function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [] }) {
             {evidenceTypes.map(et => (
               <tr key={et}>
                 <td
-                  title={ET_DESCRIPTIONS[et] ? `${ET_LABELS[et] ?? et} — ${ET_DESCRIPTIONS[et]}` : (ET_LABELS[et] ?? et)}
+                  title={etDescriptions[et] ? `${etLabels[et] ?? et} — ${etDescriptions[et]}` : (etLabels[et] ?? et)}
                   className="cursor-help whitespace-nowrap pr-2 text-right font-mono text-[10px] text-muted-foreground">
-                  {ET_LABELS[et] ?? et}
+                  {etLabels[et] ?? et}
                 </td>
                 {sources.map(src => {
                   const count    = counts[`${src}::${et}`] ?? 0;
@@ -429,7 +355,7 @@ function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [] }) {
                     <td key={src} className="p-0">
                       <div
                         onClick={() => count > 0 && onFilter(isActive ? null : { source_id: src, evidence_type: et })}
-                        title={count > 0 ? `${count} doc${count !== 1 ? "s" : ""} · ${sourceLabel(src, agentSources)} × ${ET_LABELS[et] ?? et}` : undefined}
+                        title={count > 0 ? `${count} doc${count !== 1 ? "s" : ""} · ${sourceLabel(src, agentSources)} × ${etLabels[et] ?? et}` : undefined}
                         className={`flex h-9 w-11 items-center justify-center rounded-[5px] transition-[border] duration-100 ${count > 0 ? "cursor-pointer" : "cursor-default"}`}
                         style={{
                           background: count === 0 ? "#F9F8F5" : col.bg,
@@ -459,7 +385,7 @@ function AgentMiniMap({ docs, agentFilter, onFilter, agentSources = [] }) {
 
 // ── E1 References Section ─────────────────────────────────────────────────────
 // Accepts already-deduped docs. filter = {source_id, evidence_type} | null.
-function E1ReferencesSection({ docs, filter, onClearFilter, agentSources = [] }) {
+function E1ReferencesSection({ docs, filter, onClearFilter, agentSources = [], etLabels = {}, sourceEtDefaults = {} }) {
   const [expanded, setExpanded] = useState(false);
 
   // Reset expand when filter changes
@@ -467,15 +393,15 @@ function E1ReferencesSection({ docs, filter, onClearFilter, agentSources = [] })
 
   const COLLAPSED_LIMIT = 10;
 
-  // Apply active filter — use effectiveEt so cells using SOURCE_ET_DEFAULTS still match
+  // Apply active filter — use effectiveEt so cells using sourceEtDefaults still match
   const filtered = useMemo(() => {
     if (!filter) return docs;
     return docs.filter(d => {
       if (d.source_id !== filter.source_id) return false;
-      const et = d.evidence_type || SOURCE_ET_DEFAULTS[d.source_id] || "other";
+      const et = d.evidence_type || sourceEtDefaults[d.source_id] || "other";
       return et === filter.evidence_type;
     });
-  }, [docs, filter]);
+  }, [docs, filter, sourceEtDefaults]);
 
   const extraCount = filtered.length - COLLAPSED_LIMIT;
   const displayDocs = filter ? filtered : (expanded ? filtered : filtered.slice(0, COLLAPSED_LIMIT));
@@ -542,7 +468,7 @@ function E1ReferencesSection({ docs, filter, onClearFilter, agentSources = [] })
       {filter && (
         <div className="mb-2 flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
           <span>
-            Showing {filtered.length} · {sourceLabel(filter.source_id, agentSources)} × {ET_LABELS[filter.evidence_type] ?? filter.evidence_type}
+            Showing {filtered.length} · {sourceLabel(filter.source_id, agentSources)} × {etLabels[filter.evidence_type] ?? filter.evidence_type}
           </span>
           <button
             onClick={onClearFilter}
@@ -583,7 +509,7 @@ function E1ReferencesSection({ docs, filter, onClearFilter, agentSources = [] })
 
 // ── Agent Retrieval Section — Section 1 ───────────────────────────────────────
 // Owns dedup, agentFilter state, and mini map + document list layout.
-function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
+function AgentRetrievalSection({ referencedDocs, agentSources = [], etLabels = {}, etDescriptions = {}, sourceDescriptions = {}, sourceEtDefaults = {} }) {
   const [agentFilter, setAgentFilter] = useState(null);
 
   // Dedup by composite key; keep highest similarity_score per key
@@ -607,7 +533,7 @@ function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
     return s.size;
   }, [deduped]);
 
-  // Map is always shown when docs are present — SOURCE_ET_DEFAULTS ensures rows exist
+  // Map is always shown when docs are present — sourceEtDefaults ensures rows exist
   const showMap = deduped.length > 0;
 
   // Description: report unique document count only (chunks are an internal detail)
@@ -628,7 +554,7 @@ function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
         {description}
       </div>
 
-      {/* 2-column layout when docs present (map always shown — SOURCE_ET_DEFAULTS fills rows) */}
+      {/* 2-column layout when docs present (map always shown — sourceEtDefaults fills rows) */}
       {showMap ? (
         <div className="grid grid-cols-[auto_1fr] gap-0">
           {/* Left: mini map */}
@@ -646,6 +572,10 @@ function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
               agentFilter={agentFilter}
               onFilter={setAgentFilter}
               agentSources={agentSources}
+              etLabels={etLabels}
+              etDescriptions={etDescriptions}
+              sourceDescriptions={sourceDescriptions}
+              sourceEtDefaults={sourceEtDefaults}
             />
           </div>
           {/* Right: document list */}
@@ -655,6 +585,8 @@ function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
               filter={agentFilter}
               onClearFilter={() => setAgentFilter(null)}
               agentSources={agentSources}
+              etLabels={etLabels}
+              sourceEtDefaults={sourceEtDefaults}
             />
           </div>
         </div>
@@ -665,6 +597,8 @@ function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
           filter={null}
           onClearFilter={null}
           agentSources={agentSources}
+          etLabels={etLabels}
+          sourceEtDefaults={sourceEtDefaults}
         />
       )}
     </div>
@@ -683,6 +617,30 @@ export function CorpusPanelEmbed({ onViewFull, referencedDocs = [], clientDomain
   const [srcFilter,     setSrcFilter]     = useState(null);
   // Section 2 collapsed by default; auto-expand when there's no agent run yet
   const [corpusExpanded, setCorpusExpanded] = useState(() => referencedDocs.length === 0);
+
+  // Classification labels/descriptions — sourced from /reference (no hardcoded catalogs).
+  const { data: etRows }     = useReference("evidence_types");
+  const { data: domainRows } = useReference("domains");
+  const { data: sourceRows } = useReference("cesl_sources");
+
+  const ET_LABELS = useMemo(() => codeLabelMap(etRows), [etRows]);
+  const ET_DESCRIPTIONS = useMemo(
+    () => Object.fromEntries((etRows ?? []).map((e) => [e.code, e.description])), [etRows]);
+  const DOMAIN_LABELS = useMemo(() => codeLabelMap(domainRows), [domainRows]);
+  const SOURCE_ET_DEFAULTS = useMemo(
+    () => Object.fromEntries((sourceRows ?? [])
+      .filter((s) => s.default_evidence_type)
+      .map((s) => [s.code, s.default_evidence_type])), [sourceRows]);
+  // Long-form source descriptions surfaced as hover tooltips — resolved from the
+  // fetched cesl_sources by code; no tooltip when absent.
+  const SOURCE_DESCRIPTIONS = useMemo(
+    () => Object.fromEntries((sourceRows ?? [])
+      .filter((s) => s.description)
+      .map((s) => [s.code, s.description])), [sourceRows]);
+
+  // sourceLabel resolution sources: prefer agent-provided sources, else the fetched
+  // cesl_sources. Threaded down to sub-components as `agentSources`.
+  const effectiveSources = agentSources.length ? agentSources : (sourceRows ?? []);
 
   // Fetch coverage map (source × evidence_type) from the backend (Bearer JWT, RLS).
   useEffect(() => {
@@ -782,7 +740,15 @@ export function CorpusPanelEmbed({ onViewFull, referencedDocs = [], clientDomain
         <>
           {/* ── Section 1: Augura agent retrieval ── */}
           <div className="px-4 py-5">
-            <AgentRetrievalSection referencedDocs={referencedDocs} rawRetrievalCount={rawRetrievalCount} agentSources={agentSources} />
+            <AgentRetrievalSection
+              referencedDocs={referencedDocs}
+              rawRetrievalCount={rawRetrievalCount}
+              agentSources={effectiveSources}
+              etLabels={ET_LABELS}
+              etDescriptions={ET_DESCRIPTIONS}
+              sourceDescriptions={SOURCE_DESCRIPTIONS}
+              sourceEtDefaults={SOURCE_ET_DEFAULTS}
+            />
           </div>
 
           {/* ── Divider ── */}
@@ -840,12 +806,14 @@ export function CorpusPanelEmbed({ onViewFull, referencedDocs = [], clientDomain
                   onSrcFilter={handleSrcFilter}
                   availableEts={availableEts}
                   sourceTotals={sourceTotals}
-                  agentSources={agentSources}
+                  agentSources={effectiveSources}
+                  etLabels={ET_LABELS}
                 />
 
                 <MiniPulseFeed
                   documents={feedData?.documents ?? []}
                   loading={feedLoading}
+                  etLabels={ET_LABELS}
                 />
 
                 {(feedData?.documents?.length > 0) && !feedLoading && (

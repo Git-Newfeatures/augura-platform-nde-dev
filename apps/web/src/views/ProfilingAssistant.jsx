@@ -1,40 +1,26 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/api";
 import { InfoBar } from "../ui/components";
+import { useReference, codeLabelMap } from "@/workspace/dataClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 0: PROFILING ASSISTANT
 // ─────────────────────────────────────────────────────────────────────────────
-const STUDY_DESIGN_FALLBACK = {
-  rct_parallel:             "Parallel-group RCT",
-  rct_crossover:            "Crossover RCT",
-  single_arm:               "Single-arm trial",
-  prospective_cohort:       "Prospective cohort",
-  retrospective_cohort:     "Retrospective cohort",
-  registry:                 "Registry study",
-  case_control:             "Case-control",
-  pre_post:                 "Pre-post analysis",
-  difference_in_diff:       "Difference-in-differences",
-  propensity_matched:       "Propensity score matching",
-  interrupted_ts:           "Interrupted time series",
-  regression_discontinuity: "Regression discontinuity",
-  parametric_bootstrap:     "Parametric bootstrap",
-};
-
-const DOC_TYPE_FALLBACK = {
-  pubmed:        "pubmed",
-  clinicaltrials:"clinicaltrials",
-  maude:         "maude",
-  fda_guidance:  "fda_guidance",
-};
 
 export default function ProfilingAssistant({ onDone, onRunStart, onStepsChange, product, setProduct, users, setUsers, outcome, setOutcome, uploadedData, agentStep, onAgentStep, displayName, tenantSlug, clientDomains = [], clientTagline = "", clientEndpoints = [], pendingRunToken = 0 }) {
   const [step, setStep_]        = useState(() => agentStep || "input");
   const [, setSteps]       = useState([]);
   function setStep(s) { setStep_(s); onAgentStep?.(s); }
+
+  const { data: litDesignRows } = useReference('literature_designs');
+  const { data: sourceRows }    = useReference('cesl_sources');
+  const { data: dqRules }       = useReference('dq_rules');
+  const STUDY_DESIGN_FALLBACK = useMemo(() => codeLabelMap(litDesignRows), [litDesignRows]);
+  const DOC_TYPE_FALLBACK = useMemo(
+    () => Object.fromEntries((sourceRows ?? []).map((s) => [s.code, s.code])), [sourceRows]);
 
 
   // Sync internal step when parent resets agentStep (e.g. after navigating back to Data Input)
@@ -64,6 +50,12 @@ export default function ProfilingAssistant({ onDone, onRunStart, onStepsChange, 
     if (uploadedData && localChecks.length === 0) runLocalChecks(uploadedData);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-run local checks once the backend DQ rules (biomarker ranges) arrive so the
+  // value-range check uses the real ranges rather than running before they load.
+  useEffect(() => {
+    if (uploadedData && dqRules) runLocalChecks(uploadedData);
+  }, [dqRules]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function runLocalChecks(data) {
     if (!data) { setLocalChecks([]); return; }
     const { sheets } = data;
@@ -84,13 +76,10 @@ export default function ProfilingAssistant({ onDone, onRunStart, onStepsChange, 
       checks.push({ label:"Duplicate IDs", status:"ok", message:"No duplicate member IDs detected." });
     }
 
-    const RANGES = [
-      { patterns:/hba1c/i,           min:4,   max:15,  unit:"%" },
-      { patterns:/^ldl/i,            min:30,  max:400, unit:"mg/dL" },
-      { patterns:/hs_crp|hs-crp|crp/i, min:0, max:100, unit:"mg/L" },
-      { patterns:/^bmi$/i,           min:10,  max:70,  unit:"kg/m²" },
-      { patterns:/^age$/i,           min:18,  max:100, unit:"years" },
-    ];
+    const RANGES = (dqRules?.biomarker_ranges ?? []).map((r) => ({
+      patterns: new RegExp(r.pattern, "i"),
+      min: r.value_min, max: r.value_max, unit: r.unit,
+    }));
     const rangeIssues = [];
     sheets.forEach(sheet => {
       sheet.headers.forEach((h, ci) => {

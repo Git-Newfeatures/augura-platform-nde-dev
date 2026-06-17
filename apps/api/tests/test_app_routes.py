@@ -43,6 +43,33 @@ def test_openapi_exposes_routes() -> None:
         assert path in paths, path
 
 
+def test_openapi_exposes_reference_catalogs() -> None:
+    paths = create_app().openapi()["paths"]
+    for path in (
+        "/reference/outcomes",
+        "/reference/estimands",
+        "/reference/estimators",
+        "/reference/frameworks",
+        "/reference/evidence-types",
+        "/reference/domains",
+        "/reference/jurisdictions",
+        "/reference/literature-study-designs",
+        "/reference/dq-rules",
+        "/reference/variable-roles",
+    ):
+        assert path in paths, f"missing route: {path}"
+
+
+async def test_reference_catalogs_require_auth() -> None:
+    transport = httpx.ASGITransport(app=create_app())
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        for path in ("/reference/outcomes", "/reference/dq-rules", "/reference/variable-roles"):
+            r = await client.get(path)
+            assert r.status_code == 401, path
+            assert r.headers["content-type"] == "application/problem+json"
+            assert r.json()["code"] == "unauthorized"
+
+
 async def test_protected_routes_require_auth() -> None:
     transport = httpx.ASGITransport(app=create_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:

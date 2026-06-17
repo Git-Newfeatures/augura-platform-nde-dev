@@ -173,6 +173,7 @@ def test_reference_catalogs_have_select_only_rls() -> None:
     missing = REFERENCE_CATALOGS - covered
     assert not missing, f"RLS backend_read manquante sur catalogues : {missing}"
     assert "create policy backend_read" in policies
+    assert "for select" in policies
 
 
 def test_taxonomy_tables_have_select_only_rls() -> None:

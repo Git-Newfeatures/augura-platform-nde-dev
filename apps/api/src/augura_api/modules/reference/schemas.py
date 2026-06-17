@@ -127,7 +127,7 @@ class VariableGroupOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     code: str
-    label: str
+    label: str | None = None
     description: str | None = None
 
 

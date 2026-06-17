@@ -165,8 +165,8 @@ class BiomarkerRangeCatalog(Base):
 
     code: Mapped[str] = mapped_column(Text, primary_key=True)
     pattern: Mapped[str] = mapped_column(Text)
-    value_min: Mapped[float | None] = mapped_column(Float)
-    value_max: Mapped[float | None] = mapped_column(Float)
+    value_min: Mapped[float | None] = mapped_column(Numeric)
+    value_max: Mapped[float | None] = mapped_column(Numeric)
     unit: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
@@ -196,9 +196,9 @@ class VariableRoleCatalog(Base):
 
 - [ ] **Step 2: Update the imports at the top of `models.py`**
 
-Ensure the SQLAlchemy import line includes `Float`:
+Ensure the SQLAlchemy import line includes `Numeric` (used by `BiomarkerRangeCatalog` to match the `numeric` DDL):
 ```python
-from sqlalchemy import Boolean, Float, Integer, Text, text
+from sqlalchemy import Boolean, Integer, Numeric, Text, text
 ```
 
 - [ ] **Step 3: Verify the module imports cleanly**

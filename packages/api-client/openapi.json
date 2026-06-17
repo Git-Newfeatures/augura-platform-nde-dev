@@ -40,6 +40,73 @@
         "title": "AdminStats",
         "type": "object"
       },
+      "CeslSourceOut": {
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "doc_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doc Type"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "result_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Unit"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "sort_order"
+        ],
+        "title": "CeslSourceOut",
+        "type": "object"
+      },
       "CohortBiomarkerOut": {
         "properties": {
           "adherence_pct": {
@@ -2345,6 +2412,40 @@
         "title": "StudyCreate",
         "type": "object"
       },
+      "StudyDesignOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Name"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "sort_order"
+        ],
+        "title": "StudyDesignOut",
+        "type": "object"
+      },
       "StudyOut": {
         "properties": {
           "category": {
@@ -2472,6 +2573,36 @@
           "state"
         ],
         "title": "StudyStatePut",
+        "type": "object"
+      },
+      "TenantProfileOut": {
+        "properties": {
+          "cesl_profile": {
+            "additionalProperties": true,
+            "title": "Cesl Profile",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "cesl_profile"
+        ],
+        "title": "TenantProfileOut",
         "type": "object"
       },
       "ValidationError": {
@@ -3519,6 +3650,77 @@
         "summary": "Get Job Status",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/reference/cesl-sources": {
+      "get": {
+        "operationId": "cesl_sources_reference_cesl_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CeslSourceOut"
+                  },
+                  "title": "Response Cesl Sources Reference Cesl Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cesl Sources",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/study-designs": {
+      "get": {
+        "operationId": "study_designs_reference_study_designs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StudyDesignOut"
+                  },
+                  "title": "Response Study Designs Reference Study Designs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Study Designs",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/tenant": {
+      "get": {
+        "operationId": "tenant_reference_tenant_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tenant",
+        "tags": [
+          "reference"
         ]
       }
     },

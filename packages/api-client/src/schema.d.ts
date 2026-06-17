@@ -352,6 +352,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reference/cesl-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cesl Sources */
+        get: operations["cesl_sources_reference_cesl_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/study-designs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Study Designs */
+        get: operations["study_designs_reference_study_designs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/tenant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant */
+        get: operations["tenant_reference_tenant_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/simulations": {
         parameters: {
             query?: never;
@@ -474,6 +525,23 @@ export interface components {
             unique_users: number;
             /** Window Days */
             window_days: number;
+        };
+        /** CeslSourceOut */
+        CeslSourceOut: {
+            /** Base Url */
+            base_url?: string | null;
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /** Doc Type */
+            doc_type?: string | null;
+            /** Label */
+            label: string;
+            /** Result Unit */
+            result_unit?: string | null;
+            /** Sort Order */
+            sort_order: number;
         };
         /** CohortBiomarkerOut */
         CohortBiomarkerOut: {
@@ -1224,6 +1292,17 @@ export interface components {
             /** Tagline */
             tagline?: string | null;
         };
+        /** StudyDesignOut */
+        StudyDesignOut: {
+            /** Code */
+            code: string;
+            /** Group Name */
+            group_name?: string | null;
+            /** Label */
+            label: string;
+            /** Sort Order */
+            sort_order: number;
+        };
         /** StudyOut */
         StudyOut: {
             /** Category */
@@ -1273,6 +1352,22 @@ export interface components {
             state: {
                 [key: string]: unknown;
             };
+        };
+        /** TenantProfileOut */
+        TenantProfileOut: {
+            /** Cesl Profile */
+            cesl_profile: {
+                [key: string]: unknown;
+            };
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1976,6 +2071,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cesl_sources_reference_cesl_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CeslSourceOut"][];
+                };
+            };
+        };
+    };
+    study_designs_reference_study_designs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyDesignOut"][];
+                };
+            };
+        };
+    };
+    tenant_reference_tenant_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantProfileOut"];
                 };
             };
         };

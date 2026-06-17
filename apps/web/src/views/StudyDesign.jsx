@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, ArrowLeft, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ESTIMATORS, ESTIMATOR_FILTER } from "../config";
 
 const ESTIMATOR_META = {
@@ -47,7 +48,7 @@ function Tone({ c = "b", children }) {
   );
 }
 
-export default function StudyDesign({ studyType, studyDesign = "retro_cohort", studyEstimand = "ATT" }) {
+export default function StudyDesign({ studyType, studyDesign = "retro_cohort", studyEstimand = "ATT", onNext, onBack }) {
   const isRetro = !studyType || studyType === "retro";
   const isMediation = studyDesign === "mediation";
 
@@ -142,6 +143,17 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
         </div>
       )}
 
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button
+          disabled={!isMediation && estimators.length === 0}
+          onClick={() => onNext?.(estimators)}
+        >
+          Run simulation <ArrowRight size={15} />
+        </Button>
+      </div>
     </div>
   );
 }

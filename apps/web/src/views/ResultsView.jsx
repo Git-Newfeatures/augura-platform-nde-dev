@@ -1,5 +1,6 @@
-import { Hexagon, BarChart3 } from "lucide-react";
+import { Hexagon, BarChart3, ArrowLeft, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { DagRenderer } from "./CausalModel";
 
@@ -12,7 +13,7 @@ import { DagRenderer } from "./CausalModel";
 // state instead of fabricated study results.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ResultsView({ simResults, dagCache, partnerLabel = 'Partner' }) {
+export default function ResultsView({ simResults, dagCache, partnerLabel = 'Partner', onNext, onBack }) {
   const simEst    = simResults?.result;
   const simN      = simResults?.n ?? null;
   const simEffect = simEst?.effect ?? null;
@@ -93,6 +94,15 @@ export default function ResultsView({ simResults, dagCache, partnerLabel = 'Part
           )
         }
       </Card>
+
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.()}>
+          Sensitivity analysis <ArrowRight size={15} />
+        </Button>
+      </div>
 
     </div>
   );

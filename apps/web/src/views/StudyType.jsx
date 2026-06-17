@@ -86,7 +86,7 @@ const ESTIMAND_OPTS = [
   },
 ];
 
-export default function StudyType({ partnerLabel = 'Partner', chatProps = {} }) {
+export default function StudyType({ partnerLabel = 'Partner', chatProps = {}, onNext, onBack }) {
   const [approach, setApproach] = useState("retro");
   const [design, setDesign] = useState("retro_cohort");
   const [estimand, setEstimand] = useState("ATE");
@@ -329,6 +329,15 @@ export default function StudyType({ partnerLabel = 'Partner', chatProps = {} }) 
 
       </div>
       {/* ── /two-column shell ─────────────────────────────────────────────── */}
+
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.({ approach, design, estimand })}>
+          Continue <ArrowRight size={15} />
+        </Button>
+      </div>
 
       <InlineChatbot {...chatProps} />
 

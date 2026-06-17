@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { FileText, FileCheck } from "lucide-react";
+import { FileText, FileCheck, ArrowLeft, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/EmptyState";
 import InlineChatbot from "../components/InlineChatbot";
@@ -97,7 +98,7 @@ function FormatCard({ fmt, selected, onSelect }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function ReportView({ partnerLabel = 'Partner', chatProps = {} }) {
+export default function ReportView({ partnerLabel = 'Partner', chatProps = {}, onNext, onBack }) {
   const [selectedFormat, setSelectedFormat] = useState("diga");
 
   return (
@@ -149,6 +150,15 @@ export default function ReportView({ partnerLabel = 'Partner', chatProps = {} })
           subtitle="Report compilation will assemble your locked analysis into the selected format once a live generation source is connected."
         />
       </Card>
+
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.()}>
+          Monitoring <ArrowRight size={15} />
+        </Button>
+      </div>
 
       {/* Chatbot */}
       <InlineChatbot {...chatProps} />

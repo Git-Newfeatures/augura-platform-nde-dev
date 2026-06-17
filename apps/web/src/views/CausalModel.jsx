@@ -256,7 +256,7 @@ export function DagRenderer({ nodes, edges, highlightIds = [] }) {
   );
 }
 
-export default function CausalModel({ studyType, product, outcome, dagCache, setDagCache, selectedOutcome = "hba1c", selectedCohort = "", cqExposure, cqPopulation, partnerLabel = 'Partner', candidateOutcomes = [], datasetVariables = null, chatProps = {} }) {
+export default function CausalModel({ studyType, product, outcome, dagCache, setDagCache, selectedOutcome = "hba1c", selectedCohort = "", cqExposure, cqPopulation, partnerLabel = 'Partner', candidateOutcomes = [], datasetVariables = null, chatProps = {}, onNext, onBack }) {
 
   const [cohort, setCohort] = useState(null);
 
@@ -915,6 +915,15 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
           </div>
         </Card>
       )}
+
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.()}>
+          Continue <ArrowRight size={15} />
+        </Button>
+      </div>
 
     </div>
   );

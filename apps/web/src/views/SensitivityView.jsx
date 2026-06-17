@@ -1,5 +1,6 @@
-import { Info, ShieldQuestion } from "lucide-react";
+import { Info, ShieldQuestion, ArrowLeft, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tag } from "../ui/components";
 import { EmptyState } from "@/components/EmptyState";
 import InlineChatbot from "../components/InlineChatbot";
@@ -192,7 +193,7 @@ function EValueSection({ sens, partnerLabel = 'Partner' }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function SensitivityView({ simResults, partnerLabel = 'Partner', chatProps = {} }) {
+export default function SensitivityView({ simResults, partnerLabel = 'Partner', chatProps = {}, onNext, onBack }) {
   const sens = deriveSensitivity(simResults);
 
   return (
@@ -234,6 +235,15 @@ export default function SensitivityView({ simResults, partnerLabel = 'Partner', 
           subtitle="Sensitivity analysis is computed from the locked estimator result. Run and lock an estimator to see E-value robustness here."
         />
       )}
+
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.()}>
+          Generate report <ArrowRight size={15} />
+        </Button>
+      </div>
 
       {/* Chatbot */}
       <InlineChatbot {...chatProps} />

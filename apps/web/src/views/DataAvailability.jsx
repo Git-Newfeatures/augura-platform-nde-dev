@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Check, X, AlertTriangle, Users, Filter, Network, Database } from "lucide-react";
+import { Check, X, AlertTriangle, Users, Filter, Network, Database, ArrowLeft, ArrowRight } from "lucide-react";
 import { fetchCohort } from "../workspace/cohortData";
 import { InfoBar } from "../ui/components";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SubTabs } from "@/cockpit/SubTabs";
 import { EmptyState } from "@/components/EmptyState";
 import InlineChatbot from "../components/InlineChatbot";
@@ -53,7 +54,7 @@ function SectionLabel({ children }) {
   return <div className="mb-2 text-[13px] font-semibold text-foreground">{children}</div>;
 }
 
-export default function DataAvailability({ selectedOutcome = "hba1c", selectedCohort = "", partnerLabel = 'Partner', hasEngagementCol: _hasEngagementCol = true, chatProps = {} }) {
+export default function DataAvailability({ selectedOutcome = "hba1c", selectedCohort = "", partnerLabel = 'Partner', hasEngagementCol: _hasEngagementCol = true, chatProps = {}, onNext, onBack }) {
   const [cohort, setCohort] = useState(null);
   const [sub, setSub] = useState("population");
 
@@ -205,6 +206,15 @@ export default function DataAvailability({ selectedOutcome = "hba1c", selectedCo
           />
         </Card>
       )}
+
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.()}>
+          Continue <ArrowRight size={15} />
+        </Button>
+      </div>
 
       <InlineChatbot {...chatProps} />
 

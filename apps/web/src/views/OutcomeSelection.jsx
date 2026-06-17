@@ -182,7 +182,7 @@ function ElementHeader({ icon: Icon, label, accent, rationale, editing, onEdit, 
   );
 }
 
-export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, selectedCohort = '', cqExposure, setCqExposure, cqPopulation, setCqPopulation, partnerLabel = 'Partner', hasEngagementCol = true, projectEndpoints = [], chatProps = {} }) {
+export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, selectedCohort = '', cqExposure, setCqExposure, cqPopulation, setCqPopulation, partnerLabel = 'Partner', hasEngagementCol = true, projectEndpoints = [], chatProps = {}, onNext, onBack }) {
   const [sel, setSel]         = useState(selectedOutcome ?? "hba1c");
   const [liveStats, setLiveStats] = useState(null);
 
@@ -481,6 +481,15 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
         </>
         )}
       </Card>
+
+      <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button variant="ghost" onClick={() => onBack?.()}>
+          <ArrowLeft size={15} /> Back
+        </Button>
+        <Button onClick={() => onNext?.()}>
+          Continue <ArrowRight size={15} />
+        </Button>
+      </div>
 
       {/* ── Augura assistant — BOTTOM ─────────────────────────────────────── */}
       <InlineChatbot {...chatProps} />

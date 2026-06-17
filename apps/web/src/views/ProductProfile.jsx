@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ChevronRight, LineChart, Hexagon } from "lucide-react";
+import { ChevronRight, LineChart, Hexagon, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SubTabs } from "@/cockpit/SubTabs";
 import { InfoBar, Radar, IntelRow, IntelBlock } from "../ui/components";
 import { EmptyState } from "@/components/EmptyState";
@@ -9,7 +10,7 @@ import InlineChatbot from "../components/InlineChatbot";
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 1: PRODUCT PROFILE
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ProductProfile({ e1Profile, partnerLabel = 'Partner', benchmarkMeta = null, chatProps = {} }) {
+export default function ProductProfile({ e1Profile, partnerLabel = 'Partner', benchmarkMeta = null, chatProps = {}, onNext }) {
   const [sub, setSub] = useState("product");
   // Scores are 0–5 natively from the agent; legacy/dev fixtures may still be 0–100,
   // so auto-detect: anything >5 is treated as a 0–100 value and scaled down.
@@ -200,6 +201,12 @@ export default function ProductProfile({ e1Profile, partnerLabel = 'Partner', be
           subtitle="No live data source wired. Engagement variable mappings, temporal trends, and baseline distribution will appear here once a dataset is connected."
         />
       )}
+
+      <div className="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
+        <Button onClick={() => onNext?.()}>
+          Continue <ArrowRight size={15} />
+        </Button>
+      </div>
 
       {/* Inline chatbot */}
       <InlineChatbot {...chatProps} />

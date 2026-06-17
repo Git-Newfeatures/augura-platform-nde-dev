@@ -19,3 +19,13 @@ class AdminStats(BaseModel):
     unique_users: int
     by_type: dict[str, int]
     recent: list[RecentEvent]
+
+
+class ActivityEvent(BaseModel):
+    """Élément du fil d'activité (audit trail), accessible à tout membre du tenant."""
+
+    id: UUID
+    event_type: str
+    route: str | None = None
+    created_at: datetime
+    metadata: dict[str, object] | None = None

@@ -25,21 +25,70 @@ function PageHead({ icon, title, sub }) {
   );
 }
 
-// ── History — the per-study run log (sketch's "primary daily-use surface") ─────
-const HISTORY_ICON = {
-  simulation: FlaskConical, profiling: Brain, dag: Network, export: FileText, upload: Upload, edit: RotateCcw,
+// ── History — the workspace audit trail, from the analytics activity feed ──────
+const EVENT_LABEL = {
+  "study.created": "Study created",
+  "study.updated": "Study updated",
+  "simulation.requested": "Simulation requested",
+  "simulation.bootstrap.succeeded": "Simulation completed",
+  "document.requested": "Dossier requested",
+  "document.generated": "Dossier generated",
+  "cohort.imported": "Cohort imported",
 };
 
+function relTime(iso) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "";
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
 export function StudyHistory() {
+  const [events, setEvents] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try { const e = await apiJson("/analytics/activity?limit=50"); if (alive) setEvents(e); }
+      catch { if (alive) setEvents([]); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   return (
     <div className="flex flex-col gap-5">
       <PageHead icon={<><History size={13} /> Study · Activity</>} title="History"
-        sub="Every run, agent call, edit, and export for this study — the full audit trail." />
-      <EmptyState
-        icon={History}
-        title="No activity yet"
-        subtitle="The audit trail will populate as runs, agent calls, edits, and exports happen for this study."
-      />
+        sub="Runs, agent calls, edits, and exports across your workspace — the audit trail." />
+      {events == null ? (
+        <div className="py-10 text-center text-[12px] text-muted-foreground">Loading activity…</div>
+      ) : events.length === 0 ? (
+        <EmptyState
+          icon={History}
+          title="No activity yet"
+          subtitle="The audit trail will populate as runs, agent calls, edits, and exports happen."
+        />
+      ) : (
+        <Card className="gap-0 overflow-hidden p-0">
+          {events.map((e, i) => (
+            <div
+              key={e.id}
+              className={`flex items-center gap-3 px-4 py-3 ${i === events.length - 1 ? "" : "border-b border-border/60"}`}
+            >
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+              <span className="flex-1 text-[13px] text-foreground">
+                {EVENT_LABEL[e.event_type] || e.event_type}
+                {e.metadata?.name && <span className="text-muted-foreground"> · {e.metadata.name}</span>}
+                {e.metadata?.type && <span className="text-muted-foreground"> · {e.metadata.type}</span>}
+                {e.metadata?.cohort_name && <span className="text-muted-foreground"> · {e.metadata.cohort_name}</span>}
+              </span>
+              <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground/70">{relTime(e.created_at)}</span>
+            </div>
+          ))}
+        </Card>
+      )}
     </div>
   );
 }

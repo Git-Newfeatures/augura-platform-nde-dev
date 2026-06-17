@@ -1,8 +1,33 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell } from 'lucide-react'
 import { supabase } from '@/supabase'
+import { apiJson } from '@/api'
 import AuguraAdminDashboard from '@/AuguraAdminDashboard'
+
+const NOTIF_LABEL = {
+  'study.created': 'Study created',
+  'study.updated': 'Study updated',
+  'simulation.requested': 'Simulation requested',
+  'simulation.bootstrap.succeeded': 'Simulation completed',
+  'document.requested': 'Dossier requested',
+  'document.generated': 'Dossier ready',
+  'cohort.imported': 'Cohort imported',
+}
+const notifRoute = (t) =>
+  t.startsWith('simulation') ? '/runs'
+    : t.startsWith('document') ? '/dossiers'
+    : t.startsWith('cohort') ? '/datasets'
+    : '/studies'
+const notifWhen = (iso) => {
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return ''
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  return hrs < 24 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`
+}
 
 // Evidence Workspace top bar: brand cluster + center ⌘K search pill + right cluster
 // (bell, user pill). Full-bleed sticky frosted 58px header.
@@ -13,7 +38,23 @@ export function TopBar({ email = '', onSearch }) {
   const [showAdmin, setShowAdmin] = useState(false)
   const [menu, setMenu] = useState(null) // null | 'bell' | 'account'
   const isAdmin = email.endsWith('@augura.health')
-  const notifs = []
+  const [notifs, setNotifs] = useState([])
+  useEffect(() => {
+    let alive = true
+    apiJson('/analytics/activity?limit=8')
+      .then((evs) => {
+        if (!alive) return
+        setNotifs((evs || []).map((e) => ({
+          id: e.id,
+          title: NOTIF_LABEL[e.event_type] || e.event_type,
+          sub: [e.metadata?.name || e.metadata?.cohort_name || e.metadata?.type, notifWhen(e.created_at)]
+            .filter(Boolean).join(' · '),
+          to: notifRoute(e.event_type),
+        })))
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   function signOut() {
     setMenu(null)
@@ -83,7 +124,7 @@ export function TopBar({ email = '', onSearch }) {
               ) : (
                 notifs.map((n) => (
                   <button
-                    key={n.title}
+                    key={n.id}
                     onClick={() => { setMenu(null); navigate(n.to) }}
                     className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/50"
                   >

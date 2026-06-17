@@ -92,6 +92,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analytics/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity
+         * @description Fil d'activité du tenant (audit trail) — accessible à tout membre, filtrable
+         *     par étude. Alimente l'onglet History et les notifications du front.
+         */
+        get: operations["activity_analytics_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/analytics/admin": {
         parameters: {
             query?: never;
@@ -607,6 +628,30 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActivityEvent
+         * @description Élément du fil d'activité (audit trail), accessible à tout membre du tenant.
+         */
+        ActivityEvent: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Event Type */
+            event_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
+            /** Route */
+            route?: string | null;
+        };
         /** AdminStats */
         AdminStats: {
             /** By Type */
@@ -1815,6 +1860,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VariableCheckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_analytics_activity_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                study_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityEvent"][];
                 };
             };
             /** @description Validation Error */

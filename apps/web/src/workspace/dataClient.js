@@ -111,8 +111,28 @@ const normCoverage = (resp) => {
     }))
 }
 
+// Variables registry → flattens profiled dataset columns into the shape VariablesPage
+// renders. A column is "ok" when it has a role and low missingness.
+const normVariables = (datasetsWithCols, studyNameById = new Map()) => {
+  const out = []
+  for (const { dataset, columns } of datasetsWithCols) {
+    for (const c of columns) {
+      const role = c.final_role || c.proposed_role || '—'
+      out.push({
+        id: `${dataset.id}:${c.sheet}:${c.name}`,
+        v: c.name,
+        role,
+        study: studyNameById.get(dataset.study_id) ?? dataset.name,
+        studyId: dataset.study_id,
+        type: c.value_kind || '—',
+        ok: role !== '—' && (c.null_pct == null || c.null_pct <= 0.2),
+      })
+    }
+  }
+  return out
+}
+
 // collection → async fetcher returning the normalized array (or [] on empty).
-// `variables` has no backend list endpoint yet → [] (EmptyState).
 const FETCHERS = {
   studies:         async () => normStudies(await apiJson('/studies')),
   datasets:        async () => {
@@ -134,7 +154,20 @@ const FETCHERS = {
     const nameById = new Map((studies ?? []).map((s) => [s.id, s.name]))
     return normRuns(rows, nameById)
   },
-  variables:       async () => [],
+  variables:       async () => {
+    const [datasets, studies] = await Promise.all([
+      apiJson('/datasets'),
+      apiJson('/studies').catch(() => []),
+    ])
+    const nameById = new Map((studies ?? []).map((s) => [s.id, s.name]))
+    const withCols = await Promise.all(
+      (datasets ?? []).map(async (d) => ({
+        dataset: d,
+        columns: await apiJson(`/datasets/${d.id}/columns`).catch(() => []),
+      })),
+    )
+    return normVariables(withCols, nameById)
+  },
 }
 
 /**

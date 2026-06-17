@@ -46,3 +46,15 @@ class AnalyticsRepo:
             "by_type": {str(t): int(n) for t, n in by_type_rows},
             "recent": list(recent),
         }
+
+    async def recent_activity(
+        self, tenant_id: TenantId, *, limit: int = 30, study_id: str | None = None
+    ) -> list[UsageEvent]:
+        """Fil d'activité tenant (audit trail), le plus récent d'abord. Filtre optionnel
+        sur metadata->>'study_id' quand un study_id est fourni."""
+        stmt = select(UsageEvent).where(UsageEvent.org_id == tenant_id)
+        if study_id:
+            stmt = stmt.where(UsageEvent.metadata_["study_id"].astext == study_id)
+        stmt = stmt.order_by(UsageEvent.created_at.desc()).limit(limit)
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())

@@ -1,6 +1,55 @@
 {
   "components": {
     "schemas": {
+      "ActivityEvent": {
+        "description": "Élément du fil d'activité (audit trail), accessible à tout membre du tenant.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          }
+        },
+        "required": [
+          "id",
+          "event_type",
+          "created_at"
+        ],
+        "title": "ActivityEvent",
+        "type": "object"
+      },
       "AdminStats": {
         "properties": {
           "by_type": {
@@ -3437,6 +3486,70 @@
         "summary": "Variable Check",
         "tags": [
           "agents"
+        ]
+      }
+    },
+    "/analytics/activity": {
+      "get": {
+        "description": "Fil d'activité du tenant (audit trail) — accessible à tout membre, filtrable\npar étude. Alimente l'onglet History et les notifications du front.",
+        "operationId": "activity_analytics_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "study_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Study Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityEvent"
+                  },
+                  "title": "Response Activity Analytics Activity Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activity",
+        "tags": [
+          "analytics"
         ]
       }
     },

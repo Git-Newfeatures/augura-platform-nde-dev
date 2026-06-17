@@ -15,6 +15,23 @@ class AnalyticsService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def activity(
+        self, tenant: CurrentTenant, *, limit: int = 30, study_id: str | None = None
+    ) -> list[schemas.ActivityEvent]:
+        rows = await AnalyticsRepo(self.session).recent_activity(
+            tenant.tenant_id, limit=max(1, min(100, limit)), study_id=study_id
+        )
+        return [
+            schemas.ActivityEvent(
+                id=e.id,
+                event_type=e.event_type,
+                route=e.route,
+                created_at=e.created_at,
+                metadata=e.metadata_,
+            )
+            for e in rows
+        ]
+
     async def admin_stats(
         self, tenant: CurrentTenant, *, window_days: int = 7
     ) -> schemas.AdminStats:

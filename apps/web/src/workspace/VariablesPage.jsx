@@ -49,8 +49,8 @@ export function VariablesPage() {
             </div>
             {variables.map((r, i) => (
               <div
-                key={r.v}
-                onClick={() => openStudy(r.study)}
+                key={r.id}
+                onClick={() => openStudy(r.studyId || r.study)}
                 className={`flex cursor-pointer items-center gap-3.5 py-3 transition-colors hover:bg-muted/30 ${i === variables.length - 1 ? '' : 'border-b border-border'}`}
                 style={{ background: r.ok ? 'transparent' : 'rgba(185,137,0,0.05)' }}
               >

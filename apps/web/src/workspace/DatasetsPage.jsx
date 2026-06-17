@@ -12,6 +12,7 @@ import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { useCollection } from '@/workspace/dataClient'
 import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
+import { CohortImport } from '@/workspace/CohortImport'
 import { apiJson } from '@/api'
 
 // status → Badge props
@@ -195,6 +196,7 @@ export function DatasetsPage() {
       eyebrow="Library · Cohorts"
       title="Data"
       sub={loading ? 'Loading…' : `${datasets.length} dataset${datasets.length === 1 ? '' : 's'} across your studies`}
+      action={<CohortImport />}
     >
       {loading ? (
         <Loading />

@@ -94,6 +94,9 @@ async def stream_profiling(
                     "tool_use", f"→ [{label}] {shown}", tool=block.name, tool_use_id=block.id
                 )
                 rows = await retriever(block.name, query_str)
+                # Surface the per-source result count to the client (drives the
+                # profiling-run UI counters) before feeding it back to the model.
+                yield _ndjson("tool_result", "", tool=block.name, count=len(rows))
                 results.append(
                     {
                         "type": "tool_result",

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/api";
 import { InfoBar } from "../ui/components";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ const DOC_TYPE_FALLBACK = {
   fda_guidance:  "fda_guidance",
 };
 
-export default function ProfilingAssistant({ onDone, onRunStart, onStepsChange, product, setProduct, users, setUsers, outcome, setOutcome, uploadedData, agentStep, onAgentStep, displayName, tenantSlug, studyDesigns = {}, agentSources = [], clientDomains = [], clientTagline = "", clientEndpoints = [], pendingRunToken = 0 }) {
+export default function ProfilingAssistant({ onDone, onRunStart, onStepsChange, product, setProduct, users, setUsers, outcome, setOutcome, uploadedData, agentStep, onAgentStep, displayName, tenantSlug, clientDomains = [], clientTagline = "", clientEndpoints = [], pendingRunToken = 0 }) {
   const [step, setStep_]        = useState(() => agentStep || "input");
   const [, setSteps]       = useState([]);
   function setStep(s) { setStep_(s); onAgentStep?.(s); }
@@ -181,62 +182,6 @@ export default function ProfilingAssistant({ onDone, onRunStart, onStepsChange, 
   const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
   const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  async function getEmbedding(text) {
-    const res = await fetch("/api/openai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "text-embedding-3-small", input: text.slice(0, 8000) }),
-    });
-    const data = await res.json().catch(() => null);
-    const emb = data?.data?.[0]?.embedding;
-    if (!emb) throw new Error("Embedding unavailable");
-    return emb;
-  }
-
-  async function semanticSearch(query, docType, limit = 10) {
-    const embedding = await getEmbedding(query);
-    const res = await fetch("/api/supabase", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query_embedding: "[" + embedding.join(",") + "]",
-        match_count:     limit,
-        doc_type_filter: docType,
-        tenant_slug:     tenantSlug ?? null,
-      }),
-    });
-    const rows = await res.json();
-    if (!Array.isArray(rows)) return [];
-    return rows;
-  }
-
-  const getDocType = (code) =>
-    agentSources.find(s => s.code === code)?.doc_type
-    ?? DOC_TYPE_FALLBACK[code]
-    ?? code;
-
-  // Prepend client clinical context to agent-generated queries for better
-  // semantic search relevance — prevents cross-client document bleed.
-  const ctxPrefix = [clientEndpoints[0], clientDomains[0]].filter(Boolean).join(" ");
-  const withCtx   = (q) => ctxPrefix ? `${ctxPrefix} ${q}` : q;
-
-  const TOOL_FNS = {
-    search_pubmed:          (q, n) => semanticSearch(withCtx(q), getDocType("pubmed"),        n || 10),
-    search_clinicaltrials:  (q, n) => semanticSearch(withCtx(q), getDocType("clinicaltrials"),n || 10),
-    search_maude:           (q, n) => semanticSearch(withCtx(q), getDocType("maude"),          n || 10),
-    search_fda_guidance:    (q, n) => semanticSearch(withCtx(q), getDocType("fda_guidance"),  n || 5),
-  };
-
-  // Minimum cosine similarity per source. Rows below threshold are dropped.
-  // 0.40 calibrated against intern's Gemini-judged relevance benchmark
-  // (3-layer prompt + floor 0.40 produced 2-3x more quality docs than 0.55).
-  const SIMILARITY_THRESHOLD = {
-    search_pubmed:         0.30,
-    search_clinicaltrials: 0.30,
-    search_maude:          0.30,
-    search_fda_guidance:   0.30,
-  };
-
   const AGENT_TOOLS = [
     { name:"search_pubmed",         description:"Search peer-reviewed clinical literature in PubMed for study precedents, effect sizes, endpoints, and comparable interventions.", input_schema:{ type:"object", properties:{ query:{type:"string"}, max_results:{type:"integer",default:10} }, required:["query"] } },
     { name:"search_clinicaltrials", description:"Search ClinicalTrials.gov for comparable study designs, sample sizes, and active trials.", input_schema:{ type:"object", properties:{ query:{type:"string"}, max_results:{type:"integer",default:10} }, required:["query"] } },
@@ -293,505 +238,84 @@ SCOPE: Your task is to characterise the literature and regulatory landscape for 
 CRITICAL: risk_dimensions array MUST have exactly 6 elements. opportunity_dimensions array MUST have exactly 6 elements. study_designs array MUST have exactly 3 elements. Return ONLY valid JSON.
 CRITICAL: Return raw JSON only. No markdown fences. No \`\`\`json. No \`\`\` wrapper. Start your response with { and end with }.`;
 
-  // Retry a retrieval call once after a short delay. Most failures are
-  // transient (network blip, OpenAI embedding rate limit). On second failure,
-  // re-throws so the existing catch block surfaces the error in the UI.
-  async function retryRetrieval(label, fn) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        return await fn();
-      } catch (err) {
-        console.error(`[profiling] ${label} attempt ${attempt} failed:`, err?.message ?? err);
-        if (attempt === 2) throw err;
-        await new Promise(r => setTimeout(r, 1500));
-      }
-    }
-  }
-
-  async function callWithRetry(body, addLine, retries=4) {
-    for (let i=0; i<retries; i++) {
-      const res = await fetch("/api/anthropic", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(body),
-      });
-      if (res.status === 429 || res.status === 529) {
-        const wait = (i+1) * 8000;
-        addLine(`   API busy — retrying in ${wait/1000}s…`);
-        await new Promise(r => setTimeout(r, wait));
-        continue;
-      }
-      return await res.json();
-    }
-    throw new Error("API unavailable after retries — please try again in a moment");
-  }
-
-  // Streaming variant — used for the synthesis call so tokens appear as Claude writes.
-  // Has a built-in 90s AbortController timeout to prevent indefinite hangs on
-  // sparse corpora where synthesis takes much longer than tool-call rounds.
-  async function callWithRetryStreaming(body, onTextDelta, retries=4) {
-    for (let i=0; i<retries; i++) {
-      const controller = new AbortController();
-      const timeoutId  = setTimeout(() => controller.abort(), 90_000);
-
-      let res;
-      try {
-        res = await fetch("/api/anthropic", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ ...body, stream: true }),
-          signal: controller.signal,
-        });
-      } catch(fetchErr) {
-        clearTimeout(timeoutId);
-        if (fetchErr.name === "AbortError")
-          throw new Error("Synthesis timed out after 90s — please retry");
-        throw fetchErr;
-      }
-
-      if (res.status === 429 || res.status === 529) {
-        clearTimeout(timeoutId);
-        await new Promise(r => setTimeout(r, (i+1) * 8000));
-        continue;
-      }
-
-      try {
-        const reader = res.body.getReader();
-        const dec    = new TextDecoder();
-        let buf = "", blocks = [], stopReason = null, accumText = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          const lines = buf.split("\n"); buf = lines.pop();
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6).trim();
-            if (!raw || raw === "[DONE]") continue;
-            try {
-              const ev = JSON.parse(raw);
-              if (ev.type === "content_block_start") {
-                const cb = ev.content_block;
-                blocks[ev.index] = cb.type === "tool_use"
-                  ? { type:"tool_use", id:cb.id, name:cb.name, _json:"" }
-                  : { type:"text", text: cb.text || "" };
-              } else if (ev.type === "content_block_delta") {
-                const blk = blocks[ev.index];
-                if (!blk) continue;
-                if (ev.delta.type === "text_delta") {
-                  blk.text  += ev.delta.text;
-                  accumText += ev.delta.text;
-                  onTextDelta?.(accumText);
-                } else if (ev.delta.type === "input_json_delta") {
-                  blk._json += ev.delta.partial_json;
-                }
-              } else if (ev.type === "message_delta") {
-                stopReason = ev.delta?.stop_reason ?? stopReason;
-              }
-            } catch { /* ignore malformed SSE chunk */ }
-          }
-        }
-        clearTimeout(timeoutId);
-        const content = blocks.filter(Boolean).map(b => {
-          if (b.type === "tool_use") {
-            let input = {}; try { input = JSON.parse(b._json); } catch { /* malformed tool JSON */ }
-            return { type:"tool_use", id:b.id, name:b.name, input };
-          }
-          return { type:"text", text: b.text || "" };
-        });
-        return { stop_reason: stopReason, content, error: null };
-      } catch(streamErr) {
-        clearTimeout(timeoutId);
-        if (streamErr.name === "AbortError")
-          throw new Error("Synthesis timed out after 90s — please retry");
-        throw streamErr;
-      }
-    }
-    throw new Error("API unavailable after retries — please try again in a moment");
-  }
-
   async function run() {
     setStep("running"); setSteps([]); setAgentError(null); setBannerDismissed(false);
     onRunStart?.({ product, users, projectId: tenantSlug, ranAt: new Date().toISOString() });
-    // E1 profiling reasons about the literature/corpus only — not the user's
-    // uploaded dataset. Dataset-aware reasoning happens later (Variable
-    // Availability, Simulation, Results). Keeping the dataset out of the
-    // profiling prompt prevents N values, column names, and ground-truth
-    // values from leaking into corpus-level claims.
     const productDescription = `${product}\n\nUser characteristics:\n${users}\n\nOutcomes of interest:\n${outcome}`;
-    const addLine = (t, replaceLast = false) => setSteps(p => {
-      // replaceLast: update the last entry only if it is already a __SYNTHSTREAM token
-      const shouldReplace = replaceLast && p.length > 0 &&
-        String(p[p.length - 1]).startsWith("__SYNTHSTREAM:");
-      const next = shouldReplace ? [...p.slice(0, -1), t] : [...p, t];
-      onStepsChange?.(next);
-      return next;
-    });
-
+    const addLine = (t) => setSteps(p => { const next = [...p, t]; onStepsChange?.(next); return next; });
     addLine("__INIT__");
 
     try {
-      const messages = [{ role: "user", content: productDescription }];
-      let profile = null;
-      let iterations = 0;
-      const MAX          = 6;   // max outer iterations (tool rounds + synthesis)
-      const MAX_TOOL_CALLS = 16; // hard cap on individual tool calls (4 sources × 2 max × 2 buffer)
-      const _refDocs = [];
-      const _refSeen = new Set();
-      const _refSourceCnt = {};
-
-      const calledTools    = new Set(); // tracks which tools have been called (any call)
-      const _toolCallCnt   = {};        // per-source call counter — max 2 per source
-      const _toolResultCnt = {};        // unique doc count per source (for synthesis summary)
-      const _sourceUrlSets = {};        // per-source Set of unique URLs — drives display counts
-      let   totalToolCalls = 0;         // cumulative tool calls across all iterations
-      let   synthSignaled     = false;   // ensures __SYNTH__ emitted at most once
-      let   wasSynthesisRound = false;  // set true when synthesis call fires; used for max_tokens fallback
-
-      while (iterations < MAX) {
-        iterations++;
-
-        // ── Synthesis trigger ─────────────────────────────────────────────────
-        // Primary: all 4 sources have been called at least once (ideal path)
-        // Fallback: tool call cap hit — force synthesis with accumulated results
-        // Never fire based on iteration count alone — MAUDE/FDA must be called first
-        const REQUIRED_SOURCES = [
-          'search_pubmed', 'search_clinicaltrials', 'search_maude', 'search_fda_guidance'
-        ];
-        const allSourcesCalled = REQUIRED_SOURCES.every(s => calledTools.has(s));
-        const isSynthesisRound = !synthSignaled && iterations > 1 && (
-          allSourcesCalled ||
-          totalToolCalls >= MAX_TOOL_CALLS
-        );
-
-        let data;
-        if (isSynthesisRound) {
-          // Empty-corpus guard: if every source returned zero documents, synthesising
-          // would force the model to invent a profile (or hang on the 90s timeout).
-          // Fail clearly instead — this is almost always an empty/misconfigured corpus
-          // for this tenant, not a genuine "no evidence exists" result.
-          if (_refDocs.length === 0) {
-            addLine("⚠ No matching documents in the evidence corpus — profiling stopped");
-            setAgentError("No matching documents were found in the evidence corpus for this product. This usually means the corpus is empty or not configured for this tenant. Check the corpus is populated, then retry.");
-            setStep("input");
-            break;
-          }
-          // Emit synthesising status IMMEDIATELY — before the Anthropic wait
-          addLine("__SYNTH__");
-          synthSignaled     = true;
-          wasSynthesisRound = true;
-
-          // Build compact evidence summary — collapses full tool history into
-          // a single user message with source counts + top-2 titles per source.
-          // Reduces synthesis input from ~10k tokens to ~500 tokens.
-          const SOURCE_TO_TOOL = {
-            pubmed:         "search_pubmed",
-            clinicaltrials: "search_clinicaltrials",
-            maude:          "search_maude",
-            fda_guidance:   "search_fda_guidance",
-          };
-          const TOOL_DISPLAY_S = {
-            search_pubmed:         "PubMed",
-            search_clinicaltrials: "ClinicalTrials.gov",
-            search_maude:          "MAUDE",
-            search_fda_guidance:   "FDA Guidance",
-          };
-          const TOOL_ORDER_S = ["search_pubmed","search_clinicaltrials","search_maude","search_fda_guidance"];
-
-          // Group _refDocs by tool (top 2 per source, highest similarity first)
-          const docsByTool = {};
-          for (const doc of _refDocs) {
-            const tool = SOURCE_TO_TOOL[doc.source_id] || `search_${doc.source_id}`;
-            if (!docsByTool[tool]) docsByTool[tool] = [];
-            if (docsByTool[tool].length < 2) docsByTool[tool].push(doc);
-          }
-
-          const summaryLines = ["EVIDENCE CORPUS SEARCH RESULTS\n"];
-          for (const tool of TOOL_ORDER_S) {
-            const label = TOOL_DISPLAY_S[tool] || tool;
-            const count = _toolResultCnt[tool] ?? 0;
-            const docs  = docsByTool[tool] ?? [];
-            summaryLines.push(
-              `${label}: ${count} result${count !== 1 ? "s" : ""}${docs.length ? ". Top matches:" : "."}`
-            );
-            docs.forEach((d, i) => {
-              const score = d.similarity_score != null ? ` (score: ${d.similarity_score.toFixed(2)})` : "";
-              summaryLines.push(`  ${i + 1}. ${(d.title || "Untitled").slice(0, 120)}${score}`);
-            });
-          }
-          summaryLines.push("\n\nReturn only the JSON object.");
-
-          const synthesisMessages = [
-            {
-              role:    "user",
-              content: `${messages[0].content}\n\n${summaryLines.join("\n")}`,
-            },
-          ];
-
-          // Synthesis call — no tools (forces JSON response), 90s timeout built in.
-          // Haiku + 400 max_tokens + trimmed schema → target <5s generation.
-          let synthFirstToken = true;
-          let synthThrottleTimer = null;
-          data = await callWithRetryStreaming({
-            model:       "claude-haiku-4-5-20251001",
-            max_tokens:  4000,  // raised from 1200: long rationales on rich inputs were truncating mid-JSON, causing parse failures
-            temperature: 0,
-            system:      AGENT_SYSTEM,
-            // no tools — forces text (JSON) output, not more tool calls
-            messages:    synthesisMessages,
-          }, (accumulatedText) => {
-            // Throttle to ≤7 state updates/s — replace previous __SYNTHSTREAM: token
-            if (!synthThrottleTimer) {
-              synthThrottleTimer = setTimeout(() => {
-                synthThrottleTimer = null;
-                addLine(`__SYNTHSTREAM:${accumulatedText}__`, !synthFirstToken);
-                synthFirstToken = false;
-              }, 150);
-            }
-          });
-        } else {
-          data = await callWithRetry({
-            model:       "claude-sonnet-4-6",
-            max_tokens:  2000,  // raised for Bloomlife — richer corpus produces larger tool responses
-            temperature: 0,
-            system:      AGENT_SYSTEM,
-            tools:       AGENT_TOOLS,
-            messages,
-          }, addLine);
-        }
-        if (data.error) { addLine(`⚠ Agent error: ${data.error.message}`); break; }
-
-        const toolUseBlocks = [];
-        const toolResultContents = [];
-
-        for (const block of data.content) {
-          if (block.type === "tool_use") {
-            const { name, id, input } = block;
-            calledTools.add(name); // track for synthesis detection
-            const q = (input.query||"").length > 72 ? input.query.slice(0,72)+"…" : input.query;
-            addLine(`__QUERY:${name}:${q}__`);
-            toolUseBlocks.push({ name, id, input });
-          }
-        }
-
-        for (const { name, id, input } of toolUseBlocks) {
-          // Per-source call limit — max 2 calls per source to prevent infinite loops
-          if ((_toolCallCnt[name] || 0) >= 2) {
-            toolResultContents.push({ type:"tool_result", tool_use_id: id, content: "[]" });
-            continue;
-          }
-          _toolCallCnt[name] = (_toolCallCnt[name] || 0) + 1;
-          totalToolCalls++;
-          try {
-            const fn = TOOL_FNS[name];
-            console.log(`[profiling] ${name} query="${input.query}"`);
-            const rawResult = fn
-              ? await retryRetrieval(name, () => fn(input.query, input.max_results))
-              : [];
-            // Threshold filter — drop rows below the per-source similarity floor.
-            // Logs the kept/dropped counts and full score distribution to console
-            // so you can calibrate thresholds against real retrievals.
-            const threshold = SIMILARITY_THRESHOLD[name] ?? 0.5;
-            const scoreDistribution = rawResult.map(r => Number(r.similarity ?? 0).toFixed(3));
-            const result = rawResult.filter(r => (r.similarity ?? 0) >= threshold);
-            console.log(
-              `[profiling] ${name} threshold=${threshold}: kept ${result.length}/${rawResult.length}`,
-              scoreDistribution,
-            );
-            // Validate URL shape — must be parseable http(s) URL with non-empty pathname.
-            // Drops malformed values like "null", whitespace, "undefined", etc.
-            const isValidUrl = (u) => {
-              if (!u || typeof u !== "string") return false;
-              try {
-                const parsed = new URL(u);
-                if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
-                if (!parsed.hostname) return false;
-                return true;
-              } catch { return false; }
-            };
-            // ── Build URL for a single result row (shared by Set tracking + _refDocs) ──
-            // Returns null if no valid direct URL can be constructed. Search-page
-            // fallbacks have been removed — we'd rather show fewer working links
-            // than a mix of direct links and search pages.
-            const buildRowUrl = (row) => {
-              const explicit = row.canonical_url || row.source_url || null;
-              if (isValidUrl(explicit)) return explicit;
-              if (!row.doc_type || !row.filename) return null;
-              const f = String(row.filename).trim();
-              if (!f) return null;
-              let u = null;
-              if      (row.doc_type === "pubmed")         u = `https://pubmed.ncbi.nlm.nih.gov/${f}/`;
-              else if (row.doc_type === "clinicaltrials") u = `https://clinicaltrials.gov/study/${f}`;
-              else if (row.doc_type === "fda_guidance") {
-                // Docket IDs like "FDA-2006-D-0464" live on regulations.gov.
-                // Numeric IDs are FDA media IDs and use the /media/ download path.
-                // Any other format → null (gets dropped by URL validator below).
-                if      (/^FDA-\d{4}-[A-Z]-\d+$/i.test(f)) u = `https://www.regulations.gov/docket/${f}`;
-                else if (/^\d+$/.test(f))                  u = `https://www.fda.gov/media/${f}/download`;
-                else                                       u = null;
-              }
-              else if (row.doc_type === "maude")          u = `https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfmaude/detail.cfm?mdrfoi__id=${f}`;
-              return isValidUrl(u) ? u : null;
-            };
-
-            // Track unique URLs per source across all calls — drives the display count.
-            // Only valid direct URLs are counted; rows without a direct URL are
-            // excluded from the count, which keeps headline numbers honest.
-            if (!_sourceUrlSets[name]) _sourceUrlSets[name] = new Set();
-            for (const row of result) {
-              const u = buildRowUrl(row);
-              if (u) _sourceUrlSets[name].add(u);
-            }
-            const uniqueCount = _sourceUrlSets[name].size;
-            addLine(`__RESULT:${name}:${uniqueCount}__`);
-            _toolResultCnt[name] = uniqueCount;
-
-            // Capture top 10 docs per source for referenced_docs (40 total max)
-            // match_chunks returns: content, doc_type, filename, source_url, similarity
-            // content format: "Document type: pubmed | [actual text]"
-            if (_refDocs.length < 40) {
-              for (const row of result) {
-                if ((_refSourceCnt[name] || 0) >= 10 || _refDocs.length >= 40) break;
-                const rawContent = typeof row.content === "string" ? row.content : "";
-                const stripped   = rawContent.replace(/^Document\s+type:\s*\S+\s*\|\s*/i, "").trim();
-                const title = row.title
-                  || (stripped.length > 0 ? stripped.slice(0, 120) : null)
-                  || (row.doc_type && row.filename ? `${row.doc_type.toUpperCase()} ${row.filename}` : null)
-                  || "Untitled";
-                const sourceId = row.source_id || row.doc_type || name;
-                const url = buildRowUrl(row);
-                // Strict mode: drop rows without a valid direct URL. No more
-                // search-page fallbacks — only show docs we can link to.
-                if (!url) continue;
-                const dedupeKey = url + "::" + (title || "");
-                if (_refSeen.has(dedupeKey)) continue;
-                _refSeen.add(dedupeKey);
-                _refDocs.push({ title, url, source_id: sourceId, similarity_score: row.similarity ?? null, evidence_type: row.cesl_tags?.evidence_type ?? null });
-                _refSourceCnt[name] = (_refSourceCnt[name] || 0) + 1;
-              }
-            }
-            // ── IMPROVEMENT 3: compact tool results — top 3, 300-char content ──
-            // Reduces synthesis context from ~50k tokens to ~5-8k tokens
-            // CESL tags prepended so Claude knows evidence_type / domain / lifecycle
-            const compact = result.slice(0, 3).map(r => {
-              const tags  = r.cesl_tags;
-              const label = tags
-                ? `[${tags.evidence_type ?? '?'} | ${tags.clinical_domain ?? '?'} | ${tags.lifecycle_stage ?? '?'}]`
-                : null;
-              const raw       = typeof r.content === "string" ? r.content : "";
-              const annotated = label ? `${label}\n${raw}` : raw;
-              return {
-                filename:   r.filename,
-                similarity: r.similarity,
-                content:    annotated.slice(0, 300),
-                source_id:  r.source_id,
-                doc_type:   r.doc_type,
-              };
-            });
-            toolResultContents.push({ type:"tool_result", tool_use_id: id, content: JSON.stringify(compact) });
-          } catch(err) {
-            const reason = err?.message ?? String(err);
-            console.error(`[profiling] ${name} failed after retry:`, reason, err);
-            addLine(`__ERROR:${name}__`);
-            toolResultContents.push({ type:"tool_result", tool_use_id: id, content: `Error: ${reason}`, is_error: true });
-          }
-        }
-
-        if (toolUseBlocks.length > 0) {
-          messages.push({ role: "assistant", content: data.content });
-          messages.push({ role: "user", content: toolResultContents });
-        }
-
-        if (data.stop_reason === "max_tokens" && wasSynthesisRound) {
-          console.warn('[synthesis] hit max_tokens — attempting partial parse');
-        }
-        const effectiveStopReason = (data.stop_reason === "max_tokens" && wasSynthesisRound)
-          ? "end_turn"
-          : data.stop_reason;
-        if (effectiveStopReason === "end_turn") {
-          const text = data.content.filter(b => b.type==="text").map(b => b.text).join("");
-          try {
-            const cleanJson = text
-              .replace(/^```json\s*/i, '')
-              .replace(/^```\s*/i, '')
-              .replace(/```\s*$/i, '')
-              .trim();
-            const match = cleanJson.match(/\{[\s\S]*\}/);
-            profile = JSON.parse(match ? match[0] : cleanJson);
-
-            // ── Deterministic counts ─────────────────────────────────────────
-            // Counts come from _sourceUrlSets (unique URLs retrieved from
-            // Supabase), NOT from the LLM. Headline numbers, references panel,
-            // and risk_signal are guaranteed coherent by construction.
-            const llmClaimed = {
-              pubmed:         profile.pubmed_evidence_count,
-              clinicaltrials: profile.open_trials_count,
-              maude:          profile.adverse_event_count,
-              risk_signal:    profile.risk_signal,
-            };
-            const pubmedCount = _sourceUrlSets.search_pubmed?.size         ?? 0;
-            const ctCount     = _sourceUrlSets.search_clinicaltrials?.size ?? 0;
-            const maudeCount  = _sourceUrlSets.search_maude?.size          ?? 0;
-            const fdaCount    = _sourceUrlSets.search_fda_guidance?.size   ?? 0;
-            profile.pubmed_evidence_count = pubmedCount;
-            profile.open_trials_count     = ctCount;
-            profile.adverse_event_count   = maudeCount;
-            profile.fda_guidance_count    = fdaCount;
-            profile.risk_signal = maudeCount === 0 ? "LOW"
-                                : maudeCount <= 5 ? "MEDIUM" : "HIGH";
-            console.log("[profiling] computed counts:", { pubmed: pubmedCount, clinicaltrials: ctCount, maude: maudeCount, fda: fdaCount });
-            console.log("[profiling] llm-claimed counts (overwritten):", llmClaimed);
-            console.log("[profiling] risk_signal:", profile.risk_signal, "(from maude=" + maudeCount + ")");
-
-            // Map study design codes → display labels using live Supabase data
-            // with hardcoded fallback so app never breaks if fetch is in flight
-            if (profile.study_designs) {
-              profile.study_designs = profile.study_designs.map(sd => ({
-                ...sd,
-                name: studyDesigns[sd.code] ?? STUDY_DESIGN_FALLBACK[sd.code] ?? sd.code,
-              }));
-            }
-
-            // Trim referenced_docs per source so the references panel never
-            // shows MORE entries than the headline count for that source.
-            const sourceCaps = {
-              pubmed: pubmedCount, clinicaltrials: ctCount,
-              maude:  maudeCount,  fda_guidance:   fdaCount,
-            };
-            const perSourceShown = {};
-            profile.referenced_docs = _refDocs.filter(d => {
-              const cap = sourceCaps[d.source_id] ?? 10;
-              const seen = perSourceShown[d.source_id] || 0;
-              if (seen >= cap) return false;
-              perSourceShown[d.source_id] = seen + 1;
-              return true;
-            });
-            const d = profile;
-            // __SYNTH__ was emitted before the streaming call; only add if missed
-            if (!synthSignaled) { addLine("__SYNTH__"); synthSignaled = true; }
-            addLine(`__SYNTHDATA:${JSON.stringify({ design: d.design_type, endpoint: d.endpoint })}__`);
-            addLine(`✓ Profile complete — ${d.pubmed_evidence_count} comparable studies · MAUDE ${(d.risk_signal||"").toLowerCase()} risk · ${d.study_designs?.length||3} study designs ready`);
-            window.__e1Profile = profile;
-            setStep("done");
-            onDone?.(profile);
-          } catch(e) {
-            const synthesisText = data.content?.find(b => b.type === "text")?.text ?? "";
-            console.error("Profile parse failed:", e, "\nRaw text:", synthesisText);
-            addLine(`⚠ Profile parse failed: ${e.message}`);
-            setStep("input");
-            break; // exit agent loop — do not hang waiting for next iteration
-          }
-          break;
-        }
-        if (data.stop_reason === "max_tokens") {
-          addLine("⚠ Agent output truncated — please retry");
-          break;
-        }
-        if (data.stop_reason !== "tool_use") break;
+      // Server-side profiling: the whole tool-use loop + corpus retrieval runs on the
+      // backend (POST /agents/profiling/stream, NDJSON). We translate its events into
+      // the token protocol that ProfilingRun renders.
+      const res = await apiFetch("/agents/profiling/stream", {
+        method: "POST",
+        body: JSON.stringify({
+          system: AGENT_SYSTEM,
+          tools: AGENT_TOOLS,
+          messages: [{ role: "user", content: productDescription }],
+          product_description: productDescription,
+        }),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`stream ${res.status} ${detail.slice(0, 200)}`);
       }
-      if (!profile) setStep("input");
-    } catch(err) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let profile = null;
+      let synthSignaled = false;
+      const flush = (chunk) => {
+        buf += chunk;
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          const s = line.trim();
+          if (!s) continue;
+          let ev; try { ev = JSON.parse(s); } catch { continue; }
+          if (ev.type === "tool_use") {
+            const q = String(ev.text || "").replace(/^→\s*\[[^\]]*\]\s*/, "");
+            addLine(`__QUERY:${ev.tool}:${q}__`);
+          } else if (ev.type === "tool_result") {
+            addLine(`__RESULT:${ev.tool}:${ev.count ?? 0}__`);
+          } else if (ev.type === "log") {
+            if (/synthesis|synthesising|synthesizing/i.test(ev.text || "")) {
+              if (!synthSignaled) { addLine("__SYNTH__"); synthSignaled = true; }
+            } else {
+              addLine(ev.text);
+            }
+          } else if (ev.type === "done") {
+            profile = ev.profile || null;
+          } else if (ev.type === "error") {
+            addLine(`⚠ ${ev.text}`);
+            setAgentError(ev.text);
+          }
+        }
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        flush(decoder.decode(value, { stream: true }));
+      }
+      flush(decoder.decode());
+
+      if (profile) {
+        const d = profile;
+        if (!synthSignaled) addLine("__SYNTH__");
+        addLine(`__SYNTHDATA:${JSON.stringify({ design: d.design_type, endpoint: d.endpoint })}__`);
+        addLine(`✓ Profile complete — ${d.pubmed_evidence_count ?? "?"} comparable studies · MAUDE ${(d.risk_signal || "").toLowerCase()} risk · ${d.study_designs?.length || 3} study designs ready`);
+        window.__e1Profile = profile;
+        setStep("done");
+        onDone?.(profile);
+      } else {
+        setStep("input");
+        if (!agentError) setAgentError("Profiling did not return a profile.");
+      }
+    } catch (err) {
       const msg = err?.message ?? String(err);
-      console.error("[profiling] agent run failed:", msg, err);
-      setAgentError(msg);
+      setAgentError(msg.includes("503") ? "Profiling unavailable: the LLM/embedding API keys aren't configured yet." : `Profiling failed: ${msg}`);
       addLine(`⚠ Agent failed: ${msg}`);
       setStep("input");
     }

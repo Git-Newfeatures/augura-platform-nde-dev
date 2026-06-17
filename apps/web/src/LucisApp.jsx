@@ -17,7 +17,8 @@ class ErrorBoundary extends Component {
   }
 }
 import { useParams, useNavigate } from "react-router-dom";
-import { FALLBACK_PROJECT_ID, BLANK_DEFAULTS } from "./data/projectDefaults";
+import { BLANK_DEFAULTS } from "./data/projectDefaults";
+import { EmptyState } from "@/workspace/CollectionStates";
 import SimulationEngine from "./SimulationEngine";
 import { apiJson } from "./api";
 
@@ -61,7 +62,7 @@ function ssStore(key, value, ssKey = SS_KEY_DEFAULT) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LucisApp() {
   const params = useParams();
-  const projectId = params.id ?? FALLBACK_PROJECT_ID;
+  const projectId = params.id ?? null;
   const splat = params["*"] || "";
   const navigate = useNavigate();
   // Studies render with neutral defaults; real per-study metadata should be
@@ -523,6 +524,10 @@ SOURCE COUNTS:
     go("simulation");
   }
 
+  if (!projectId) {
+    return <EmptyState title="No study selected" subtitle="Open a study from the workspace to continue." />;
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
 
@@ -561,7 +566,7 @@ SOURCE COUNTS:
             agentStep={agentStep} onAgentStep={setAgentStep}
             hasDataset={hasDataset}
             displayName={defaults.displayName}
-            tenantSlug={projectId ?? FALLBACK_PROJECT_ID}
+            tenantSlug={projectId}
             studyDesigns={studyDesigns}
             agentSources={agentSources}
             clientDomains={clientDomains}
@@ -576,7 +581,7 @@ SOURCE COUNTS:
             uploadedData={uploadedData}
             onUploadData={(data) => { setUploadedData(data); if (!data) { setReady(false); setE1Profile(null); setCompletedTab(null); setVariableMappings({}); setVariableCheckResult(null); } }}
             product={product} users={users} outcome={outcome}
-            tenantSlug={projectId ?? FALLBACK_PROJECT_ID}
+            tenantSlug={projectId}
             selectedCohort={selectedCohort}
             onCohortSelect={(name, rowCount) => { setSelectedCohort(name); ssStore("selectedCohort", name, SS_KEY); if (rowCount != null) setUploadedRowCount(rowCount); }}
             variableMappings={variableMappings}

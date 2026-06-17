@@ -36,5 +36,3 @@ export const BLANK_DEFAULTS: ProjectDefaults = {
   cqPopulation: [],
   benchmarkMeta: { indication: '', included: '', excluded: '' },
 };
-
-export const FALLBACK_PROJECT_ID = 'lucis';

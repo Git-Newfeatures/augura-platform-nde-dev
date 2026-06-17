@@ -105,6 +105,12 @@ class SimulationRepo:
                     ci_upper=r.get("ci_upper"),
                     power=r.get("power"),
                     p_value=r.get("p_value"),
+                    bias=r.get("bias"),
+                    variance=r.get("variance"),
+                    mse=r.get("mse"),
+                    n_total=r.get("n_total"),
+                    n_treatment=r.get("n_treatment"),
+                    dropout=r.get("dropout"),
                 )
             )
         await self.session.flush()

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, Text, text
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -29,6 +29,13 @@ class SimulationResult(Base):
     ci_upper: Mapped[float | None] = mapped_column(Numeric)
     power: Mapped[float | None] = mapped_column(Numeric)
     p_value: Mapped[float | None] = mapped_column(Numeric)
+    # Métriques bootstrap (scatter Bias-vs-MSE) + paramètres de cohorte par scénario.
+    bias: Mapped[float | None] = mapped_column(Numeric)
+    variance: Mapped[float | None] = mapped_column(Numeric)
+    mse: Mapped[float | None] = mapped_column(Numeric)
+    n_total: Mapped[int | None] = mapped_column(Integer)
+    n_treatment: Mapped[int | None] = mapped_column(Integer)
+    dropout: Mapped[float | None] = mapped_column(Numeric)
 
 
 class SimulationRun(Base):

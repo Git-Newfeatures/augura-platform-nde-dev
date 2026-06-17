@@ -2728,6 +2728,17 @@
       },
       "SimulationResultOut": {
         "properties": {
+          "bias": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias"
+          },
           "ci_lower": {
             "anyOf": [
               {
@@ -2754,6 +2765,17 @@
             "title": "Cohort Name",
             "type": "string"
           },
+          "dropout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropout"
+          },
           "effect_size": {
             "anyOf": [
               {
@@ -2768,6 +2790,39 @@
           "estimator": {
             "title": "Estimator",
             "type": "string"
+          },
+          "mse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mse"
+          },
+          "n_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Total"
+          },
+          "n_treatment": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Treatment"
           },
           "p_value": {
             "anyOf": [
@@ -2794,6 +2849,17 @@
           "scenario": {
             "title": "Scenario",
             "type": "string"
+          },
+          "variance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variance"
           }
         },
         "required": [

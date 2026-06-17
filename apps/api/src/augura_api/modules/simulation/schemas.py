@@ -47,6 +47,12 @@ class SimulationResultOut(BaseModel):
     ci_upper: float | None = None
     power: float | None = None
     p_value: float | None = None
+    bias: float | None = None
+    variance: float | None = None
+    mse: float | None = None
+    n_total: int | None = None
+    n_treatment: int | None = None
+    dropout: float | None = None
 
 
 class SimulationRequest(BaseModel):

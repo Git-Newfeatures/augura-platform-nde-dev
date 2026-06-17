@@ -23,8 +23,12 @@ def test_bootstrap_shape_scenarios_x_estimators() -> None:
     assert n_est == len(calibration.ESTIMATORS)
     assert len(res["rows"]) == n_scen * n_est
     row = res["rows"][0]
-    for key in ("scenario", "estimator", "effect_size", "ci_lower", "ci_upper", "power", "p_value"):
+    for key in (
+        "scenario", "estimator", "effect_size", "ci_lower", "ci_upper", "power", "p_value",
+        "bias", "variance", "mse", "n_total", "n_treatment", "dropout",
+    ):
         assert key in row
+    assert row["n_total"] > row["n_treatment"] > 0  # n_treat est un sous-ensemble de n_eff
 
 
 def test_bootstrap_ci_brackets_effect() -> None:

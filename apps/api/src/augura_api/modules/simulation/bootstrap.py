@@ -110,6 +110,11 @@ def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
                     "bias": round(bias_mag, 4),
                     "variance": round(variance, 4),
                     "mse": round(bias_mag * bias_mag + variance, 4),
+                    # Scenario-level cohort parameters (read by SimulationEngine for the
+                    # parameter panel + bootstrap-N display).
+                    "n_total": int(round(n_eff)),
+                    "n_treatment": n_treat,
+                    "dropout": round(dropout, 4),
                 }
             )
 

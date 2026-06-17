@@ -244,12 +244,19 @@ create table if not exists simulation_results (
     org_id      uuid not null references orgs(id) on delete cascade,
     cohort_name text not null,
     scenario    text not null check (scenario in ('baseline', 'conservative', 'high_risk')),
-    estimator   text not null check (estimator in ('lme', 'ols', 'ipw', 'tmle')),
+    estimator   text not null check (estimator in ('lme', 'ols', 'ipw', 'mediation', 'tmle', 'did')),
     effect_size numeric,
     ci_lower    numeric,
     ci_upper    numeric,
     power       numeric,
     p_value     numeric,
+    -- Métriques bootstrap (scatter Bias-vs-MSE) + paramètres de cohorte par scénario.
+    bias        numeric,
+    variance    numeric,
+    mse         numeric,
+    n_total     integer,
+    n_treatment integer,
+    dropout     numeric,
     unique (org_id, cohort_name, scenario, estimator)
 );
 

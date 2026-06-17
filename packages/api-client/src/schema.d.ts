@@ -1557,22 +1557,34 @@ export interface components {
         };
         /** SimulationResultOut */
         SimulationResultOut: {
+            /** Bias */
+            bias?: number | null;
             /** Ci Lower */
             ci_lower?: number | null;
             /** Ci Upper */
             ci_upper?: number | null;
             /** Cohort Name */
             cohort_name: string;
+            /** Dropout */
+            dropout?: number | null;
             /** Effect Size */
             effect_size?: number | null;
             /** Estimator */
             estimator: string;
+            /** Mse */
+            mse?: number | null;
+            /** N Total */
+            n_total?: number | null;
+            /** N Treatment */
+            n_treatment?: number | null;
             /** P Value */
             p_value?: number | null;
             /** Power */
             power?: number | null;
             /** Scenario */
             scenario: string;
+            /** Variance */
+            variance?: number | null;
         };
         /** SimulationRunCreated */
         SimulationRunCreated: {

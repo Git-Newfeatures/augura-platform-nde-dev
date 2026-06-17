@@ -13,6 +13,7 @@ import { useCollection } from '@/workspace/dataClient'
 import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { CohortImport } from '@/workspace/CohortImport'
+import { DatasetUpload } from '@/workspace/DatasetUpload'
 import { apiJson } from '@/api'
 
 // status → Badge props
@@ -176,9 +177,11 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
 }
 
 export function DatasetsPage() {
-  const { data: datasets, loading } = useCollection('datasets')
+  const [reloadToken, setReloadToken] = useState(0)
+  const { data: datasets, loading } = useCollection('datasets', reloadToken)
   const { openStudy } = useStudyNav()
   const [selectedDataset, setSelectedDataset] = useState(null)
+  const refresh = () => setReloadToken((t) => t + 1)
 
   // Detail view replaces the list (sketch: "← Back to datasets" header).
   if (selectedDataset) {
@@ -202,7 +205,12 @@ export function DatasetsPage() {
       eyebrow="Library · Cohorts"
       title="Data"
       sub={loading ? 'Loading…' : `${datasets.length} dataset${datasets.length === 1 ? '' : 's'} across your studies`}
-      action={<CohortImport />}
+      action={
+        <div className="flex items-center gap-2">
+          <DatasetUpload onUploaded={refresh} />
+          <CohortImport />
+        </div>
+      }
     >
       {loading ? (
         <Loading />

@@ -352,4 +352,27 @@ create table if not exists artifacts (
 create index if not exists ix_artifacts_org on artifacts(org_id);
 create index if not exists ix_artifacts_study_kind on artifacts(study_id, kind);
 
+-- ─────────────────────────────────────────────────────────────────────────
+-- Module : reference — catalogues CESL globaux (non tenant-scopés, lecture seule)
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table if not exists cesl_sources (
+    code        text primary key,
+    label       text not null,
+    doc_type    text,
+    description text,
+    base_url    text,
+    result_unit text,
+    sort_order  int     not null default 0,
+    active      boolean not null default true
+);
+
+create table if not exists cesl_study_designs (
+    code       text primary key,
+    label      text not null,
+    group_name text,
+    sort_order int     not null default 0,
+    active     boolean not null default true
+);
+
 commit;

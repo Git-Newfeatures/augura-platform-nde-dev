@@ -30,6 +30,8 @@ EXPECTED_TABLES = {
     "usage_events",
     "outbox_events",
     "artifacts",
+    "cesl_sources",
+    "cesl_study_designs",
 }
 
 # Tables tenant-scopées qui DOIVENT porter une policy RLS.
@@ -98,3 +100,18 @@ def test_functions_define_match_chunks_and_coverage_view() -> None:
     assert "create or replace function match_chunks" in fns
     assert "create or replace view v_coverage_map" in fns
     assert "embedding <=> query_embedding" in fns  # distance cosinus pgvector
+
+
+def test_seed_includes_cesl_reference_catalogs() -> None:
+    seed = _read("seed.sql").lower()
+    assert "insert into cesl_sources" in seed
+    assert "insert into cesl_study_designs" in seed
+
+
+def test_reference_tables_have_select_only_rls() -> None:
+    policies = _read("policies.sql")
+    for t in ("cesl_sources", "cesl_study_designs"):
+        assert f"alter table {t} enable row level security" in policies
+        assert f"create policy backend_read on {t}" in policies
+    # Read-only : la policy de référence est FOR SELECT (pas d'écriture tenant).
+    assert "for select" in policies

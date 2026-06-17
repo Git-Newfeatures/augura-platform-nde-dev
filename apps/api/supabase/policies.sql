@@ -204,4 +204,21 @@ begin
 end
 $$;
 
+-- ── Catalogues de référence (cesl_sources, cesl_study_designs) ────────────
+-- Globaux, lecture seule pour les sessions tenant. RLS activée + gate « session
+-- backend » en LECTURE uniquement (FOR SELECT) : anon/PostgREST refusé, backend
+-- (app.tenant_id posé) autorisé en lecture. Aucune policy d'écriture ⇒ INSERT/
+-- UPDATE/DELETE refusés pour augura_app ; le seed entre via le rôle privilégié.
+alter table cesl_sources enable row level security;
+alter table cesl_sources force row level security;
+create policy backend_read on cesl_sources
+    for select
+    using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table cesl_study_designs enable row level security;
+alter table cesl_study_designs force row level security;
+create policy backend_read on cesl_study_designs
+    for select
+    using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
 commit;

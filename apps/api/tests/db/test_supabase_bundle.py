@@ -44,6 +44,35 @@ EXPECTED_TABLES = {
     "search_sessions",
     "literature_events",
     "literature_queries",
+    # Reference catalogs (frontend real-only cleanup) — globaux, lecture seule.
+    "outcome_catalog",
+    "estimand_catalog",
+    "estimator_catalog",
+    "framework_catalog",
+    "evidence_type_catalog",
+    "domain_catalog",
+    "jurisdiction_catalog",
+    "literature_design_catalog",
+    "pii_pattern_catalog",
+    "biomarker_range_catalog",
+    "variable_group_catalog",
+    "variable_role_catalog",
+}
+
+# Catalogues de référence (frontend real-only cleanup) : globaux, lecture seule.
+REFERENCE_CATALOGS = {
+    "outcome_catalog",
+    "estimand_catalog",
+    "estimator_catalog",
+    "framework_catalog",
+    "evidence_type_catalog",
+    "domain_catalog",
+    "jurisdiction_catalog",
+    "literature_design_catalog",
+    "pii_pattern_catalog",
+    "biomarker_range_catalog",
+    "variable_group_catalog",
+    "variable_role_catalog",
 }
 
 # Tables tenant-scopées qui DOIVENT porter une policy RLS.
@@ -133,6 +162,17 @@ def test_reference_tables_have_select_only_rls() -> None:
         assert f"create policy backend_read on {t}" in policies
     # Read-only : la policy de référence est FOR SELECT (pas d'écriture tenant).
     assert "for select" in policies
+
+
+def test_reference_catalogs_have_select_only_rls() -> None:
+    policies = _read("policies.sql")
+    array_blocks = re.findall(r"array\[(.*?)\]", policies, re.DOTALL)
+    looped = {name for block in array_blocks for name in re.findall(r"'(\w+)'", block)}
+    explicit = set(re.findall(r"alter table (\w+) enable row level security", policies))
+    covered = looped | explicit
+    missing = REFERENCE_CATALOGS - covered
+    assert not missing, f"RLS backend_read manquante sur catalogues : {missing}"
+    assert "create policy backend_read" in policies
 
 
 def test_taxonomy_tables_have_select_only_rls() -> None:

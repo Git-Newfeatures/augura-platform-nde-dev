@@ -19,6 +19,7 @@ class ErrorBoundary extends Component {
 import { useParams, useNavigate } from "react-router-dom";
 import { FALLBACK_PROJECT_ID, BLANK_DEFAULTS } from "./data/projectDefaults";
 import SimulationEngine from "./SimulationEngine";
+import { apiJson } from "./api";
 
 import ProfilingAssistant     from "./views/ProfilingAssistant";
 import DatasetVerification    from "./views/DatasetVerification";
@@ -114,20 +115,18 @@ export default function LucisApp() {
   // Shape: { clinical_domain, outcomes_catalog_size, total_columns, batches, matches, dataset_questions }
   const [variableCheckResult, setVariableCheckResult] = useState(() => load("variableCheckResult", null));
 
-  // ── Tenant CESL profile — fetched server-side to avoid RLS on anon reads ─────
+  // ── Tenant CESL profile — served by the backend (/reference/tenant, JWT-scoped).
+  // No projectId param: the server resolves the tenant from the auth token.
   const [tenantProfile, setTenantProfile] = useState(null);
   useEffect(() => {
-    if (!projectId) return;
-    fetch(`/api/tenant?projectId=${encodeURIComponent(projectId)}`)
-      .then(r => (r.ok ? r.json().catch(() => null) : null))
+    apiJson('/reference/tenant')
       .then(data => { if (data) setTenantProfile(data); })
       .catch(() => {});
-  }, [projectId]);
+  }, []);
 
   const [studyDesigns, setStudyDesigns] = useState({}); // { code: label }
   useEffect(() => {
-    fetch('/api/study-designs')
-      .then(r => (r.ok ? r.json().catch(() => []) : []))
+    apiJson('/reference/study-designs')
       .then(data => {
         const map = {};
         (Array.isArray(data) ? data : []).forEach(d => { map[d.code] = d.label; });
@@ -138,8 +137,7 @@ export default function LucisApp() {
 
   const [agentSources, setAgentSources] = useState([]); // [{ code, label, doc_type, ... }]
   useEffect(() => {
-    fetch('/api/cesl-sources')
-      .then(r => (r.ok ? r.json().catch(() => []) : []))
+    apiJson('/reference/cesl-sources')
       .then(data => setAgentSources(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);

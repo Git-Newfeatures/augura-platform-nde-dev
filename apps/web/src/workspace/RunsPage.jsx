@@ -28,7 +28,7 @@ export function RunsPage() {
           {runs.map((r, i) => (
             <div
               key={r.id}
-              onClick={() => openStudy(r.study)}
+              onClick={() => openStudy(r.studyId || r.study)}
               className={`flex cursor-pointer items-center gap-3.5 py-3.5 transition-colors hover:bg-muted/30 ${i === runs.length - 1 ? '' : 'border-b border-border'}`}
             >
               <span

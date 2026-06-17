@@ -51,6 +51,26 @@ const normDatasets = (rows, studyNameById = new Map()) =>
     when: relTime(d.created_at),
   }))
 
+// Simulation runs → the exact shape RunsPage / HomePage "Recent runs" render.
+// summary.recommended_power is a 0–100 percentage; the UI multiplies by 100, so we
+// store it as a 0–1 fraction. `studyId` drives navigation, `study` is the display label.
+const normRuns = (rows, studyNameById = new Map()) =>
+  (rows ?? []).map((r) => {
+    const s = r.summary || {}
+    const running = r.status === 'queued' || r.status === 'running'
+    return {
+      id: r.id,
+      studyId: r.study_id,
+      study: studyNameById.get(r.study_id) ?? '—',
+      kind: 'Simulation bootstrap',
+      estimator: s.recommended_estimator ?? (running ? 'computing…' : '—'),
+      mode: r.status === 'succeeded' ? 'VALIDATED' : running ? undefined : 'LIVE',
+      power: s.recommended_power != null ? s.recommended_power / 100 : null,
+      state: running ? 'running' : 'done',
+      when: relTime(r.created_at),
+    }
+  })
+
 const DOSSIER_LABEL = { protocol: 'Study protocol', report: 'Evidence report' }
 const normDossiers = (rows) =>
   (rows ?? []).map((g) => ({
@@ -92,7 +112,7 @@ const normCoverage = (resp) => {
 }
 
 // collection → async fetcher returning the normalized array (or [] on empty).
-// `runs` and `variables` have no backend list endpoint yet → [] (EmptyState).
+// `variables` has no backend list endpoint yet → [] (EmptyState).
 const FETCHERS = {
   studies:         async () => normStudies(await apiJson('/studies')),
   datasets:        async () => {
@@ -106,36 +126,48 @@ const FETCHERS = {
   dossiers:        async () => normDossiers(await apiJson('/documents')),
   corpus_sources:  async () => normSources(await apiJson('/corpus/sources')),
   corpus_coverage: async () => normCoverage(await apiJson('/corpus/coverage')),
-  runs:            async () => [],
+  runs:            async () => {
+    const [rows, studies] = await Promise.all([
+      apiJson('/simulations/runs'),
+      apiJson('/studies').catch(() => []),
+    ])
+    const nameById = new Map((studies ?? []).map((s) => [s.id, s.name]))
+    return normRuns(rows, nameById)
+  },
   variables:       async () => [],
+}
+
+/**
+ * One-shot fetch of a normalized collection (same logic as useCollection, usable
+ * outside React — e.g. to refresh a list after a mutation). Yields [] on error.
+ */
+export async function fetchCollection(name) {
+  try {
+    const fetcher = FETCHERS[name]
+    return fetcher ? await fetcher() : []
+  } catch {
+    return []
+  }
 }
 
 /**
  * Returns { data, loading } for a workspace collection. `data` is always an array;
  * the backend (or an empty/unwired collection) yields [] so the UI renders an
- * EmptyState rather than crashing.
+ * EmptyState rather than crashing. `reloadToken` forces a re-fetch when it changes.
  */
-export function useCollection(name) {
+export function useCollection(name, reloadToken = 0) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let alive = true
-    setLoading(true)
     ;(async () => {
-      try {
-        const fetcher = FETCHERS[name]
-        const base = fetcher ? await fetcher() : []
-        if (alive) setData(base)
-      } catch {
-        // Backend unreachable or non-2xx → blank (EmptyState), never crash the view.
-        if (alive) setData([])
-      } finally {
-        if (alive) setLoading(false)
-      }
+      setLoading(true)
+      const base = await fetchCollection(name)
+      if (alive) { setData(base); setLoading(false) }
     })()
     return () => { alive = false }
-  }, [name])
+  }, [name, reloadToken])
 
   return { data: data ?? [], loading }
 }

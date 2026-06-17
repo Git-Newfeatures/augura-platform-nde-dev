@@ -74,9 +74,7 @@ def profile_column(name: str, values: list[str]) -> ColumnProfile:
         if nums:
             value_min, value_max = min(nums), max(nums)
 
-    top_values = [
-        {"value": val, "count": cnt} for val, cnt in Counter(non_null).most_common(10)
-    ]
+    top_values = [{"value": val, "count": cnt} for val, cnt in Counter(non_null).most_common(10)]
     return ColumnProfile(
         value_kind=value_kind,
         n_total=n_total,

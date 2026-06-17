@@ -21,6 +21,7 @@ def test_parse_csv() -> None:
 def test_parse_xlsx() -> None:
     wb = Workbook()
     ws = wb.active
+    assert ws is not None
     ws.append(["id", "age"])
     ws.append([1, 40])
     ws.append([2, 55])

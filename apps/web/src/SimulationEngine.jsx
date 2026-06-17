@@ -22,6 +22,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fetchCohort, fetchSimulationResults, engagementGroup } from "./workspace/cohortData";
+import { apiJson } from "@/api";
 import {
   POWER_THRESHOLD, POWER_MARGINAL_FLOOR,
   ESTIMATORS, ESTIMATOR_FILTER,
@@ -472,10 +473,10 @@ export default function SimulationEngine({
     setChatLoading(true);
     const cur2 = result?.all?.[estimator];
     try {
-      const res = await window.fetch("/api/anthropic", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      // Passerelle backend FastAPI → POST /agents/chat (Bearer JWT) → {text}.
+      const d = await apiJson("/agents/chat", {
+        method: "POST",
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001", max_tokens: 200,
           system: `Augura E2 simulation assistant. ${partnerLabel} (N=${cohortN ?? "unknown"}).
 Current: ${estimator} estimator${dropout != null ? `, ${Math.round(dropout * 100)}% dropout` : ""}${effectAssumed != null ? `, effect assumed ${effectAssumed}` : ""}.
 Result: power ${cur2?.power ?? "n/a"}%, MSE ${cur2?.mse != null ? cur2.mse.toFixed(4) : "n/a"}, bias ${cur2?.bias != null ? cur2.bias.toFixed(4) : "n/a"}.
@@ -484,11 +485,13 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
           messages: [{ role: "user", content: q }],
         }),
       });
-      const d    = await res.json();
-      const text = d.content?.filter(b => b.type === "text").map(b => b.text).join("") || "Engine unavailable.";
+      const text = d.text || "No response.";
       setMsgs(m => [...m, { role: "assistant", text }]);
-    } catch {
-      setMsgs(m => [...m, { role: "assistant", text: "Chat unavailable locally — works on deployed Vercel." }]);
+    } catch (e) {
+      const text = String(e?.message || "").includes("503")
+        ? "Assistant unavailable: the LLM API key isn't configured yet."
+        : "Assistant unavailable — check your connection.";
+      setMsgs(m => [...m, { role: "assistant", text }]);
     }
     setChatLoading(false);
   }

@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, ClipboardList } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { slugify } from '@/lib/utils'
+import { apiJson } from '@/api'
 
 const FRAMEWORKS = ['DiGA', 'CONSORT-AI', 'EU MDR', 'NICE DSP', 'EUnetHTA', 'FDA SaMD']
 
@@ -29,16 +30,37 @@ export function NewStudyPage() {
   const [tagline, setTagline] = useState('')
   const [category, setCategory] = useState('')
   const [framework, setFramework] = useState(FRAMEWORKS[0])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
 
-  const canCreate = name.trim().length > 1
+  const canCreate = name.trim().length > 1 && !busy
 
-  function create() {
+  async function create() {
     if (!canCreate) return
-    const id = slugify(name)
-    // No backend /studies POST yet, so creation does not persist; the form
-    // still validates input and lands on the new study's first workflow step
-    // (cohort upload).
-    navigate(`/studies/${id}/workflow/assistant`)
+    setBusy(true)
+    setError(null)
+    try {
+      // Persiste réellement l'étude côté backend ; on navigue vers l'UUID renvoyé
+      // (et non un slug local) pour que la page workflow retrouve l'étude.
+      const study = await apiJson('/studies', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name.trim(),
+          slug: slugify(name),
+          tagline: tagline.trim() || null,
+          category: category.trim() || null,
+          framework,
+        }),
+      })
+      navigate(`/studies/${study.id}/workflow/assistant`)
+    } catch (e) {
+      setBusy(false)
+      setError(
+        String(e?.message || '').includes('401')
+          ? 'Session expired — please sign in again.'
+          : 'Could not create the study. Please try again.',
+      )
+    }
   }
 
   return (
@@ -116,11 +138,12 @@ export function NewStudyPage() {
         </Field>
 
         <div className="mt-1 flex items-center justify-end gap-2 border-t border-border pt-4">
-          <Button variant="ghost" onClick={() => navigate('/studies')}>
+          {error && <span className="mr-auto text-[12.5px] text-red-600">{error}</span>}
+          <Button variant="ghost" onClick={() => navigate('/studies')} disabled={busy}>
             Cancel
           </Button>
           <Button disabled={!canCreate} onClick={create}>
-            Create study <ArrowRight size={15} />
+            {busy ? 'Creating…' : 'Create study'} <ArrowRight size={15} />
           </Button>
         </div>
       </Card>

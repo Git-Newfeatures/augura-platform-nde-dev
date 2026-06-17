@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { apiJson } from "@/api";
 
 // ── Inline markdown + source badge renderer ───────────────────────────────────
 // NOTE: the markdown output is injected via dangerouslySetInnerHTML, so its styles
@@ -170,21 +171,19 @@ export default function InlineChatbot({
     const messages = newHistory.map(m => ({ role: m.role, content: m.text }));
 
     try {
-      const res = await fetch("/api/anthropic", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model:      "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          system,
-          messages,
-        }),
+      // Passerelle backend FastAPI (Bearer JWT) → POST /agents/chat → {text}.
+      const data = await apiJson("/agents/chat", {
+        method: "POST",
+        body: JSON.stringify({ system: system || undefined, messages }),
       });
-      const data = await res.json();
-      const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "Engine unavailable.";
+      const text = data.text || "No response.";
       onHistory?.([...newHistory, { role: "assistant", text }]);
-    } catch {
-      onHistory?.([...newHistory, { role: "assistant", text: "Engine unavailable — check connection." }]);
+    } catch (e) {
+      const msg = String(e?.message || "");
+      const text = msg.includes("503")
+        ? "Assistant unavailable: the LLM API key isn't configured yet."
+        : "Assistant unavailable — check your connection.";
+      onHistory?.([...newHistory, { role: "assistant", text }]);
     }
     setLoading(false);
   }

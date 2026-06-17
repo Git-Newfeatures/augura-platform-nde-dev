@@ -24,6 +24,7 @@ class CeslSourceOut(BaseModel):
     description: str | None = None
     base_url: str | None = None
     result_unit: str | None = None
+    default_evidence_type: str | None = None
     sort_order: int
 
 

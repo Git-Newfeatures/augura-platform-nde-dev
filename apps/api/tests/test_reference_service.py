@@ -42,7 +42,15 @@ class _FakeRepo:
         return self._org
 
     async def list_cesl_sources(self) -> list[CeslSource]:
-        return [CeslSource(code="pubmed", label="PubMed", sort_order=10, active=True)]
+        return [
+            CeslSource(
+                code="pubmed",
+                label="PubMed",
+                sort_order=10,
+                active=True,
+                default_evidence_type="rwe_study",
+            )
+        ]
 
     async def list_study_designs(self) -> list[CeslStudyDesign]:
         return [
@@ -79,6 +87,7 @@ async def test_cesl_sources_and_designs_map() -> None:
     sources = await svc.cesl_sources()
     designs = await svc.study_designs()
     assert sources[0].code == "pubmed"
+    assert sources[0].default_evidence_type == "rwe_study"
     assert designs[0].label == "Retrospective cohort"
 
 

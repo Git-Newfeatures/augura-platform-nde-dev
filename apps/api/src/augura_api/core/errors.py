@@ -47,6 +47,18 @@ class ConflictError(AppError):
     title = "Conflict"
 
 
+class PayloadTooLargeError(AppError):
+    code = "payload_too_large"
+    http_status = 413
+    title = "Payload too large"
+
+
+class UnsupportedMediaTypeError(AppError):
+    code = "unsupported_media_type"
+    http_status = 415
+    title = "Unsupported media type"
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_request: Request, exc: AppError) -> JSONResponse:

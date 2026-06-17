@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/agents/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat
+         * @description Assistant inline : passerelle Messages Anthropic. 503 explicite si pas de clé.
+         */
+        post: operations["chat_agents_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/dag": {
         parameters: {
             query?: never;
@@ -318,6 +338,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents/{document_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Document
+         * @description Sert les octets du dossier généré (scopé tenant). 404 tant que non `ready`.
+         */
+        get: operations["download_document_documents__document_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -454,6 +494,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/simulations/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_simulations_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/studies": {
         parameters: {
             query?: never;
@@ -486,7 +543,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Study */
+        patch: operations["update_study_studies__study_id__patch"];
         trace?: never;
     };
     "/studies/{study_id}/state": {
@@ -542,6 +600,32 @@ export interface components {
             result_unit?: string | null;
             /** Sort Order */
             sort_order: number;
+        };
+        /** ChatMessage */
+        ChatMessage: {
+            /** Content */
+            content: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+        };
+        /** ChatRequest */
+        ChatRequest: {
+            /** Messages */
+            messages: components["schemas"]["ChatMessage"][];
+            /** Model */
+            model?: string | null;
+            /** System */
+            system?: string | null;
+        };
+        /** ChatResponse */
+        ChatResponse: {
+            /** Model */
+            model: string;
+            /** Text */
+            text: string;
         };
         /** CohortBiomarkerOut */
         CohortBiomarkerOut: {
@@ -1192,8 +1276,10 @@ export interface components {
              * @default 20
              */
             match_count: number;
+            /** Query */
+            query?: string | null;
             /** Query Embedding */
-            query_embedding: number[];
+            query_embedding?: number[] | null;
         };
         /** Sheet */
         Sheet: {
@@ -1262,6 +1348,32 @@ export interface components {
             run_id: string;
             /** Status */
             status: string;
+        };
+        /**
+         * SimulationRunOut
+         * @description Élément de la liste des runs (alimente la page Runs du front).
+         */
+        SimulationRunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Id */
+            job_id?: string | null;
+            /** Status */
+            status: string;
+            /** Study Id */
+            study_id?: string | null;
+            /** Summary */
+            summary?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** SourceCount */
         SourceCount: {
@@ -1353,6 +1465,27 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * StudyUpdate
+         * @description Mise à jour partielle d'une étude (cycle de vie + métadonnées).
+         *     Seuls les champs explicitement fournis sont écrits (model_dump exclude_unset).
+         */
+        StudyUpdate: {
+            /** Category */
+            category?: string | null;
+            /** Framework */
+            framework?: string | null;
+            /** Lead */
+            lead?: string | null;
+            /** N Subjects */
+            n_subjects?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Status */
+            status?: ("draft" | "active" | "locked" | "archived") | null;
+            /** Tagline */
+            tagline?: string | null;
+        };
         /** TenantProfileOut */
         TenantProfileOut: {
             /** Cesl Profile */
@@ -1412,6 +1545,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    chat_agents_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     dag_agents_dag_post: {
         parameters: {
             query?: never;
@@ -2022,6 +2188,37 @@ export interface operations {
             };
         };
     };
+    download_document_documents__document_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     healthz_healthz_get: {
         parameters: {
             query?: never;
@@ -2232,6 +2429,26 @@ export interface operations {
             };
         };
     };
+    list_runs_simulations_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationRunOut"][];
+                };
+            };
+        };
+    };
     list_studies_studies_get: {
         parameters: {
             query?: never;
@@ -2295,6 +2512,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_study_studies__study_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudyUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -107,6 +107,85 @@
         "title": "CeslSourceOut",
         "type": "object"
       },
+      "ChatMessage": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage",
+        "type": "object"
+      },
+      "ChatRequest": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "minItems": 1,
+            "title": "Messages",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System"
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "title": "ChatRequest",
+        "type": "object"
+      },
+      "ChatResponse": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "model"
+        ],
+        "title": "ChatResponse",
+        "type": "object"
+      },
       "CohortBiomarkerOut": {
         "properties": {
           "adherence_pct": {
@@ -2121,17 +2200,34 @@
             "title": "Match Count",
             "type": "integer"
           },
+          "query": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
           "query_embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Query Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Embedding"
           }
         },
-        "required": [
-          "query_embedding"
-        ],
         "title": "SearchRequest",
         "type": "object"
       },
@@ -2309,6 +2405,68 @@
           "status"
         ],
         "title": "SimulationRunCreated",
+        "type": "object"
+      },
+      "SimulationRunOut": {
+        "description": "Élément de la liste des runs (alimente la page Runs du front).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "title": "SimulationRunOut",
         "type": "object"
       },
       "SourceCount": {
@@ -2575,6 +2733,96 @@
         "title": "StudyStatePut",
         "type": "object"
       },
+      "StudyUpdate": {
+        "description": "Mise à jour partielle d'une étude (cycle de vie + métadonnées).\nSeuls les champs explicitement fournis sont écrits (model_dump exclude_unset).",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "framework": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Framework"
+          },
+          "lead": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead"
+          },
+          "n_subjects": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Subjects"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "draft",
+                  "active",
+                  "locked",
+                  "archived"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tagline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          }
+        },
+        "title": "StudyUpdate",
+        "type": "object"
+      },
       "TenantProfileOut": {
         "properties": {
           "cesl_profile": {
@@ -2726,6 +2974,48 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/agents/chat": {
+      "post": {
+        "description": "Assistant inline : passerelle Messages Anthropic. 503 explicite si pas de clé.",
+        "operationId": "chat_agents_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/agents/dag": {
       "post": {
         "operationId": "dag_agents_dag_post",
@@ -3588,6 +3878,48 @@
         ]
       }
     },
+    "/documents/{document_id}/download": {
+      "get": {
+        "description": "Sert les octets du dossier généré (scopé tenant). 404 tant que non `ready`.",
+        "operationId": "download_document_documents__document_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "operationId": "healthz_healthz_get",
@@ -3859,6 +4191,31 @@
         ]
       }
     },
+    "/simulations/runs": {
+      "get": {
+        "operationId": "list_runs_simulations_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SimulationRunOut"
+                  },
+                  "title": "Response List Runs Simulations Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Runs",
+        "tags": [
+          "simulation"
+        ]
+      }
+    },
     "/studies": {
       "get": {
         "operationId": "list_studies_studies_get",
@@ -3961,6 +4318,57 @@
           }
         },
         "summary": "Get Study",
+        "tags": [
+          "studies"
+        ]
+      },
+      "patch": {
+        "operationId": "update_study_studies__study_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "study_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Study Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Study",
         "tags": [
           "studies"
         ]

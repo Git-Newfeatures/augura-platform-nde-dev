@@ -25,8 +25,13 @@ NUM_COLS: dict[str, set[str]] = {
 }
 # Ordre d'insertion (FK : concepts d'abord).
 TABLES = [
-    "taxonomy_concepts", "taxonomy_synonyms", "taxonomy_dq_valid_values",
-    "taxonomy_measurement_units", "unit_conversions", "table_archetypes", "dq_constraints",
+    "taxonomy_concepts",
+    "taxonomy_synonyms",
+    "taxonomy_dq_valid_values",
+    "taxonomy_measurement_units",
+    "unit_conversions",
+    "table_archetypes",
+    "dq_constraints",
 ]
 
 

@@ -17,14 +17,23 @@ def test_rows_to_sql_handles_nulls_quotes_bools_nums(tmp_path: Path) -> None:
     csv_path = tmp_path / "table_archetypes.csv"
     _write_csv(
         csv_path,
-        ["archetype_id", "archetype_name", "key_selectors", "semantic_score",
-         "is_surrogate", "description_template", "review_status", "version", "active"],
+        [
+            "archetype_id",
+            "archetype_name",
+            "key_selectors",
+            "semantic_score",
+            "is_surrogate",
+            "description_template",
+            "review_status",
+            "version",
+            "active",
+        ],
         [["a1", "O'Brien grain", "person|time", "0.8", "false", "", "approved", "v1", "true"]],
     )
     sql = rows_to_sql("table_archetypes", csv_path)
     assert "insert into table_archetypes" in sql
     assert "on conflict do nothing" in sql
-    assert "'O''Brien grain'" in sql          # single-quote escaped
-    assert "0.8" in sql and ", true" in sql    # numeric + boolean unquoted
+    assert "'O''Brien grain'" in sql  # single-quote escaped
+    assert "0.8" in sql and ", true" in sql  # numeric + boolean unquoted
     assert "false" in sql
-    assert "NULL" in sql                        # empty description_template → NULL
+    assert "NULL" in sql  # empty description_template → NULL

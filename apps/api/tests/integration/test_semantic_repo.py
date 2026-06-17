@@ -49,9 +49,7 @@ async def test_taxonomy_readable_and_seeded(sm: async_sessionmaker[AsyncSession]
         constraints = await repo.list_constraints()
     assert len(concepts) > 100  # ~171 seeded
     assert all(c.active for c in concepts)
-    assert [c.local_concept_id for c in concepts] == sorted(
-        c.local_concept_id for c in concepts
-    )
+    assert [c.local_concept_id for c in concepts] == sorted(c.local_concept_id for c in concepts)
     assert len(archetypes) >= 1
     assert len(constraints) >= 1
 

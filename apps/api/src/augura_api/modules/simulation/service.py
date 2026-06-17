@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.errors import BadRequestError
 from augura_api.core.tenancy import CurrentTenant
+from augura_api.modules import analytics
 from augura_api.modules.jobs import create_job
 from augura_api.modules.simulation import calibration, power, schemas
 from augura_api.modules.simulation.repo import SimulationRepo
@@ -46,6 +47,24 @@ class SimulationService:
         rows = await SimulationRepo(self.session).list_results(tenant.tenant_id, cohort_name)
         return [schemas.SimulationResultOut.model_validate(r) for r in rows]
 
+    async def list_runs(self, tenant: CurrentTenant) -> list[schemas.SimulationRunOut]:
+        runs = await SimulationRepo(self.session).list_runs(tenant.tenant_id)
+        out: list[schemas.SimulationRunOut] = []
+        for r in runs:
+            results = r.results
+            summary = results.get("summary") if isinstance(results, dict) else None
+            out.append(
+                schemas.SimulationRunOut(
+                    id=r.id,
+                    study_id=r.study_id,
+                    job_id=r.job_id,
+                    status=r.status,
+                    created_at=r.created_at,
+                    summary=summary,
+                )
+            )
+        return out
+
     async def create_simulation(
         self, tenant: CurrentTenant, req: schemas.SimulationRequest
     ) -> schemas.SimulationRunCreated:
@@ -60,6 +79,14 @@ class SimulationService:
         run = await SimulationRepo(self.session).create_run(
             tenant.tenant_id, study_id=req.study_id, params=req.params, job_id=job.id
         )
-        # En prod : modal.Function.spawn(job.id) lance le worker bootstrap
-        # (jobs/ entrypoint, image scientifique) — non câblé en local.
+        await analytics.log_usage(
+            self.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="simulation.requested",
+            route="/simulations",
+            metadata={"job_id": str(job.id), "run_id": str(run.id)},
+        )
+        # Le worker (jobs.runner.enqueue_job, planifié par le router) exécute le
+        # bootstrap après la réponse — fallback local du worker Modal.
         return schemas.SimulationRunCreated(job_id=job.id, run_id=run.id, status=job.status)

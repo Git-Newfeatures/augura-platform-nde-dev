@@ -22,3 +22,25 @@ def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUGURA_ENV", "dev")
     get_settings.cache_clear()
     assert get_settings() is get_settings()
+
+
+def test_llm_keys_load_from_unprefixed_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Le .env pose ANTHROPIC_API_KEY / OPENAI_API_KEY / NCBI_API_KEY sans préfixe :
+    l'alias doit les charger malgré env_prefix=AUGURA_ (sinon les clés sont ignorées)."""
+    monkeypatch.setenv("AUGURA_ENV", "dev")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-unprefixed")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-unprefixed")
+    monkeypatch.setenv("NCBI_API_KEY", "ncbi-unprefixed")
+    s = Settings()  # pyright: ignore[reportCallIssue]
+    assert s.anthropic_api_key == "sk-ant-unprefixed"
+    assert s.openai_api_key == "sk-openai-unprefixed"
+    assert s.ncbi_api_key == "ncbi-unprefixed"
+
+
+def test_llm_keys_prefer_prefixed_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Le nom préfixé AUGURA_* reste accepté et prioritaire."""
+    monkeypatch.setenv("AUGURA_ENV", "dev")
+    monkeypatch.setenv("AUGURA_ANTHROPIC_API_KEY", "sk-ant-prefixed")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-unprefixed")
+    s = Settings()  # pyright: ignore[reportCallIssue]
+    assert s.anthropic_api_key == "sk-ant-prefixed"

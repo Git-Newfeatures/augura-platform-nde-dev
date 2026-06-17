@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.ids import TenantId
@@ -42,3 +42,29 @@ class JobRepo:
         await self.session.flush()
         await self.session.refresh(job)
         return job
+
+    async def update(
+        self,
+        tenant_id: TenantId,
+        job_id: UUID,
+        *,
+        status: str | None = None,
+        progress: float | None = None,
+        result_ref: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        """Met à jour les champs de suivi d'un job (écrit par le runner). Scopé tenant
+        (défense en profondeur en plus de la RLS). `updated_at` toujours rafraîchi."""
+        values: dict[str, Any] = {"updated_at": text("now()")}
+        if status is not None:
+            values["status"] = status
+        if progress is not None:
+            values["progress"] = progress
+        if result_ref is not None:
+            values["result_ref"] = result_ref
+        if error is not None:
+            values["error"] = error
+        await self.session.execute(
+            update(Job).where(Job.org_id == tenant_id, Job.id == job_id).values(**values)
+        )
+        await self.session.flush()

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.errors import NotFoundError
 from augura_api.core.tenancy import CurrentTenant
+from augura_api.modules import analytics
 from augura_api.modules.documents import schemas
 from augura_api.modules.documents.repo import DocumentRepo
 from augura_api.modules.jobs import create_job
@@ -41,8 +42,16 @@ class DocumentService:
             },
             idempotency_key=req.idempotency_key,
         )
-        # En prod : modal.Function.spawn(job.id) → worker WeasyPrint/python-docx →
-        # Storage → URL signée. Non câblé en local.
+        await analytics.log_usage(
+            self.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="document.requested",
+            route="/documents",
+            metadata={"document_id": str(doc.id), "type": req.type},
+        )
+        # Le worker (jobs.runner) génère le dossier et le marque `ready` après la
+        # réponse — fallback local du worker Modal WeasyPrint/python-docx → Storage.
         return schemas.GeneratedDocumentCreated(
             document_id=doc.id, job_id=job.id, status=doc.status
         )

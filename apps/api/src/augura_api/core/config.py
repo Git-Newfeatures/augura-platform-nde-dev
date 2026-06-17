@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _CORS_DEV_DEFAULT = "http://localhost:5173,http://127.0.0.1:5173"
@@ -33,13 +33,29 @@ class Settings(BaseSettings):
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_issuer: str | None = None
 
-    # LLM (agents). Clés requises pour un run live ; absentes en local ⇒ agents
-    # validés à LLM mocké. Modèles par défaut = équivalents courants des choix JS.
-    anthropic_api_key: str | None = None
-    openai_api_key: str | None = None
+    # Stockage des artefacts générés (dossiers PDF/HTML, exports). Local en dev ;
+    # un bucket Supabase Storage / volume Modal prendra le relais en prod via la
+    # même interface (core.storage). Chemin relatif → résolu depuis le CWD de l'API.
+    artifacts_dir: str = "var/artifacts"
+
+    # LLM (agents). Clés requises pour un run live ; absentes en local ⇒ les routes
+    # /agents/* renvoient une 503 explicite « clé manquante ». On accepte le nom
+    # préfixé AUGURA_* ET le nom standard sans préfixe (ANTHROPIC_API_KEY…), pour
+    # ne pas dépendre d'un renommage des secrets côté plateforme.
+    anthropic_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("AUGURA_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+    )
+    openai_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("AUGURA_OPENAI_API_KEY", "OPENAI_API_KEY"),
+    )
     # PubMed E-utilities (NCBI). Clé optionnelle : relève la limite de débit
     # (3→10 req/s). La recherche de littérature marche sans clé.
-    ncbi_api_key: str | None = None
+    ncbi_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("AUGURA_NCBI_API_KEY", "NCBI_API_KEY"),
+    )
     agent_model_dag: str = "claude-sonnet-4-6"
     agent_model_fast: str = "claude-haiku-4-5"
     agent_model_deep: str = "claude-opus-4-8"

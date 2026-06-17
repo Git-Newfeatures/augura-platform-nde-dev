@@ -1,5 +1,6 @@
 """Contrat public du module simulation."""
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -58,3 +59,16 @@ class SimulationRunCreated(BaseModel):
     job_id: UUID
     run_id: UUID
     status: str
+
+
+class SimulationRunOut(BaseModel):
+    """Élément de la liste des runs (alimente la page Runs du front)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    study_id: UUID | None = None
+    job_id: UUID | None = None
+    status: str
+    created_at: datetime
+    summary: dict[str, Any] | None = None

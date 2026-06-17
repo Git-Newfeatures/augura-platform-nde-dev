@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.ids import TenantId
@@ -37,3 +37,24 @@ class DocumentRepo:
         await self.session.flush()
         await self.session.refresh(doc)
         return doc
+
+    async def set_status(
+        self,
+        tenant_id: TenantId,
+        document_id: UUID,
+        *,
+        status: str,
+        storage_path: str | None = None,
+    ) -> None:
+        values: dict[str, object] = {"status": status}
+        if storage_path is not None:
+            values["storage_path"] = storage_path
+        await self.session.execute(
+            update(GeneratedDocument)
+            .where(
+                GeneratedDocument.org_id == tenant_id,
+                GeneratedDocument.id == document_id,
+            )
+            .values(**values)
+        )
+        await self.session.flush()

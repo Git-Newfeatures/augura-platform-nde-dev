@@ -30,3 +30,27 @@ async def create_job(
 
 async def get_job(session: AsyncSession, tenant_id: TenantId, job_id: UUID) -> Job | None:
     return await JobRepo(session).get(tenant_id, job_id)
+
+
+async def mark_running(session: AsyncSession, tenant_id: TenantId, job_id: UUID) -> None:
+    await JobRepo(session).update(tenant_id, job_id, status="running", progress=0.0)
+
+
+async def set_progress(
+    session: AsyncSession, tenant_id: TenantId, job_id: UUID, progress: float
+) -> None:
+    await JobRepo(session).update(tenant_id, job_id, progress=max(0.0, min(1.0, progress)))
+
+
+async def mark_succeeded(
+    session: AsyncSession, tenant_id: TenantId, job_id: UUID, *, result_ref: str | None = None
+) -> None:
+    await JobRepo(session).update(
+        tenant_id, job_id, status="succeeded", progress=1.0, result_ref=result_ref
+    )
+
+
+async def mark_failed(
+    session: AsyncSession, tenant_id: TenantId, job_id: UUID, *, error: str
+) -> None:
+    await JobRepo(session).update(tenant_id, job_id, status="failed", error=error[:2000])

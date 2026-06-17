@@ -1,8 +1,9 @@
 """Adaptateur HTTP du module simulation."""
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, BackgroundTasks, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.jobs.runner import enqueue_job
 from augura_api.modules.simulation import schemas
 from augura_api.modules.simulation.service import SimulationService, compute_power_response
 
@@ -22,8 +23,23 @@ async def results(
     return await SimulationService(session).list_results(tenant, cohort_name)
 
 
+@router.get("/runs", response_model=list[schemas.SimulationRunOut])
+async def list_runs(
+    tenant: CurrentTenantDep, session: SessionDep
+) -> list[schemas.SimulationRunOut]:
+    return await SimulationService(session).list_runs(tenant)
+
+
 @router.post("", response_model=schemas.SimulationRunCreated, status_code=status.HTTP_202_ACCEPTED)
 async def create_simulation(
-    req: schemas.SimulationRequest, tenant: CurrentTenantDep, session: SessionDep
+    req: schemas.SimulationRequest,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    background_tasks: BackgroundTasks,
 ) -> schemas.SimulationRunCreated:
-    return await SimulationService(session).create_simulation(tenant, req)
+    created = await SimulationService(session).create_simulation(tenant, req)
+    # Le job tourne après la réponse (la session de requête est alors committée) :
+    # bootstrap réel → simulation_runs.results + read-model simulation_results.
+    enqueue_job(background_tasks, tenant, created.job_id, settings=settings)
+    return created

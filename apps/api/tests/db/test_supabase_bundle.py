@@ -39,6 +39,7 @@ EXPECTED_TABLES = {
     "unit_conversions",
     "table_archetypes",
     "dq_constraints",
+    "dq_bundles",
 }
 
 # Tables tenant-scopées qui DOIVENT porter une policy RLS.
@@ -61,6 +62,7 @@ RLS_REQUIRED = {
     "generated_documents",
     "usage_events",
     "artifacts",
+    "dq_bundles",
 }
 
 

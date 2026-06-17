@@ -123,6 +123,23 @@ create table if not exists dataset_columns (
 );
 create index if not exists ix_dataset_columns_dataset on dataset_columns(dataset_id);
 
+-- ─────────────────────────────────────────────────────────────────────────
+-- Module : dq (A3a) — bundles de qualité des données (tenant-scopé)
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table if not exists dq_bundles (
+    id                  uuid primary key default gen_random_uuid(),
+    org_id              uuid not null references orgs(id) on delete cascade,
+    dataset_id          uuid not null references datasets(id) on delete cascade,
+    score_profile       text not null default 'exploratory',
+    overall_score       numeric,
+    status              text not null default 'draft' check (status in ('draft', 'sealed')),
+    requires_resolution boolean not null default false,
+    bundle              jsonb not null default '{}'::jsonb,
+    created_at          timestamptz not null default now()
+);
+create index if not exists dq_bundles_dataset_idx on dq_bundles (dataset_id, created_at desc);
+
 -- Cohorte démographique (= validation_members côté front).
 create table if not exists cohort_members (
     id               uuid primary key default gen_random_uuid(),

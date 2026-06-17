@@ -257,4 +257,11 @@ alter table dq_constraints force row level security;
 create policy backend_read on dq_constraints
   for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
 
+-- ── dq_bundles (A3a) : tenant-scopé via org_id ───────────────────────────
+alter table dq_bundles enable row level security;
+alter table dq_bundles force row level security;
+create policy tenant_isolation on dq_bundles
+    using (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+    with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
+
 commit;

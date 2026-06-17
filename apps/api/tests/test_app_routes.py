@@ -38,6 +38,7 @@ def test_openapi_exposes_routes() -> None:
         "/reference/cesl-sources",
         "/reference/study-designs",
         "/semantic/concepts",
+        "/datasets/{dataset_id}/map",
     ):
         assert path in paths, path
 
@@ -55,6 +56,12 @@ async def test_protected_routes_require_auth() -> None:
             "/semantic/concepts",
         ):
             r = await client.get(path)
+            assert r.status_code == 401, path
+            assert r.headers["content-type"] == "application/problem+json"
+            assert r.json()["code"] == "unauthorized"
+        # POST-only routes: verify auth guard fires on the correct method
+        for path in ("/datasets/{dataset_id}/map",):
+            r = await client.post(path)
             assert r.status_code == 401, path
             assert r.headers["content-type"] == "application/problem+json"
             assert r.json()["code"] == "unauthorized"

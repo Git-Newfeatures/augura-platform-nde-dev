@@ -44,3 +44,14 @@ def test_llm_keys_prefer_prefixed_name(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-unprefixed")
     s = Settings()  # pyright: ignore[reportCallIssue]
     assert s.anthropic_api_key == "sk-ant-prefixed"
+
+
+def test_blank_llm_key_normalised_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Une clé vide/whitespace (`ANTHROPIC_API_KEY=`) doit valoir None — sinon les
+    constructeurs LLM bâtissent un client à clé vide au lieu de lever 503 (bug wiring)."""
+    monkeypatch.setenv("AUGURA_ENV", "dev")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+    s = Settings()  # pyright: ignore[reportCallIssue]
+    assert s.anthropic_api_key is None
+    assert s.openai_api_key is None

@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _CORS_DEV_DEFAULT = "http://localhost:5173,http://127.0.0.1:5173"
@@ -59,6 +59,16 @@ class Settings(BaseSettings):
     agent_model_dag: str = "claude-sonnet-4-6"
     agent_model_fast: str = "claude-haiku-4-5"
     agent_model_deep: str = "claude-opus-4-8"
+
+    @field_validator("anthropic_api_key", "openai_api_key", "ncbi_api_key", mode="after")
+    @classmethod
+    def _blank_key_is_none(cls, v: str | None) -> str | None:
+        # Une clé vide/whitespace dans .env (`ANTHROPIC_API_KEY=`) doit valoir « absente »
+        # (None), sinon les constructeurs LLM bâtissent un client avec une clé vide et
+        # échouent de façon opaque au lieu de renvoyer une 503 « clé manquante » propre.
+        if isinstance(v, str):
+            return v.strip() or None
+        return v
 
     @property
     def cors_origin_list(self) -> list[str]:

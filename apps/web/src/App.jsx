@@ -12,6 +12,7 @@ import { RunsPage } from './workspace/RunsPage'
 import { DossiersPage } from './workspace/DossiersPage'
 import { HomePage } from './workspace/HomePage'
 import { NewStudyPage } from './workspace/NewStudyPage'
+import IntakeApp from './views/intake/IntakeApp'
 
 function AuthenticatedApp() {
   const [session, setSession] = useState(undefined)
@@ -49,6 +50,7 @@ function AuthenticatedApp() {
         <Route index element={<Navigate to="/studies" replace />} />
         <Route path="/studies" element={<HomePage />} />
         <Route path="/datasets" element={<DatasetsPage />} />
+        <Route path="/intake" element={<IntakeApp />} />
         <Route path="/corpus" element={<CorpusPage />} />
         <Route path="/variables" element={<VariablesPage />} />
         <Route path="/runs" element={<RunsPage />} />

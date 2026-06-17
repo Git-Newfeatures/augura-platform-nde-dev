@@ -5,8 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { slugify } from '@/lib/utils'
 import { apiJson } from '@/api'
-
-const FRAMEWORKS = ['DiGA', 'CONSORT-AI', 'EU MDR', 'NICE DSP', 'EUnetHTA', 'FDA SaMD']
+import { useReference } from '@/workspace/dataClient'
 
 const fieldCls =
   'w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-foreground ' +
@@ -26,6 +25,8 @@ function Field({ label, hint, children }) {
 
 export function NewStudyPage() {
   const navigate = useNavigate()
+  const { data: frameworkRows } = useReference('frameworks')
+  const FRAMEWORKS = (frameworkRows ?? []).map((f) => f.label)
   const [name, setName] = useState('')
   const [tagline, setTagline] = useState('')
   const [category, setCategory] = useState('')

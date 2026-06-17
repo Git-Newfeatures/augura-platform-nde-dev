@@ -57,6 +57,15 @@ async def test_upload_persists_dataset_and_profiled_columns(
 
     async with sm() as session, session.begin():
         await _scope(session, tenant)
+        # datasets.org_id references orgs(id) — create the tenant's org first. The
+        # orgs `tenant_self` policy (with check defaults to id = app.tenant_id)
+        # permits inserting the row whose id is the scoped tenant.
+        await session.execute(
+            text(
+                "insert into orgs (id, name, slug) "
+                "values (cast(:i as uuid), 'IT', :s)"
+            ).bindparams(i=str(tenant), s="it-" + uuid4().hex[:8])
+        )
         svc = DatasetService(DatasetRepo(session))
         result = await svc.upload_dataset(
             CurrentTenant(tenant_id=tenant, user_id=USER, role="owner"),

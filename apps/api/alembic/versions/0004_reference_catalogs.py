@@ -18,10 +18,18 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 _TABLES = (
-    "outcome_catalog", "estimand_catalog", "estimator_catalog", "framework_catalog",
-    "evidence_type_catalog", "domain_catalog", "jurisdiction_catalog",
-    "literature_design_catalog", "pii_pattern_catalog", "biomarker_range_catalog",
-    "variable_group_catalog", "variable_role_catalog",
+    "outcome_catalog",
+    "estimand_catalog",
+    "estimator_catalog",
+    "framework_catalog",
+    "evidence_type_catalog",
+    "domain_catalog",
+    "jurisdiction_catalog",
+    "literature_design_catalog",
+    "pii_pattern_catalog",
+    "biomarker_range_catalog",
+    "variable_group_catalog",
+    "variable_role_catalog",
 )
 
 

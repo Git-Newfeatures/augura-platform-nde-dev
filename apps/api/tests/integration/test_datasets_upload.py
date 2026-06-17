@@ -53,7 +53,7 @@ async def test_upload_persists_dataset_and_profiled_columns(
     get_settings.cache_clear()
     settings = get_settings()
 
-    csv = b"member_id,age,sex\n1,40,M\n2,55,F\n3,,F\n"
+    csv = b"member_id,age,sex\n1,40,M\n2,55,F\n3,,F\n4,61,M\n5,48,F\n6,52,M\n"
 
     async with sm() as session, session.begin():
         await _scope(session, tenant)
@@ -76,7 +76,7 @@ async def test_upload_persists_dataset_and_profiled_columns(
             study_id=None,
         )
 
-    assert result.dataset.row_count == 3
+    assert result.dataset.row_count == 6
     assert result.dataset.storage_path
     by_name = {c.name: c for c in result.columns}
     assert by_name["age"].value_kind == "numeric"

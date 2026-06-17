@@ -13,18 +13,25 @@ def test_numeric_column() -> None:
     assert abs(p.null_pct - 0.2) < 1e-9
 
 
-def test_categorical_top_values() -> None:
+def test_binary_top_values() -> None:
+    # Two distinct non-null values → 'binary' (dataset_columns CHECK vocabulary).
     p = profile_column("sex", ["M", "F", "F", "F", "M"])
-    assert p.value_kind == "categorical"
+    assert p.value_kind == "binary"
     assert p.n_distinct == 2
     top = {d["value"]: d["count"] for d in p.top_values}
     assert top == {"F": 3, "M": 2}
     assert p.value_min is None
 
 
-def test_date_column() -> None:
+def test_date_column_is_timestamp() -> None:
     p = profile_column("visit_dt", ["2024-01-01", "2024-02-15", "2024-03-30"])
-    assert p.value_kind == "date"
+    assert p.value_kind == "timestamp"
+
+
+def test_multivalue_text() -> None:
+    # >2 distinct, non-numeric, non-date → 'text' (not a CHECK-allowed 'categorical').
+    p = profile_column("city", ["Paris", "Lyon", "Nice", "Lyon", "Brest"])
+    assert p.value_kind == "text"
 
 
 def test_all_missing() -> None:

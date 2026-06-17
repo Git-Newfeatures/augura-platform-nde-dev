@@ -80,5 +80,5 @@ async def test_upload_persists_dataset_and_profiled_columns(
     assert result.dataset.storage_path
     by_name = {c.name: c for c in result.columns}
     assert by_name["age"].value_kind == "numeric"
-    assert by_name["sex"].value_kind == "categorical"
+    assert by_name["sex"].value_kind == "binary"
     assert by_name["sex"].n_distinct == 2

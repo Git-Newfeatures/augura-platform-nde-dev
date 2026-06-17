@@ -58,12 +58,15 @@ def profile_column(name: str, values: list[str]) -> ColumnProfile:
     def frac(pred: Callable[[str], bool]) -> float:
         return sum(1 for v in sample if pred(v)) / len(sample) if sample else 0.0
 
+    # value_kind vocabulary is constrained by the dataset_columns CHECK:
+    # ('numeric', 'text', 'binary', 'timestamp'). 'binary' = exactly two distinct
+    # non-null values; richer categorical typing (for DQ) is derived in A3.
     if frac(_is_float) >= 0.8:
         value_kind = "numeric"
     elif frac(_is_date) >= 0.8:
-        value_kind = "date"
-    elif n_non_null and n_distinct <= 50 and (n_distinct / n_non_null) <= 0.5:
-        value_kind = "categorical"
+        value_kind = "timestamp"
+    elif n_distinct == 2:
+        value_kind = "binary"
     else:
         value_kind = "text"
 

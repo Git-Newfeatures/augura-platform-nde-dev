@@ -204,3 +204,99 @@ export function useCollection(name, reloadToken = 0) {
 
   return { data: data ?? [], loading }
 }
+
+// ── Reference catalogs ──────────────────────────────────────────────────────
+//   Static config served by the backend /reference/* endpoints. Cached for the
+//   session (these don't change between fetches). Raw payloads are cached; views
+//   apply the exported normalizers (some need per-study context, e.g. {partner}).
+const REFERENCE_ENDPOINTS = {
+  outcomes:           '/reference/outcomes',
+  study_designs:      '/reference/study-designs',
+  estimands:          '/reference/estimands',
+  estimators:         '/reference/estimators',
+  frameworks:         '/reference/frameworks',
+  evidence_types:     '/reference/evidence-types',
+  domains:            '/reference/domains',
+  jurisdictions:      '/reference/jurisdictions',
+  literature_designs: '/reference/literature-study-designs',
+  dq_rules:           '/reference/dq-rules',
+  variable_roles:     '/reference/variable-roles',
+  cesl_sources:       '/reference/cesl-sources',
+}
+
+const _refCache = new Map()
+
+/** One-shot, session-cached fetch of a raw reference payload. Yields null on error. */
+export async function fetchReference(name) {
+  if (_refCache.has(name)) return _refCache.get(name)
+  const path = REFERENCE_ENDPOINTS[name]
+  const promise = (path ? apiJson(path) : Promise.resolve(null)).catch(() => null)
+  _refCache.set(name, promise)
+  return promise
+}
+
+/** Returns { data, loading } for a reference catalog. `data` is the raw payload (array or object) or null. */
+export function useReference(name) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      const d = await fetchReference(name)
+      if (alive) { setData(d); setLoading(false) }
+    })()
+    return () => { alive = false }
+  }, [name])
+  return { data, loading }
+}
+
+// snake_case API → the exact shapes each view renders. Pure functions, no fetch.
+
+/** /reference/outcomes → { [columnCode]: { key, label, unit, primary, desc, tags, verdict, verdictLabel } }.
+ *  The "In dataset ✓" availability tag is added by the view from the live cohort, not here. */
+export const normOutcomeCatalog = (rows) =>
+  Object.fromEntries((rows ?? []).map((o) => [o.code, {
+    key: o.short_key, label: o.label, unit: o.unit, primary: o.is_primary,
+    desc: o.description, tags: o.regulatory_tags ?? [],
+    verdict: o.verdict, verdictLabel: o.verdict_label,
+  }]))
+
+/** /reference/estimators → array with camelCase fields matching the old ESTIMATORS const. */
+export const normEstimators = (rows) =>
+  (rows ?? []).map((e) => ({
+    key: e.key, label: e.label, short: e.short, recommended: e.recommended,
+    bootstrapPending: e.bootstrap_pending, interpretability: e.interpretability,
+    stability: e.stability, tooltip: e.tooltip,
+    eligibleStudyTypes: e.eligible_study_types ?? [],
+  }))
+
+/** Build the old ESTIMATOR_FILTER shape ({ retro:[keys], prosp:[keys] }) from normalized estimators. */
+export const estimatorFilter = (estimators) => ({
+  retro: (estimators ?? []).filter((e) => e.eligibleStudyTypes.includes('retro')).map((e) => e.key),
+  prosp: (estimators ?? []).filter((e) => e.eligibleStudyTypes.includes('prosp')).map((e) => e.key),
+})
+
+/** /reference/study-designs → the StudyType selector shape. Only enriched designs
+ *  (those with a description) are selector options. {partner} is interpolated here. */
+export const normStudyDesigns = (rows, partner = 'Partner') =>
+  (rows ?? [])
+    .filter((d) => d.description != null && d.description !== '')
+    .map((d) => ({
+      id: d.code,
+      name: d.label,
+      desc: String(d.description ?? '').replaceAll('{partner}', partner),
+      tags: (d.tags ?? []).map(([c, t]) => [c, String(t).replaceAll('{partner}', partner)]),
+      estimands: d.estimands ?? [],
+    }))
+
+/** /reference/estimands → the old ESTIMAND_OPTS shape (desc ← description). */
+export const normEstimands = (rows) =>
+  (rows ?? []).map((e) => ({
+    key: e.key, name: e.name, desc: e.description,
+    regulatory: e.regulatory, recommended: e.recommended, tag: e.tag,
+  }))
+
+/** Array of { code, label } → { [code]: label } map (evidence-types/domains/jurisdictions/literature designs/sources). */
+export const codeLabelMap = (rows) =>
+  Object.fromEntries((rows ?? []).map((r) => [r.code, r.label]))

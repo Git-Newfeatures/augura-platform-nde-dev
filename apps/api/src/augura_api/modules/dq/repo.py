@@ -15,13 +15,24 @@ class DqRepo:
         self.session = session
 
     async def create_bundle(
-        self, tenant_id: TenantId, *, dataset_id: UUID, score_profile: str,
-        overall_score: float | None, status: str, requires_resolution: bool, bundle: dict[str, Any],
+        self,
+        tenant_id: TenantId,
+        *,
+        dataset_id: UUID,
+        score_profile: str,
+        overall_score: float | None,
+        status: str,
+        requires_resolution: bool,
+        bundle: dict[str, Any],
     ) -> DqBundle:
         row = DqBundle(
-            org_id=tenant_id, dataset_id=dataset_id, score_profile=score_profile,
-            overall_score=overall_score, status=status,
-            requires_resolution=requires_resolution, bundle=bundle,
+            org_id=tenant_id,
+            dataset_id=dataset_id,
+            score_profile=score_profile,
+            overall_score=overall_score,
+            status=status,
+            requires_resolution=requires_resolution,
+            bundle=bundle,
         )
         self.session.add(row)
         await self.session.flush()

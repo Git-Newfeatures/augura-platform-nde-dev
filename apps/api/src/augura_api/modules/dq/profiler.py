@@ -9,8 +9,18 @@ _MISSING = {"", "na", "n/a"}
 _SAMPLE = 200
 _SENTINEL_NUMERIC = {-1, -99, -999, 999, 9999, 99999, -9999}
 _SENTINEL_STRING = {
-    "na", "n/a", "unknown", "unk", "missing", "none", "null",
-    "not applicable", "not available", "nr", "nd", "refused",
+    "na",
+    "n/a",
+    "unknown",
+    "unk",
+    "missing",
+    "none",
+    "null",
+    "not applicable",
+    "not available",
+    "nr",
+    "nd",
+    "refused",
 }
 
 
@@ -97,16 +107,29 @@ def profile_column(col_name: str, values: list[str | None]) -> ColumnDQProfile:
             q3 = nums[int(n * 0.75)]
             var = sum((x - mean) ** 2 for x in nums) / (n - 1) if n > 1 else None
             num_summary = NumSummary(
-                n=n, min=nums[0], max=nums[-1], mean=round(mean, 4),
-                median=nums[n // 2], q1=q1, q3=q3, iqr=q3 - q1,
+                n=n,
+                min=nums[0],
+                max=nums[-1],
+                mean=round(mean, 4),
+                median=nums[n // 2],
+                q1=q1,
+                q3=q3,
+                iqr=q3 - q1,
                 std_dev=(var**0.5 if var is not None else None),
             )
 
     return ColumnDQProfile(
-        col_name=col_name, total_count=total, is_numeric=is_numeric,
-        is_categorical=is_categorical, is_date=is_date, missing_count=missing_count,
-        missing_rate=missing_rate, sentinel_count=sentinel_count,
-        numeric_values=numeric_values, num_summary=num_summary,
+        col_name=col_name,
+        total_count=total,
+        is_numeric=is_numeric,
+        is_categorical=is_categorical,
+        is_date=is_date,
+        missing_count=missing_count,
+        missing_rate=missing_rate,
+        sentinel_count=sentinel_count,
+        numeric_values=numeric_values,
+        num_summary=num_summary,
         unique_values=(sorted(set(non_missing)) if is_categorical else None),
-        unique_count=unique_count, sample_values=non_missing[:5],
+        unique_count=unique_count,
+        sample_values=non_missing[:5],
     )

@@ -15,8 +15,12 @@ def file_fingerprint(ctx: dict[str, Any]) -> list[dict[str, Any]]:
     digest = hashlib.sha256(ctx["raw_bytes"]).hexdigest()
     return [
         make_finding(
-            check_id="DQ_FILE_002", category="file", scope="file", severity="info",
-            message=f"File fingerprint: {digest[:16]}…", evidence={"sha256": digest},
+            check_id="DQ_FILE_002",
+            category="file",
+            scope="file",
+            severity="info",
+            message=f"File fingerprint: {digest[:16]}…",
+            evidence={"sha256": digest},
         )
     ]
 
@@ -28,15 +32,20 @@ def missing_rate(ctx: dict[str, Any]) -> list[dict[str, Any]]:
     severity = "hard" if rate > 0.50 else "soft" if rate > 0.05 else "info"
     return [
         make_finding(
-            check_id="DQ_MISS_001", category="missing", scope="column", severity=severity,
-            table=ctx["table"], column=p.col_name,
+            check_id="DQ_MISS_001",
+            category="missing",
+            scope="column",
+            severity=severity,
+            table=ctx["table"],
+            column=p.col_name,
             message=f'"{p.col_name}": {rate * 100:.1f}% missing',
             evidence={
                 "missing_count": p.missing_count,
                 "total_count": p.total_count,
                 "missing_rate": rate,
             },
-            affected_count=p.missing_count, affected_proportion=rate,
+            affected_count=p.missing_count,
+            affected_proportion=rate,
         )
     ]
 
@@ -45,17 +54,21 @@ def mostly_missing(ctx: dict[str, Any]) -> list[dict[str, Any]]:
     p: ColumnDQProfile = ctx["profile"]
     return [
         make_finding(
-            check_id="DQ_MISS_003", category="missing", scope="column", severity="hard",
-            table=ctx["table"], column=p.col_name,
+            check_id="DQ_MISS_003",
+            category="missing",
+            scope="column",
+            severity="hard",
+            table=ctx["table"],
+            column=p.col_name,
             message=(
-                f'"{p.col_name}" is {p.missing_rate * 100:.0f}% missing'
-                " — handling policy required"
+                f'"{p.col_name}" is {p.missing_rate * 100:.0f}% missing — handling policy required'
             ),
             evidence={
                 "missing_rate": p.missing_rate,
                 "policy_options": ["exclude", "flag", "keep"],
             },
-            affected_count=p.missing_count, affected_proportion=p.missing_rate,
+            affected_count=p.missing_count,
+            affected_proportion=p.missing_rate,
         )
     ]
 
@@ -80,15 +93,23 @@ def iqr_outliers(ctx: dict[str, Any]) -> list[dict[str, Any]]:
         return []
     return [
         make_finding(
-            check_id="DQ_RANGE_002", category="range", scope="column", severity="soft",
-            table=ctx["table"], column=p.col_name,
+            check_id="DQ_RANGE_002",
+            category="range",
+            scope="column",
+            severity="soft",
+            table=ctx["table"],
+            column=p.col_name,
             message=f'"{p.col_name}": {total} outlier(s) beyond Q1/Q3 ± {k}×IQR',
             evidence={
-                "lower_fence": round(lower, 3), "upper_fence": round(upper, 3),
-                "low_count": len(low), "high_count": len(high),
-                "low_sample": low[:5], "high_sample": high[:5],
+                "lower_fence": round(lower, 3),
+                "upper_fence": round(upper, 3),
+                "low_count": len(low),
+                "high_count": len(high),
+                "low_sample": low[:5],
+                "high_sample": high[:5],
             },
-            affected_count=total, affected_proportion=total / len(p.numeric_values),
+            affected_count=total,
+            affected_proportion=total / len(p.numeric_values),
         )
     ]
 
@@ -109,12 +130,36 @@ def _trigger_true(ctx: dict[str, Any]) -> bool:  # noqa: ARG001
 
 # id, category, scope, severity, trigger, run
 REGISTRY: list[dict[str, Any]] = [
-    {"id": "DQ_FILE_002", "category": "file", "scope": "file", "severity": "info",
-     "trigger": _trigger_true, "run": file_fingerprint},
-    {"id": "DQ_MISS_001", "category": "missing", "scope": "column", "severity": "info",
-     "trigger": _trigger_true, "run": missing_rate},
-    {"id": "DQ_MISS_003", "category": "missing", "scope": "column", "severity": "hard",
-     "trigger": _trigger_mostly_missing, "run": mostly_missing},
-    {"id": "DQ_RANGE_002", "category": "range", "scope": "column", "severity": "soft",
-     "trigger": _trigger_iqr, "run": iqr_outliers},
+    {
+        "id": "DQ_FILE_002",
+        "category": "file",
+        "scope": "file",
+        "severity": "info",
+        "trigger": _trigger_true,
+        "run": file_fingerprint,
+    },
+    {
+        "id": "DQ_MISS_001",
+        "category": "missing",
+        "scope": "column",
+        "severity": "info",
+        "trigger": _trigger_true,
+        "run": missing_rate,
+    },
+    {
+        "id": "DQ_MISS_003",
+        "category": "missing",
+        "scope": "column",
+        "severity": "hard",
+        "trigger": _trigger_mostly_missing,
+        "run": mostly_missing,
+    },
+    {
+        "id": "DQ_RANGE_002",
+        "category": "range",
+        "scope": "column",
+        "severity": "soft",
+        "trigger": _trigger_iqr,
+        "run": iqr_outliers,
+    },
 ]

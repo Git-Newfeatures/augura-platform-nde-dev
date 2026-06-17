@@ -19,8 +19,12 @@ class DqService:
         self.datasets = datasets
 
     async def run(
-        self, tenant: CurrentTenant, settings: Settings, dataset_id: UUID,
-        *, weight_profile: str = "exploratory",
+        self,
+        tenant: CurrentTenant,
+        settings: Settings,
+        dataset_id: UUID,
+        *,
+        weight_profile: str = "exploratory",
     ) -> schemas.DqRunResult:
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None or not dataset.storage_path:
@@ -29,16 +33,22 @@ class DqService:
         sheets = parse_upload(dataset.name, data)
         bundle = run_dq(
             [{"name": s.name, "headers": s.headers, "rows": s.rows} for s in sheets],
-            raw_bytes=data, weight_profile=weight_profile,
+            raw_bytes=data,
+            weight_profile=weight_profile,
         )
         row = await self.repo.create_bundle(
-            tenant.tenant_id, dataset_id=dataset_id, score_profile=weight_profile,
-            overall_score=bundle["summary"]["overall_score"], status=bundle["meta"]["status"],
-            requires_resolution=bundle["summary"]["requires_resolution"], bundle=bundle,
+            tenant.tenant_id,
+            dataset_id=dataset_id,
+            score_profile=weight_profile,
+            overall_score=bundle["summary"]["overall_score"],
+            status=bundle["meta"]["status"],
+            requires_resolution=bundle["summary"]["requires_resolution"],
+            bundle=bundle,
         )
         return schemas.DqRunResult(
-            bundle_id=row.id, status=row.status, overall_score=float(row.overall_score)
-            if row.overall_score is not None else None,
+            bundle_id=row.id,
+            status=row.status,
+            overall_score=float(row.overall_score) if row.overall_score is not None else None,
         )
 
     async def latest(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.DqBundleOut:

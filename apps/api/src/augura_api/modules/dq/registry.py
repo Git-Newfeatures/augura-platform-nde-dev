@@ -9,8 +9,15 @@ def evaluate_check(
     check: dict[str, Any], ctx: dict[str, Any], audit: dict[str, Any]
 ) -> list[dict[str, Any]]:
     item = audit.setdefault(
-        check["id"], {"check_id": check["id"], "scope": check["scope"],
-                      "evaluations": 0, "triggered": 0, "findings": 0, "errors": []}
+        check["id"],
+        {
+            "check_id": check["id"],
+            "scope": check["scope"],
+            "evaluations": 0,
+            "triggered": 0,
+            "findings": 0,
+            "errors": [],
+        },
     )
     item["evaluations"] += 1
     try:

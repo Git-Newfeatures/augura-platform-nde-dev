@@ -2,12 +2,18 @@
 
 WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     "exploratory": {
-        "completeness": 0.25, "validity": 0.25, "consistency": 0.20,
-        "coherence": 0.15, "labelling": 0.15,
+        "completeness": 0.25,
+        "validity": 0.25,
+        "consistency": 0.20,
+        "coherence": 0.15,
+        "labelling": 0.15,
     },
     "regulatory": {
-        "completeness": 0.20, "validity": 0.35, "consistency": 0.30,
-        "coherence": 0.10, "labelling": 0.05,
+        "completeness": 0.20,
+        "validity": 0.35,
+        "consistency": 0.30,
+        "coherence": 0.10,
+        "labelling": 0.05,
     },
 }
 DIMENSION_CATEGORIES: dict[str, list[str]] = {

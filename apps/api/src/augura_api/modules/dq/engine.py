@@ -41,29 +41,47 @@ def run_dq(
             outliers = next(
                 (f["affected_count"] for f in col_findings if f["check_id"] == "DQ_RANGE_002"), 0
             )
-            table_cols.append({
-                "column": header,
-                "type": ("numeric" if profile.is_numeric else "date" if profile.is_date
-                         else "categorical" if profile.is_categorical else "text"),
-                "missing_rate": profile.missing_rate,
-                "outlier_count": outliers or 0,
-                "findings": col_findings,
-            })
-        tables.append({
-            "table_label": sheet["name"], "grain": None, "columns": table_cols,
-            "cross_column_findings": [], "table_findings": [],
-        })
+            table_cols.append(
+                {
+                    "column": header,
+                    "type": (
+                        "numeric"
+                        if profile.is_numeric
+                        else "date"
+                        if profile.is_date
+                        else "categorical"
+                        if profile.is_categorical
+                        else "text"
+                    ),
+                    "missing_rate": profile.missing_rate,
+                    "outlier_count": outliers or 0,
+                    "findings": col_findings,
+                }
+            )
+        tables.append(
+            {
+                "table_label": sheet["name"],
+                "grain": None,
+                "columns": table_cols,
+                "cross_column_findings": [],
+                "table_findings": [],
+            }
+        )
 
     score = compute_dq_score(all_findings, weight_profile)
     hard_total = sum(1 for f in all_findings if f["severity"] == "hard")
     return {
         "meta": {
-            "policy_version": POLICY_VERSION, "dataset_fingerprint": fingerprint,
-            "score_profile": weight_profile, "status": "draft",
+            "policy_version": POLICY_VERSION,
+            "dataset_fingerprint": fingerprint,
+            "score_profile": weight_profile,
+            "status": "draft",
         },
         "summary": {
-            "overall_score": score["overall"], "dimensions": score["dimensions"],
-            "hard_findings_total": hard_total, "requires_resolution": hard_total > 0,
+            "overall_score": score["overall"],
+            "dimensions": score["dimensions"],
+            "hard_findings_total": hard_total,
+            "requires_resolution": hard_total > 0,
         },
         "check_plan": {
             "by_scope": {"file": 1, "column": 3},

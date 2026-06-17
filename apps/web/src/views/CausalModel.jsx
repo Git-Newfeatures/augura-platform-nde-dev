@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, ArrowRight, RotateCcw, Undo2, RefreshCw, ChevronUp, ChevronDown, AlertTriangle, Ban, Info, Check, X, Circle, Network, MessageSquare } from "lucide-react";
 import { apiJson } from "../api";
 import { fetchCohort, isHighEngager } from "../workspace/cohortData";
+import { useReference, normOutcomeCatalog } from "@/workspace/dataClient";
 import { C, FONT, MONO } from "../theme";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -260,6 +261,14 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
 
   const [cohort, setCohort] = useState(null);
 
+  // Outcome catalog from /reference/outcomes, re-keyed by short_key (e.g. hba1c)
+  // so labels / clinical prose are sourced from the reference, never hardcoded.
+  const { data: outcomeRows } = useReference('outcomes');
+  const outcomeByShort = useMemo(() => {
+    const cat = normOutcomeCatalog(outcomeRows);                 // keyed by column code e.g. hba1c_pct
+    return Object.fromEntries(Object.values(cat).map((o) => [o.key, o]));  // re-key by short_key e.g. hba1c
+  }, [outcomeRows]);
+
   useEffect(() => {
     let alive = true;
     fetchCohort(selectedCohort).then(({ members }) => {
@@ -314,14 +323,10 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
     ? (dag.adjustment_set || []).filter(id => !colliders.some(c => c.id === id))
     : [];
 
-  const D1_INTERVENTION = cqExposure || "High app engagement (top quartile of engagement score)";
-  const D1_COMPARATOR   = "medium / low engagers (REST group)";
-  const D1_OUTCOME_MAP  = {
-    hba1c: "HbA1c % change at 12 months",
-    ldl:   "LDL-C mg/dL change at 12 months",
-    crp:   "hs-CRP mg/L change at 12 months",
-  };
-  const D1_OUTCOME    = D1_OUTCOME_MAP[selectedOutcome] || "HbA1c % change at 12 months";
+  const D1_INTERVENTION = cqExposure || "the exposure group";
+  const D1_COMPARATOR   = "the comparison group";
+  const D1_OUTCOME_MAP  = Object.fromEntries(Object.entries(outcomeByShort).map(([k, o]) => [k, o.label + ' at 12 months']));
+  const D1_OUTCOME    = D1_OUTCOME_MAP[selectedOutcome] || outcomeByShort[selectedOutcome]?.label || selectedOutcome;
   const D1_POPULATION = cqPopulation?.length
     ? cqPopulation.join(" · ") + (cohort ? ` · N=${cohort.total}` : "")
     : cohort
@@ -334,16 +339,12 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
     setDagSource(null);
     setGapVariables([]);
 
-    const intervention = cqExposure || "HIGH engagement (top quartile of engagement score) vs. REST (medium + low engagers)";
-    const OUTCOME_LABEL_MAP = {
-      hba1c: "HbA1c % change at 12 months (primary endpoint for prediabetes — gold standard cardiometabolic marker)",
-      ldl:   "LDL-C mg/dL change at 12 months (lipid endpoint — statin confounding is a key validity threat)",
-      crp:   "hs-CRP mg/L change at 12 months (inflammation marker — high within-person variability, regression to mean risk)",
-    };
-    const outcomeLabel = OUTCOME_LABEL_MAP[selectedOutcome] || outcome || "HbA1c change at 12 months";
+    const intervention = cqExposure || "the exposure group vs. the comparison group";
+    const OUTCOME_LABEL_MAP = Object.fromEntries(Object.entries(outcomeByShort).map(([k, o]) => [k, o.desc ? (o.label + ' at 12 months (' + o.desc + ')') : (o.label + ' at 12 months')]));
+    const outcomeLabel = OUTCOME_LABEL_MAP[selectedOutcome] || outcome || outcomeByShort[selectedOutcome]?.label || selectedOutcome;
     const population   = cqPopulation?.length
-      ? `${cqPopulation.join(", ")}, longitudinal digital health cohort`
-      : "the study population, longitudinal digital health cohort";
+      ? cqPopulation.join(", ")
+      : "the study population";
     const productDocs  = product ? product.slice(0, 500) : "";
 
     // Flatten confirmed measured variables to pass to gap detection
@@ -884,7 +885,7 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
           </div>
           <div className="mb-3 text-[12.5px] leading-relaxed text-[#633806]">
             The Augura agent identified the following variables as important confounders or mediators for{" "}
-            <strong>{{ hba1c:"HbA1c", ldl:"LDL-C", crp:"hs-CRP" }[selectedOutcome] ?? "this outcome"}</strong>{" "}
+            <strong>{(outcomeByShort[selectedOutcome]?.label?.replace(/ change$/i, "").trim()) ?? "this outcome"}</strong>{" "}
             based on published literature, but they are <strong>not present in the {partnerLabel} dataset</strong>.
           </div>
           <div className="flex flex-col gap-2">

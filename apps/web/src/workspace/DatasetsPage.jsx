@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Database,
   ArrowRight,
@@ -12,6 +12,7 @@ import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { useCollection } from '@/workspace/dataClient'
 import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
+import { apiJson } from '@/api'
 
 // status → Badge props
 function StatusBadge({ d }) {
@@ -52,6 +53,21 @@ function StatusBadge({ d }) {
 
 // ── Dataset detail (inline view that replaces the list) ───────────────────────
 function DatasetDetail({ d, onBack, onOpenStudy }) {
+  // Profiled columns come from the backend (GET /datasets/:id/columns).
+  const [columns, setColumns] = useState(null)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const cols = await apiJson(`/datasets/${d.id}/columns`)
+        if (alive) setColumns(Array.isArray(cols) ? cols : [])
+      } catch {
+        if (alive) setColumns([])
+      }
+    })()
+    return () => { alive = false }
+  }, [d.id])
+
   return (
     <div className="flex flex-col gap-4">
       {/* Back + study link */}
@@ -97,13 +113,57 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
         </div>
       </Card>
 
-      {/* Detailed dataset metadata (privacy, mapping, validation, lineage) is not
-          wired to a live source yet — show an honest empty state. */}
-      <EmptyState
-        icon={Database}
-        title="No detailed metadata yet"
-        subtitle="Detailed dataset metadata will appear here once available."
-      />
+      {/* Profiled columns (live from the backend). */}
+      {columns == null ? (
+        <Loading />
+      ) : columns.length === 0 ? (
+        <EmptyState
+          icon={Database}
+          title="No profiled columns yet"
+          subtitle="Column profiling will appear here once the dataset has been verified."
+        />
+      ) : (
+        <Card className="gap-0 overflow-x-auto rounded-xl border p-0">
+          <table className="w-full border-collapse text-[12.5px]">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-medium">Column</th>
+                <th className="px-4 py-2.5 font-medium">Sheet</th>
+                <th className="px-4 py-2.5 font-medium">Type</th>
+                <th className="px-4 py-2.5 font-medium text-right">Null %</th>
+                <th className="px-4 py-2.5 font-medium text-right">Distinct</th>
+                <th className="px-4 py-2.5 font-medium">Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              {columns.map((c) => (
+                <tr key={c.id} className="border-b border-border/60 last:border-0">
+                  <td className="px-4 py-2 font-mono text-foreground">{c.name}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{c.sheet}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{c.value_kind ?? '—'}</td>
+                  <td className="px-4 py-2 text-right font-mono text-muted-foreground">
+                    {c.null_pct != null
+                      ? `${Math.round(c.null_pct <= 1 ? c.null_pct * 100 : c.null_pct)}%`
+                      : '—'}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono text-muted-foreground">
+                    {c.n_distinct ?? '—'}
+                  </td>
+                  <td className="px-4 py-2">
+                    {(c.final_role || c.proposed_role) ? (
+                      <Badge variant="secondary" className="text-primary">
+                        {c.final_role || c.proposed_role}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
     </div>
   )
 }

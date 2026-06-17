@@ -1,4 +1,4 @@
-import { useState, useEffect, Component } from "react";
+import { useState, useEffect, useMemo, Component } from "react";
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -38,7 +38,7 @@ import MonitoringView         from "./views/MonitoringView";
 import { StudyShell }         from "./cockpit/StudyShell";
 import { Rail }               from "./cockpit/Rail";
 import { StudyHistory, StudyLineage, StudySettings } from "./cockpit/StudyTabs";
-import { getCockpitStudy }    from "./cockpit/cockpitData";
+import { buildCockpitStudy } from "./cockpit/cockpitData";
 import { VIEW_ORDER } from "./lib/nav";
 
 // ── Session persistence helpers ───────────────────────────────────────────────
@@ -105,6 +105,9 @@ export default function LucisApp() {
   // Tracks the furthest Profiling sub-tab the user has explicitly completed (clicked Next from)
   // null = none yet (agent just finished), then advances through profiling tab ids in order
   const [completedTab, setCompletedTab] = useState(() => load("completedTab", null));
+  // Live study record (GET /studies/:id) backing the cockpit shell. null until loaded
+  // or when projectId isn't a real UUID (legacy/slug routes) → scaffold fallback.
+  const [studyRow, setStudyRow] = useState(null);
   // (admin entry now lives in the shell TopBar; sidebar replaced by the StepNav rail)
 
   // Variable mappings produced by the 1b verification view — keyed by `sheet::column`.
@@ -185,6 +188,33 @@ export default function LucisApp() {
 
   // A dataset must be uploaded before the agent can run and before any downstream phase is accessible
   const hasDataset = !!uploadedData;
+
+  // Load the real study record for the cockpit shell (UUID routes only).
+  const isUuidId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!isUuidId) { setStudyRow(null); return; }
+      try { const r = await apiJson(`/studies/${projectId}`); if (alive) setStudyRow(r); }
+      catch { /* legacy/slug route or unreachable → scaffold fallback */ }
+    })();
+    return () => { alive = false; };
+  }, [projectId, isUuidId]);
+
+  // Cockpit study shape = live backend row + real workflow progress (replaces the
+  // former static scaffold). Rail / StepNav / Overview / Settings all consume this.
+  const cockpitStudy = useMemo(
+    () => buildCockpitStudy(projectId, studyRow, {
+      hasDataset, profileReady, completedTab, lockedEstimator, simResults, currentView: view,
+      question: {
+        population: Array.isArray(cqPopulation) ? cqPopulation.join(", ") : cqPopulation,
+        exposure: cqExposure,
+        outcome: selectedOutcome,
+      },
+    }),
+    [projectId, studyRow, hasDataset, profileReady, completedTab, lockedEstimator,
+     simResults, view, cqPopulation, cqExposure, selectedOutcome],
+  );
 
   // Flat lowercased column names across all uploaded sheets — used to gate
   // hardcoded variable displays (engagement, mediators) on what is actually present.
@@ -417,14 +447,14 @@ SOURCE COUNTS:
           surface: breadcrumb + header + left rail (StudyShell), with the main panel
           swapping between the Overview dashboard and a workflow step. */}
       <StudyShell
-        study={getCockpitStudy(projectId)}
+        study={cockpitStudy}
         go={go}
         onExit={() => navigate('/studies')}
         ctx={{ hasDataset, profileReady, completedTab, lockedEstimator, currentView: view }}
       >
         {/* Overview dashboard — the study home (needs-attention · causal question · readiness) */}
         <div className={`max-w-[640px] ${view === "cockpit" ? "block" : "hidden"}`}>
-          <Rail study={getCockpitStudy(projectId)} go={go} />
+          <Rail study={cockpitStudy} go={go} />
         </div>
 
         {/* Step content — ProfilingAssistant stays mounted so its agent loop survives navigation */}
@@ -490,9 +520,9 @@ SOURCE COUNTS:
           {view==="sensitivity" && <ErrorBoundary><SensitivityView  simResults={simResults} onBack={()=>go("results")}      onNext={()=>go("report")} chatProps={chatProps} partnerLabel={defaults.partnerLabel} /></ErrorBoundary>}
           {view==="report"      && <ReportView       simResults={simResults} onBack={()=>go("sensitivity")}  onNext={()=>go("monitoring")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
           {view==="monitoring"  && <MonitoringView   simResults={simResults} onBack={()=>go("report")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
-          {view==="history"     && <StudyHistory  study={getCockpitStudy(projectId)} />}
-          {view==="lineage"     && <StudyLineage  study={getCockpitStudy(projectId)} />}
-          {view==="settings"    && <StudySettings study={getCockpitStudy(projectId)} projectId={projectId} />}
+          {view==="history"     && <StudyHistory  study={cockpitStudy} />}
+          {view==="lineage"     && <StudyLineage  study={cockpitStudy} />}
+          {view==="settings"    && <StudySettings study={cockpitStudy} projectId={projectId} />}
         </>}
         </div>
       </StudyShell>

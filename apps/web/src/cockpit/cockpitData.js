@@ -98,7 +98,91 @@ export function studyFromRow(row) {
 
 /** Returns the cockpit study shape for a projectId. The studies list is sourced
  *  live from the backend (see workspace/dataClient); the cockpit detail builds a
- *  blank scaffold for the id (no per-study backend fetch wired yet). */
+ *  blank scaffold for the id when no live row/progress is available. */
 export function getCockpitStudy(projectId) {
   return makeDefault(projectId);
+}
+
+// completedTab scale (LucisApp.TAB_ORDER) → which workflow steps are "done".
+const TAB_ORDER = ["profile", "outcomes", "causal", "datacheck", "studytype", "design"];
+
+function tabReached(completedTab, tab) {
+  return TAB_ORDER.indexOf(completedTab) >= TAB_ORDER.indexOf(tab);
+}
+
+// Live state of one workflow step, derived from the app's real progress.
+function stepStateFromProgress(key, p, isCurrent) {
+  if (isCurrent) return "active";
+  const afterProfiling = p.profileReady ? "ready" : p.hasDataset ? "pending" : "locked";
+  switch (key) {
+    case "input":     return p.hasDataset ? "done" : "active";
+    case "profiling": return p.profileReady ? "done" : p.hasDataset ? "ready" : "pending";
+    case "question":  return tabReached(p.completedTab, "outcomes") ? "done" : afterProfiling;
+    case "dag":       return tabReached(p.completedTab, "causal") ? "done" : afterProfiling;
+    case "verify":    return tabReached(p.completedTab, "datacheck") ? "done" : afterProfiling;
+    case "design":    return tabReached(p.completedTab, "design") ? "done" : afterProfiling;
+    case "sim":       return p.simResults ? "done" : p.lockedEstimator ? "ready" : "locked";
+    case "results":   return p.simResults ? "done" : "locked";
+    case "sens":      return p.simResults ? "ready" : "locked";
+    case "report":    return p.simResults ? "ready" : "locked";
+    default:          return "locked";
+  }
+}
+
+/**
+ * Builds the full cockpit study shape from the LIVE backend study row + the app's
+ * real workflow progress. `row` is the GET /studies/:id payload (or null → scaffold);
+ * `progress` carries { hasDataset, profileReady, completedTab, lockedEstimator,
+ * simResults, currentView, question }.
+ */
+export function buildCockpitStudy(projectId, row, progress = {}) {
+  const base = row ? studyFromRow({ ...row, n: row.n_subjects ?? row.n }) : makeDefault(projectId);
+  const p = progress;
+
+  const steps = STEP_DEFS.map((s) => ({
+    ...s,
+    state: stepStateFromProgress(s.key, p, STEP_TO_VIEW[s.key] === p.currentView),
+  }));
+  const done = steps.filter((s) => s.state === "done").length;
+  const activeIdx = steps.findIndex((s) => s.state === "active");
+  const activeStep = activeIdx >= 0 ? activeIdx + 1 : Math.min(done + 1, STEP_DEFS.length);
+
+  const q = p.question || {};
+  const readinessRows = [
+    { label: "Causal question",       done: tabReached(p.completedTab, "outcomes") },
+    { label: "DAG confounder set",    done: tabReached(p.completedTab, "causal") },
+    { label: "Variable availability", done: tabReached(p.completedTab, "datacheck") },
+    { label: "Estimator locked",      done: !!p.lockedEstimator },
+    { label: "Dossier compiled",      done: !!p.simResults },
+  ];
+  const doneRows = readinessRows.filter((r) => r.done).length;
+
+  // Single contextual "needs attention" action — the next thing to do.
+  const actions = [];
+  if (!p.hasDataset) actions.push({ step: 1, label: "Upload your cohort to begin" });
+  else if (!p.profileReady) actions.push({ step: 2, label: "Run the profiling agent" });
+  else if (!tabReached(p.completedTab, "design")) actions.push({ step: 6, label: "Complete the study design" });
+  else if (!p.lockedEstimator) actions.push({ step: 7, label: "Run the simulation and lock an estimator" });
+  else if (!p.simResults) actions.push({ step: 8, label: "Review results" });
+
+  return {
+    ...base,
+    id: projectId,
+    steps,
+    done,
+    total: STEP_DEFS.length,
+    activeStep,
+    question: {
+      population: q.population || "—",
+      exposure: q.exposure || "—",
+      outcome: q.outcome || "—",
+      nNote: base.n ? `N = ${base.n}` : "",
+    },
+    readiness: Math.max(5, Math.round((doneRows / readinessRows.length) * 100)),
+    readinessRows: readinessRows.map((r, i) => ({
+      label: r.label,
+      state: r.done ? "done" : i === doneRows ? "active" : "locked",
+    })),
+    actions,
+  };
 }

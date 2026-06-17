@@ -1,10 +1,26 @@
 import { useState } from "react";
-import { FileText, FileCheck, ArrowLeft, ArrowRight } from "lucide-react";
+import { FileText, FileCheck, ArrowLeft, ArrowRight, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/EmptyState";
 import InlineChatbot from "../components/InlineChatbot";
+import { apiJson, apiFetch } from "@/api";
+
+const isUuid = (s) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s || "");
+
+async function pollJob(jobId, tries = 10) {
+  for (let i = 0; i < tries; i++) {
+    await new Promise((r) => setTimeout(r, 1200));
+    try {
+      const j = await apiJson(`/jobs/${jobId}`);
+      if (j.status === "succeeded" || j.status === "failed") return j;
+    } catch {
+      /* keep polling */
+    }
+  }
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 10: REPORT GENERATION
@@ -98,8 +114,37 @@ function FormatCard({ fmt, selected, onSelect }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function ReportView({ partnerLabel = 'Partner', chatProps = {}, onNext, onBack }) {
+export default function ReportView({ partnerLabel = 'Partner', chatProps = {}, onNext, onBack, studyId }) {
   const [selectedFormat, setSelectedFormat] = useState("diga");
+  const [busy, setBusy] = useState(false);
+  const [docId, setDocId] = useState(null);
+  const [msg, setMsg] = useState(null);
+
+  async function generate() {
+    setBusy(true); setMsg(null); setDocId(null);
+    try {
+      const res = await apiJson("/documents", {
+        method: "POST",
+        body: JSON.stringify({ type: "report", study_id: isUuid(studyId) ? studyId : null }),
+      });
+      const j = await pollJob(res.job_id);
+      if (j?.status === "failed") setMsg("Generation failed.");
+      else { setDocId(res.document_id); setMsg("Dossier ready."); }
+    } catch (e) {
+      setMsg(String(e?.message || "").includes("401") ? "Session expired — sign in again." : "Could not generate the dossier.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openDoc() {
+    const r = await apiFetch(`/documents/${docId}/download`);
+    if (!r.ok) return;
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
 
   return (
     <div className="mx-auto max-w-[960px]">
@@ -144,11 +189,21 @@ export default function ReportView({ partnerLabel = 'Partner', chatProps = {}, o
           Partner: <strong>{partnerLabel}</strong> ·
           Format: <strong>{FORMATS.find(f => f.id === selectedFormat)?.label}</strong>
         </div>
-        <EmptyState
-          icon={FileCheck}
-          title="Not available yet — no live data source wired"
-          subtitle="Report compilation will assemble your locked analysis into the selected format once a live generation source is connected."
-        />
+        <div className="flex items-center gap-3">
+          <Button onClick={generate} disabled={busy}>
+            {busy ? "Generating…" : "Generate dossier"}
+          </Button>
+          {docId && (
+            <Button variant="outline" onClick={openDoc} className="text-xs font-medium">
+              <Download size={14} /> Open dossier
+            </Button>
+          )}
+          {msg && <span className="text-[12.5px] text-muted-foreground">{msg}</span>}
+        </div>
+        <div className="mt-2 text-[11.5px] text-muted-foreground/70">
+          Compiles your study record, simulation results and evidence base into a downloadable
+          dossier (print-friendly HTML — use the browser's “Print → Save as PDF” for a PDF).
+        </div>
       </Card>
 
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">

@@ -518,7 +518,7 @@ SOURCE COUNTS:
           {view==="simulation"  && <SimulationEngine   onBack={()=>go("design")}      onNext={(data)=>{ setLockedEstimator(data.estimator); setSimResults(data); go("results"); }} e1Profile={e1Profile} outcome={outcome} studyType={studyType} selectedEstimators={selectedEstimators} selectedCohort={selectedCohort} selectedOutcome={selectedOutcome} uploadedRowCount={uploadedRowCount} partnerLabel={defaults.partnerLabel} />}
           {view==="results"     && <ResultsView      onBack={()=>go("simulation")} onNext={()=>go("sensitivity")} simResults={simResults} dagCache={dagCache} partnerLabel={defaults.partnerLabel} />}
           {view==="sensitivity" && <ErrorBoundary><SensitivityView  simResults={simResults} onBack={()=>go("results")}      onNext={()=>go("report")} chatProps={chatProps} partnerLabel={defaults.partnerLabel} /></ErrorBoundary>}
-          {view==="report"      && <ReportView       simResults={simResults} onBack={()=>go("sensitivity")}  onNext={()=>go("monitoring")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
+          {view==="report"      && <ReportView       simResults={simResults} onBack={()=>go("sensitivity")}  onNext={()=>go("monitoring")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} studyId={projectId} />}
           {view==="monitoring"  && <MonitoringView   simResults={simResults} onBack={()=>go("report")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
           {view==="history"     && <StudyHistory  study={cockpitStudy} />}
           {view==="lineage"     && <StudyLineage  study={cockpitStudy} />}

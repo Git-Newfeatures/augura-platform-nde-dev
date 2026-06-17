@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "./supabase";
+import { apiJson } from "./api";
 
 function timeAgo(ts) {
   const diff = (Date.now() - new Date(ts)) / 1000;
@@ -148,14 +148,19 @@ export default function AuguraAdminDashboard({ onClose }) {
   async function fetchData() {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch("/api/admin-stats", {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      if (!res.ok) { setLoading(false); return; }
-      const data = await res.json();
+      // Backend FastAPI analytics (owner-only, Bearer JWT via apiJson).
+      const data = await apiJson("/analytics/admin");
 
-      const eventsData = data.recentEvents || [];
+      // Map UsageEvent rows → the dashboard's event shape. The backend doesn't expose
+      // a user directory or token accounting, so logins/users/tokens stay empty.
+      const eventsData = (data.recent || []).map((e, i) => ({
+        id: `${e.created_at ?? "evt"}-${i}`,
+        event_type: e.event_type,
+        route: e.route,
+        user_email: null,
+        created_at: e.created_at,
+        metadata: {},
+      }));
 
       // Daily activity (last 7 days) from recent events
       const days = Array.from({ length: 7 }, (_, i) => {
@@ -167,15 +172,13 @@ export default function AuguraAdminDashboard({ onClose }) {
         if (day) day.count++;
       });
 
-      const totalTokens = eventsData.reduce((sum, e) => sum + (e.metadata?.tokens_used || 0), 0);
-
       setEvents(eventsData);
       setDailyActivity(days);
-      setLoginsByUser(data.loginsByUser || []);
-      setStats({ ...data.stats, totalTokens });
-      setUsers(data.users || []);
+      setLoginsByUser([]);
+      setStats({ activeUsers: data.unique_users ?? 0, totalQueries: data.total_events ?? 0, totalTokens: 0 });
+      setUsers([]);
     } catch (err) {
-      console.error("[admin-stats]", err);
+      console.error("[analytics/admin]", err);
     }
     setLoading(false);
   }

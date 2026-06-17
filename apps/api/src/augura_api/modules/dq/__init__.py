@@ -1,1 +1,5 @@
-"""Module dq — moteur de qualité des données (A3)."""
+"""Interface publique du module dq."""
+
+from augura_api.modules.dq.router import router
+
+__all__ = ["router"]

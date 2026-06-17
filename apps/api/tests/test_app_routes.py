@@ -32,6 +32,7 @@ def test_openapi_exposes_routes() -> None:
         "/jobs/{job_id}",
         "/documents",
         "/documents/{document_id}",
+        "/datasets/{dataset_id}/dq",
         "/analytics/admin",
         "/reference/tenant",
         "/reference/cesl-sources",
@@ -49,6 +50,7 @@ async def test_protected_routes_require_auth() -> None:
             "/corpus/feed",
             "/datasets",
             "/datasets/cohorts",
+            "/datasets/{dataset_id}/dq",
             "/reference/tenant",
             "/semantic/concepts",
         ):

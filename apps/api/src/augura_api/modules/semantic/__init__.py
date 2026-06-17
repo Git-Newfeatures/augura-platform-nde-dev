@@ -1,1 +1,5 @@
-"""Module semantic — taxonomie DQ globale (lecture seule, A1)."""
+"""Interface publique du module semantic."""
+
+from augura_api.modules.semantic.router import router
+
+__all__ = ["router"]

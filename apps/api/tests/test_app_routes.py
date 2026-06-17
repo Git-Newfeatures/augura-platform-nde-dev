@@ -35,6 +35,7 @@ def test_openapi_exposes_routes() -> None:
         "/reference/tenant",
         "/reference/cesl-sources",
         "/reference/study-designs",
+        "/semantic/concepts",
     ):
         assert path in paths, path
 
@@ -48,6 +49,7 @@ async def test_protected_routes_require_auth() -> None:
             "/datasets",
             "/datasets/cohorts",
             "/reference/tenant",
+            "/semantic/concepts",
         ):
             r = await client.get(path)
             assert r.status_code == 401, path

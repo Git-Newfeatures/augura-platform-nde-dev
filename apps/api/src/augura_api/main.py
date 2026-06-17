@@ -11,6 +11,7 @@ from augura_api.modules.datasets import router as datasets_router
 from augura_api.modules.documents import router as documents_router
 from augura_api.modules.jobs import router as jobs_router
 from augura_api.modules.reference import router as reference_router
+from augura_api.modules.semantic import router as semantic_router
 from augura_api.modules.simulation import router as simulation_router
 from augura_api.modules.studies import router as studies_router
 
@@ -43,5 +44,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(documents_router)
     app.include_router(analytics_router)
     app.include_router(reference_router)
+    app.include_router(semantic_router)
 
     return app

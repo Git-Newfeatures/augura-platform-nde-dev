@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Check, X, AlertTriangle, Users, Filter, Network, Database, ArrowLeft, ArrowRight } from "lucide-react";
 import { fetchCohort } from "../workspace/cohortData";
+import { useReference, normOutcomeCatalog } from "@/workspace/dataClient";
 import { InfoBar } from "../ui/components";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,31 +93,42 @@ export default function DataAvailability({ selectedOutcome = "hba1c", selectedCo
     return () => { alive = false; };
   }, [selectedCohort]);
 
+  // Outcome catalog from /reference/outcomes, re-keyed by short_key (e.g. hba1c)
+  // so labels / clinical prose are sourced from the reference, never hardcoded.
+  const { data: outcomeRows } = useReference('outcomes');
+  const outcomeByShort = useMemo(() => {
+    const cat = normOutcomeCatalog(outcomeRows);                 // keyed by column code e.g. hba1c_pct
+    return Object.fromEntries(Object.values(cat).map((o) => [o.key, o]));  // re-key by short_key e.g. hba1c
+  }, [outcomeRows]);
+
+  // Catalog-derived caveat for an outcome short_key (first regulatory tag → description → none).
+  const caveatFor = (k) => outcomeByShort[k]?.tags?.[0]?.[1] ?? outcomeByShort[k]?.desc ?? "";
+
   // ── Live availability rows driven by the selected outcome + cohort ─────────
   const PRIMARY_OUTCOME_ROW = {
-    hba1c: { label:"HbA1c change at 12 months (primary outcome)", icon:"✓", status:"green",
+    hba1c: { label:`${outcomeByShort.hba1c?.label ?? "hba1c"} at 12 months (primary outcome)`, icon:"✓", status:"green",
       pct: cohort?.hba1cT12Pct ?? 0,
-      sub: `hba1c_t12 · N=${cohort?.hba1cT12N ?? "…"} eligible · lab-measured` },
-    ldl:   { label:"LDL-C change at 12 months (primary outcome)", icon:"✓", status:"green",
+      sub: `hba1c_t12 · N=${cohort?.hba1cT12N ?? "…"} eligible · ${caveatFor("hba1c")}` },
+    ldl:   { label:`${outcomeByShort.ldl?.label ?? "ldl"} at 12 months (primary outcome)`, icon:"✓", status:"green",
       pct: cohort?.ldlT12Pct ?? 0,
-      sub: `ldl_t12 · N=${cohort?.ldlT12N ?? "…"} eligible · medication confounder unmeasured — critical` },
-    crp:   { label:"hs-CRP change at 12 months (primary outcome)", icon:"✓", status:"green",
+      sub: `ldl_t12 · N=${cohort?.ldlT12N ?? "…"} eligible · ${caveatFor("ldl")}` },
+    crp:   { label:`${outcomeByShort.crp?.label ?? "crp"} at 12 months (primary outcome)`, icon:"✓", status:"green",
       pct: cohort?.crpT12Pct ?? 0,
-      sub: `hs_crp_t12 · N=${cohort?.crpT12N ?? "…"} eligible · high within-person variability` },
+      sub: `hs_crp_t12 · N=${cohort?.crpT12N ?? "…"} eligible · ${caveatFor("crp")}` },
   };
 
   const DYNAMIC_SECONDARIES = {
     hba1c: [
-      { label:"LDL-C change at 12M",      icon:"✓", status:"green", pct: cohort?.ldlT12Pct   ?? 0, sub:`ldl_t12 · N=${cohort?.ldlT12N ?? "…"} · medication confounder unmeasured` },
-      { label:"hs-CRP change at 12M",     icon:"✓", status:"green", pct: cohort?.crpT12Pct   ?? 0, sub:`hs_crp_t12 · N=${cohort?.crpT12N ?? "…"} · high within-person variability` },
+      { label:`${outcomeByShort.ldl?.label ?? "ldl"} at 12M`,   icon:"✓", status:"green", pct: cohort?.ldlT12Pct   ?? 0, sub:`ldl_t12 · N=${cohort?.ldlT12N ?? "…"} · ${caveatFor("ldl")}` },
+      { label:`${outcomeByShort.crp?.label ?? "crp"} at 12M`,   icon:"✓", status:"green", pct: cohort?.crpT12Pct   ?? 0, sub:`hs_crp_t12 · N=${cohort?.crpT12N ?? "…"} · ${caveatFor("crp")}` },
     ],
     ldl: [
-      { label:"HbA1c change at 12M",      icon:"✓", status:"green", pct: cohort?.hba1cT12Pct ?? 0, sub:`hba1c_t12 · N=${cohort?.hba1cT12N ?? "…"} · lab-measured` },
-      { label:"hs-CRP change at 12M",     icon:"✓", status:"green", pct: cohort?.crpT12Pct   ?? 0, sub:`hs_crp_t12 · N=${cohort?.crpT12N ?? "…"} · high within-person variability` },
+      { label:`${outcomeByShort.hba1c?.label ?? "hba1c"} at 12M`, icon:"✓", status:"green", pct: cohort?.hba1cT12Pct ?? 0, sub:`hba1c_t12 · N=${cohort?.hba1cT12N ?? "…"} · ${caveatFor("hba1c")}` },
+      { label:`${outcomeByShort.crp?.label ?? "crp"} at 12M`,   icon:"✓", status:"green", pct: cohort?.crpT12Pct   ?? 0, sub:`hs_crp_t12 · N=${cohort?.crpT12N ?? "…"} · ${caveatFor("crp")}` },
     ],
     crp: [
-      { label:"HbA1c change at 12M",      icon:"✓", status:"green", pct: cohort?.hba1cT12Pct ?? 0, sub:`hba1c_t12 · N=${cohort?.hba1cT12N ?? "…"} · lab-measured` },
-      { label:"LDL-C change at 12M",      icon:"✓", status:"green", pct: cohort?.ldlT12Pct   ?? 0, sub:`ldl_t12 · N=${cohort?.ldlT12N ?? "…"} · medication confounder unmeasured` },
+      { label:`${outcomeByShort.hba1c?.label ?? "hba1c"} at 12M`, icon:"✓", status:"green", pct: cohort?.hba1cT12Pct ?? 0, sub:`hba1c_t12 · N=${cohort?.hba1cT12N ?? "…"} · ${caveatFor("hba1c")}` },
+      { label:`${outcomeByShort.ldl?.label ?? "ldl"} at 12M`,   icon:"✓", status:"green", pct: cohort?.ldlT12Pct   ?? 0, sub:`ldl_t12 · N=${cohort?.ldlT12N ?? "…"} · ${caveatFor("ldl")}` },
     ],
   };
 

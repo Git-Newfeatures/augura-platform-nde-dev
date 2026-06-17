@@ -43,7 +43,11 @@ async def test_protected_routes_require_auth() -> None:
     transport = httpx.ASGITransport(app=create_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         for path in (
-            "/studies", "/corpus/feed", "/datasets", "/datasets/cohorts", "/reference/tenant"
+            "/studies",
+            "/corpus/feed",
+            "/datasets",
+            "/datasets/cohorts",
+            "/reference/tenant",
         ):
             r = await client.get(path)
             assert r.status_code == 401, path

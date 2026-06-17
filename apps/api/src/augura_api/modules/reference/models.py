@@ -17,9 +17,7 @@ class Org(Base):
     id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
     name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text)
-    cesl_profile: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, server_default=text("'{}'::jsonb")
-    )
+    cesl_profile: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
 
 
 class CeslSource(Base):

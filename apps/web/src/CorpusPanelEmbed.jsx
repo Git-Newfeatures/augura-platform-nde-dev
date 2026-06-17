@@ -226,7 +226,7 @@ function FeedFilterBar({ etFilter, onEtFilter, srcFilter, onSrcFilter, available
   const srcOptions = [
     { label: "All sources",                  value: null },
     { label: sourceLabel("clinicaltrials", agentSources),  value: "clinicaltrials" },
-    { label: sourceLabel("fda_guidance",   agentSources),  value: "fda_guidance" },
+    { label: sourceLabel("guidance",       agentSources),  value: "guidance" },
     { label: sourceLabel("maude",          agentSources),  value: "maude" },
     { label: sourceLabel("pubmed",         agentSources),  value: "pubmed" },
   ];

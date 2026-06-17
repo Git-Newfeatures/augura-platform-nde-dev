@@ -56,6 +56,7 @@ RLS_REQUIRED = {
     "artifacts",
 }
 
+
 def _read(name: str) -> str:
     return (SUPABASE_DIR / name).read_text(encoding="utf-8")
 

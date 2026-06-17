@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Check, ArrowLeft, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ESTIMATORS, ESTIMATOR_FILTER } from "../config";
+import { useReference, normEstimators, estimatorFilter } from "@/workspace/dataClient";
 import { apiJson } from "@/api";
 
 const ESTIMATOR_META = {
@@ -53,6 +53,11 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
   const isRetro = !studyType || studyType === "retro";
   const isMediation = studyDesign === "mediation";
 
+  // Estimators — live from /reference/estimators.
+  const { data: estimatorRows, loading: estimatorsLoading } = useReference('estimators');
+  const ESTIMATORS = useMemo(() => normEstimators(estimatorRows), [estimatorRows]);
+  const ESTIMATOR_FILTER = useMemo(() => estimatorFilter(ESTIMATORS), [ESTIMATORS]);
+
   const allowedKeys = ESTIMATOR_FILTER[isRetro ? "retro" : "prosp"] ?? ESTIMATOR_FILTER.retro;
   const visibleEstimators = ESTIMATORS.filter((e) => allowedKeys.includes(e.key) && e.key !== "mediation");
 
@@ -83,6 +88,9 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
     }, 400);
     return () => { alive = false; clearTimeout(t); };
   }, [estimators]);
+
+  // Hold the estimator list until /reference/estimators resolves.
+  if (estimatorsLoading && ESTIMATORS.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-5">

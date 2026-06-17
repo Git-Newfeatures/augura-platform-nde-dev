@@ -16,7 +16,7 @@
  * Parameters pre-populated from E1 output (e1Profile prop).
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ArrowLeft, ArrowRight, Lock, FlaskConical } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,8 @@ import { fetchCohort, fetchSimulationResults, engagementGroup } from "./workspac
 import { apiJson } from "@/api";
 import {
   POWER_THRESHOLD, POWER_MARGINAL_FLOOR,
-  ESTIMATORS, ESTIMATOR_FILTER,
 } from "./config";
+import { useReference, normEstimators, estimatorFilter } from "@/workspace/dataClient";
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 // Layout/containers use Tailwind tokens; C is retained for values consumed inside
@@ -293,6 +293,11 @@ export default function SimulationEngine({
   uploadedRowCount,  // row count from uploaded Excel file — highest-priority N override
   partnerLabel = 'Partner',
 }) {
+  // ── Estimators — live from /reference/estimators ──────────────────────────────
+  const { data: estimatorRows, loading: estimatorsLoading } = useReference('estimators');
+  const ESTIMATORS = useMemo(() => normEstimators(estimatorRows), [estimatorRows]);
+  const ESTIMATOR_FILTER = useMemo(() => estimatorFilter(ESTIMATORS), [ESTIMATORS]);
+
   // ── Cohort — live from the validation dataset (fetchCohort) only ──────────────
   // No COHORT_N fallback: when the backend returns no cohort, liveCohort stays
   // null and the UI guards for the missing N rather than fabricating one.
@@ -502,6 +507,17 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
   const pcol    = cur?.power != null ? powerColor(cur.power) : C.faint;
 
   // ── Render ────────────────────────────────────────────────────────────────────
+  // Estimator metadata drives the entire estimator-comparison UI; hold the render
+  // until /reference/estimators resolves rather than flashing an empty workspace.
+  if (estimatorsLoading) {
+    return (
+      <EmptyState
+        title="Loading estimators…"
+        body="Fetching the estimator catalogue from the reference service."
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col">
 

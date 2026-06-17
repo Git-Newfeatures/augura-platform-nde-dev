@@ -32,6 +32,13 @@ EXPECTED_TABLES = {
     "artifacts",
     "cesl_sources",
     "cesl_study_designs",
+    "taxonomy_concepts",
+    "taxonomy_synonyms",
+    "taxonomy_dq_valid_values",
+    "taxonomy_measurement_units",
+    "unit_conversions",
+    "table_archetypes",
+    "dq_constraints",
 }
 
 # Tables tenant-scopées qui DOIVENT porter une policy RLS.
@@ -116,3 +123,13 @@ def test_reference_tables_have_select_only_rls() -> None:
         assert f"create policy backend_read on {t}" in policies
     # Read-only : la policy de référence est FOR SELECT (pas d'écriture tenant).
     assert "for select" in policies
+
+
+def test_taxonomy_tables_have_select_only_rls() -> None:
+    policies = _read("policies.sql")
+    for t in (
+        "taxonomy_concepts", "taxonomy_synonyms", "taxonomy_dq_valid_values",
+        "taxonomy_measurement_units", "unit_conversions", "table_archetypes", "dq_constraints",
+    ):
+        assert f"alter table {t} enable row level security" in policies
+        assert f"create policy backend_read on {t}" in policies

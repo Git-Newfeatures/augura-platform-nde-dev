@@ -221,4 +221,40 @@ create policy backend_read on cesl_study_designs
     for select
     using (nullif(current_setting('app.tenant_id', true), '') is not null);
 
+-- ── Taxonomie sémantique (A1) : globale, lecture seule (FOR SELECT) ───────
+alter table taxonomy_concepts enable row level security;
+alter table taxonomy_concepts force row level security;
+create policy backend_read on taxonomy_concepts
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table taxonomy_synonyms enable row level security;
+alter table taxonomy_synonyms force row level security;
+create policy backend_read on taxonomy_synonyms
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table taxonomy_dq_valid_values enable row level security;
+alter table taxonomy_dq_valid_values force row level security;
+create policy backend_read on taxonomy_dq_valid_values
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table taxonomy_measurement_units enable row level security;
+alter table taxonomy_measurement_units force row level security;
+create policy backend_read on taxonomy_measurement_units
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table unit_conversions enable row level security;
+alter table unit_conversions force row level security;
+create policy backend_read on unit_conversions
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table table_archetypes enable row level security;
+alter table table_archetypes force row level security;
+create policy backend_read on table_archetypes
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+alter table dq_constraints enable row level security;
+alter table dq_constraints force row level security;
+create policy backend_read on dq_constraints
+  for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
+
 commit;

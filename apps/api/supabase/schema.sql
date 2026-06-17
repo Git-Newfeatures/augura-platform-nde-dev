@@ -375,4 +375,115 @@ create table if not exists cesl_study_designs (
     active     boolean not null default true
 );
 
+-- ─────────────────────────────────────────────────────────────────────────
+-- Module : semantic (A1) — taxonomie DQ globale (lecture seule). DDL porté de
+-- l'MVP semantic schema → public. Versioning/ontologie causale = subsystem B.
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table if not exists taxonomy_concepts (
+  local_concept_id text primary key,
+  layer smallint not null check (layer between 0 and 2),
+  concept_name text not null,
+  review_section text,
+  augura_domain text not null,
+  omop_domain_id text,
+  omop_target_table text,
+  omop_target_concept_field text,
+  namespace text,
+  unit_source_value text,
+  value_min numeric,
+  value_max numeric,
+  value_type text,
+  design_rationale text,
+  review_status text not null,
+  version text not null,
+  active boolean not null,
+  canonical_unit text,
+  temporality text,
+  dq_column_role text,
+  fhir_crosswalk text,
+  sdtm_crosswalk text,
+  unit_coverage_status text,
+  range_support_status text,
+  check (value_min is null or value_max is null or value_min <= value_max)
+);
+
+create table if not exists taxonomy_synonyms (
+  local_concept_id text not null references taxonomy_concepts(local_concept_id),
+  synonym text not null,
+  synonym_type text not null,
+  source text not null,
+  review_status text not null,
+  primary key (local_concept_id, synonym)
+);
+
+create table if not exists taxonomy_dq_valid_values (
+  local_concept_id text not null references taxonomy_concepts(local_concept_id),
+  value text not null,
+  label text not null,
+  coding_system text not null,
+  review_status text not null,
+  primary key (local_concept_id, value)
+);
+
+create table if not exists taxonomy_measurement_units (
+  unit_id text primary key,
+  concept_id text not null references taxonomy_concepts(local_concept_id),
+  ucum_code text not null,
+  display_label text not null,
+  source_aliases text not null,
+  status text not null,
+  quantity_kind text not null,
+  is_preferred boolean not null,
+  review_status text not null,
+  version text not null
+);
+
+create table if not exists unit_conversions (
+  conversion_id text primary key,
+  from_ucum text not null,
+  to_ucum text not null,
+  quantity_kind text not null,
+  applicable_concept_id text references taxonomy_concepts(local_concept_id),
+  conversion_type text not null,
+  equation_id text not null,
+  scale_factor numeric,
+  "offset" numeric,
+  precision integer not null,
+  bidirectional boolean not null,
+  provenance text not null,
+  review_status text not null,
+  version text not null
+);
+
+create table if not exists table_archetypes (
+  archetype_id text primary key,
+  archetype_name text not null,
+  key_selectors text not null,
+  semantic_score numeric not null check (semantic_score between 0 and 1),
+  is_surrogate boolean not null,
+  description_template text not null,
+  review_status text not null,
+  version text not null,
+  active boolean not null
+);
+
+create table if not exists dq_constraints (
+  constraint_id text primary key,
+  target_scope text not null,
+  subject_concept_or_role text not null,
+  operator text not null,
+  object_concept_or_role text,
+  parameters text,
+  applies_when text not null,
+  severity text not null,
+  implementation_id text not null,
+  evidence_source text not null,
+  status text not null,
+  version text not null
+);
+
+create index if not exists taxonomy_synonyms_synonym_idx on taxonomy_synonyms (lower(synonym));
+create index if not exists taxonomy_measurement_units_concept_idx on taxonomy_measurement_units (concept_id);
+
 commit;

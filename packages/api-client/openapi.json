@@ -165,6 +165,43 @@
         "title": "ArtifactOut",
         "type": "object"
       },
+      "Body_upload_dataset_datasets_upload_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_dataset_datasets_upload_post",
+        "type": "object"
+      },
       "CeslSourceOut": {
         "properties": {
           "base_url": {
@@ -3405,6 +3442,26 @@
         "title": "TenantProfileOut",
         "type": "object"
       },
+      "UploadResult": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetOut"
+          }
+        },
+        "required": [
+          "dataset",
+          "columns"
+        ],
+        "title": "UploadResult",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -4364,6 +4421,47 @@
           }
         },
         "summary": "Cohort Members",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/upload": {
+      "post": {
+        "operationId": "upload_dataset_datasets_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_dataset_datasets_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Dataset",
         "tags": [
           "datasets"
         ]

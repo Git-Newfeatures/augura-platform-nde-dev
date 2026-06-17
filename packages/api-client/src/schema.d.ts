@@ -348,6 +348,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Dataset */
+        post: operations["upload_dataset_datasets_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/datasets/{dataset_id}": {
         parameters: {
             query?: never;
@@ -740,6 +757,15 @@ export interface components {
             study_id?: string | null;
             /** Version */
             version: number;
+        };
+        /** Body_upload_dataset_datasets_upload_post */
+        Body_upload_dataset_datasets_upload_post: {
+            /** File */
+            file: string;
+            /** Name */
+            name?: string | null;
+            /** Study Id */
+            study_id?: string | null;
         };
         /** CeslSourceOut */
         CeslSourceOut: {
@@ -1776,6 +1802,12 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** UploadResult */
+        UploadResult: {
+            /** Columns */
+            columns: components["schemas"]["ColumnOut"][];
+            dataset: components["schemas"]["DatasetOut"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -2385,6 +2417,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CohortMemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_dataset_datasets_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_dataset_datasets_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResult"];
                 };
             };
             /** @description Validation Error */

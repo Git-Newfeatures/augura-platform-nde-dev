@@ -1741,3 +1741,166 @@ insert into dq_constraints ("constraint_id", "target_scope", "subject_concept_or
 insert into dq_constraints ("constraint_id", "target_scope", "subject_concept_or_role", "operator", "object_concept_or_role", "parameters", "applies_when", "severity", "implementation_id", "evidence_source", "status", "version") values ('DQC_LABEL_001', 'column', 'any', 'mapping_confidence_sufficient', NULL, NULL, 'always', 'hard', 'DQ_MEAN_001', 'concept_matcher', 'active', '2.0.0') on conflict do nothing;
 insert into dq_constraints ("constraint_id", "target_scope", "subject_concept_or_role", "operator", "object_concept_or_role", "parameters", "applies_when", "severity", "implementation_id", "evidence_source", "status", "version") values ('DQC_LABEL_002', 'column', 'any', 'mapping_confidence_high', NULL, NULL, 'confidence<0.40', 'soft', 'DQ_MEAN_002', 'concept_matcher', 'active', '2.0.0') on conflict do nothing;
 insert into dq_constraints ("constraint_id", "target_scope", "subject_concept_or_role", "operator", "object_concept_or_role", "parameters", "applies_when", "severity", "implementation_id", "evidence_source", "status", "version") values ('DQC_LABEL_003', 'table', 'grain_key', 'reports_inferred_grain', NULL, NULL, 'always', 'info', 'DQ_MEAN_003', 'grain_inferrer', 'active', '2.1.0') on conflict do nothing;
+
+-- ── Reference catalogs (frontend real-only cleanup) ───────────────────────
+-- Enrich the StudyType selector designs. {partner} is interpolated client-side.
+update cesl_study_designs set
+  description = 'Stratify existing users by engagement level (HIGH vs REST). Measure biomarker change between groups. Fast, no new data required.',
+  tags = '[["g","{partner} data available"],["b","DiGA / HAS eligible"],["a","Observational — confounding risk"]]'::jsonb,
+  estimands = '["ATE","ATT"]'::jsonb
+  where code = 'retro_cohort';
+update cesl_study_designs set
+  description = 'Compare each user''s biomarkers before and after joining {partner}. No separate control group — uses within-person change.',
+  tags = '[["g","Simple"],["b","No external data"],["a","No control group — regression to mean risk"]]'::jsonb,
+  estimands = '["ATE"]'::jsonb
+  where code = 'pre_post';
+update cesl_study_designs set
+  description = 'Match {partner} users to external non-users (e.g. Constances cohort). Stronger causal interpretation than internal comparison.',
+  tags = '[["b","Stronger causal claim"],["a","Requires external dataset"],["a","Matching complexity"]]'::jsonb,
+  estimands = '["ATE","ATT"]'::jsonb
+  where code = 'external_matched';
+update cesl_study_designs set
+  description = 'Decompose total effect into direct (platform → HbA1c) and indirect (via behaviour change). Different causal question — cannot be combined with total-effect estimators.',
+  tags = '[["b","Mechanism analysis"],["b","Scientific differentiator"],["a","Stronger assumptions required"]]'::jsonb,
+  estimands = '["MEDIATION"]'::jsonb
+  where code = 'mediation';
+
+-- Default evidence type per corpus source (was SOURCE_ET_DEFAULTS).
+update cesl_sources set default_evidence_type = 'trial_record'   where code = 'clinicaltrials';
+update cesl_sources set default_evidence_type = 'adverse_events' where code = 'maude';
+update cesl_sources set default_evidence_type = 'guidance'       where code = 'guidance';
+update cesl_sources set default_evidence_type = 'rwe_study'      where code = 'pubmed';
+
+insert into outcome_catalog (code, short_key, label, unit, is_primary, description, regulatory_tags, verdict, verdict_label, sort_order, active) values
+  ('hba1c_pct',   'hba1c',   'HbA1c change',            '%',     true,  'Gold-standard cardiometabolic endpoint. Widely accepted by DiGA, NICE DSP, and HAS for digital health interventions.',                 '[["g","DiGA · NICE · HAS"]]'::jsonb,        'g', '★ Recommended',        10, true),
+  ('ldl_mgdl',    'ldl',     'LDL-C change',            'mg/dL', true,  'Standard lipid endpoint. Note: medication changes are an uncontrolled confounder — sensitivity analysis required.',                  '[["a","Medication confounder"]]'::jsonb,    'b', 'Good option',          20, true),
+  ('hs_crp_mgl',  'crp',     'hs-CRP change',           'mg/L',  true,  'Inflammatory marker. High within-person variability limits precision as a primary endpoint — better as secondary.',                  '[["a","High variability"]]'::jsonb,         'a', 'Secondary preferred',  30, true),
+  ('glucose_mmol','glucose', 'Fasting glucose change',  'mmol/L',true,  'Direct diabetes risk marker. Accepted by HAS and DiGA as a primary or co-primary endpoint.',                                        '[["b","HAS · DiGA"]]'::jsonb,               'b', 'Good option',          40, true),
+  ('bmi',         'bmi',     'BMI change',              'kg/m²', false, 'Anthropometric endpoint. Widely used as secondary in lifestyle intervention studies.',                                              '[["b","Secondary / co-primary"]]'::jsonb,   'a', 'Secondary preferred',  50, true),
+  ('weight_kg',   'weight',  'Body weight change',      'kg',    false, 'Common secondary endpoint in lifestyle and digital health studies.',                                                                 '[["b","Secondary"]]'::jsonb,                'a', 'Secondary preferred',  60, true),
+  ('sbp_mmhg',    'sbp',     'Systolic BP change',      'mmHg',  false, 'Cardiovascular endpoint. Suitable as co-primary for hypertension-adjacent populations.',                                            '[["b","Cardiovascular"]]'::jsonb,           'a', 'Possible',             70, true),
+  ('tg_mgdl',     'tg',      'Triglycerides change',    'mg/dL', false, 'Lipid panel component. Typically secondary alongside LDL-C.',                                                                        '[["b","Secondary"]]'::jsonb,                'a', 'Secondary preferred',  80, true)
+on conflict (code) do nothing;
+
+insert into estimand_catalog (key, name, description, regulatory, recommended, tag, sort_order, active) values
+  ('ATE',       'ATE — Average Treatment Effect',                               'What would the effect of the intervention be if applied to the entire eligible population? Population-level causal effect — the default starting point for most causal questions.',                                                            'Conservative, broadly accepted across payer submissions (HAS, NICE DSP, DiGA).',                                            true,  NULL,                      10, true),
+  ('ATT',       'ATT — Average Treatment effect on the Treated',                'What is the effect of the intervention specifically for users who actually received or engaged with it? Answers: ''did it work for the people who used it?''',                                                                                  'Preferred when treated and untreated populations differ structurally — common in real-world evidence.',                     false, NULL,                      20, true),
+  ('CATE',      'CATE — Conditional ATE',                                       'The causal effect as a function of individual or subgroup covariates — ''which users benefit most?'' Enables personalised evidence claims. Requires larger N and careful regularisation.',                                                     'Heterogeneous effects — supports subgroup and personalised claims; estimated with Causal Forest / GRF, BART, or meta-learners.', false, 'Heterogeneous effects', 30, true),
+  ('MEDIATION', 'Mediation Analysis — Direct, Indirect, Total Effects',         'Decomposes the total effect into the direct effect (intervention → outcome bypassing the mediator) and the indirect effect (intervention → mediator → outcome). Use when the mechanism of action matters, not just the headline effect.',      'Mechanism evidence — supports HTA narratives but typically paired with ATE/ATT as the primary estimand.',                   false, NULL,                      40, true)
+on conflict (key) do nothing;
+
+insert into estimator_catalog (key, label, short, recommended, bootstrap_pending, interpretability, stability, tooltip, eligible_study_types, sort_order, active) values
+  ('lme',       'Mixed-effects (LME)',       'LME',       true,  false, 4, true,  'Best fit for longitudinal data with repeated measurements per user. Accounts for individual variation over time. Recommended for Lucis because biomarkers are measured every 3–6 months.',                                                  '["retro","prosp"]'::jsonb, 10, true),
+  ('ols',       'Linear regression (OLS)',   'OLS',       false, false, 5, true,  'Simple benchmark model. Easier to interpret but assumes one measurement per user. Useful to compare against LME — if results diverge, the repeated-measures structure matters.',                                                            '["retro","prosp"]'::jsonb, 20, true),
+  ('ipw',       'Propensity weighting (IPW)','IPW',       false, false, 3, false, 'Reweights users so the HIGH and REST groups look comparable on observed characteristics (age, BMI, baseline HbA1c). Useful when the groups differ at baseline. Higher variance than LME.',                                                  '["retro"]'::jsonb,         30, true),
+  ('mediation', 'Causal mediation',          'Mediation', true,  false, 3, true,  'Splits the total effect into direct (platform → HbA1c) and indirect (platform → behaviour change → HbA1c). Quantifies how much of the benefit is driven by recommendation adherence.',                                                     '["retro","prosp"]'::jsonb, 40, true),
+  ('tmle',      'TMLE (Doubly robust)',      'TMLE',      false, true,  2, true,  'Advanced method that combines outcome and propensity models. Remains valid even if one of the two models is misspecified. Most robust to confounding but requires larger samples.',                                                        '["retro","prosp"]'::jsonb, 50, true),
+  ('did',       'Difference-in-differences', 'DID',       false, true,  4, false, 'Compares how much each group changed over time, rather than absolute levels. Controls for baseline differences that are stable over time. Requires that both groups would have evolved similarly without the intervention (parallel trends assumption).', '["retro"]'::jsonb, 60, true)
+on conflict (key) do nothing;
+
+insert into framework_catalog (code, label, sort_order, active) values
+  ('diga',       'DiGA',       10, true),
+  ('consort_ai', 'CONSORT-AI', 20, true),
+  ('eu_mdr',     'EU MDR',     30, true),
+  ('nice_dsp',   'NICE DSP',   40, true),
+  ('eunethta',   'EUnetHTA',   50, true),
+  ('fda_samd',   'FDA SaMD',   60, true)
+on conflict (code) do nothing;
+
+insert into evidence_type_catalog (code, label, description, sort_order, active) values
+  ('guidance',       'Guidance',       'Regulatory guidance documents (FDA, EMA, HAS, etc.) describing how a device or therapy should be evaluated, classified, or submitted.', 10, true),
+  ('rwe_study',      'RWE study',      'Real-world evidence studies — observational research using routinely collected data (claims, EHR, registries, digital cohorts), not protocolised trials.', 20, true),
+  ('rct',            'RCT',            'Randomised controlled trials — protocolised interventional studies with random assignment to treatment groups.', 30, true),
+  ('preprint',       'Preprint',       'Pre-publication manuscripts (e.g. medRxiv, bioRxiv) — not yet peer-reviewed.', 40, true),
+  ('trial_record',   'Trial record',   'ClinicalTrials.gov or similar registry entries describing trial protocols, recruitment status, and primary endpoints.', 50, true),
+  ('meta_analysis',  'Meta-analysis',  'Systematic reviews and meta-analyses aggregating evidence across multiple primary studies.', 60, true),
+  ('adverse_events', 'Adverse events', 'Post-market safety reports submitted to regulators (e.g. MAUDE) describing device-related incidents or failures.', 70, true),
+  ('other',          'Other',          'Documents not classified into a primary evidence type.', 80, true)
+on conflict (code) do nothing;
+
+insert into domain_catalog (code, label, sort_order, active) values
+  ('cardiometabolic','Cardiometabolic',10,true), ('womens_health','Women''s health',20,true),
+  ('preventive_health','Preventive health',30,true), ('patient_monitoring','Patient monitoring',40,true),
+  ('oncology_dx','Oncology DX',50,true), ('neurology','Neurology',60,true),
+  ('respiratory','Respiratory',70,true), ('infectious_disease','Infectious disease',80,true),
+  ('ophthalmology','Ophthalmology',90,true), ('radiology_ai','Radiology AI',100,true),
+  ('mental_health','Mental health',110,true), ('gastroenterology','Gastroenterology',120,true),
+  ('samd_general','SaMD general',130,true), ('samd_biomarker','SaMD biomarker',140,true),
+  ('regulatory_general','Regulatory general',150,true), ('adverse_events','Adverse events',160,true),
+  ('other','Other',170,true)
+on conflict (code) do nothing;
+
+insert into jurisdiction_catalog (code, label, sort_order, active) values
+  ('fda','FDA 🇺🇸',10,true), ('ema','EMA 🇪🇺',20,true), ('mhra','MHRA 🇬🇧',30,true),
+  ('health_ca','Health CA 🇨🇦',40,true), ('tga','TGA 🇦🇺',50,true),
+  ('imdrf','IMDRF 🌐',60,true), ('global','Global 🌐',70,true)
+on conflict (code) do nothing;
+
+insert into literature_design_catalog (code, label, sort_order, active) values
+  ('rct_parallel','Parallel-group RCT',10,true), ('rct_crossover','Crossover RCT',20,true),
+  ('single_arm','Single-arm trial',30,true), ('prospective_cohort','Prospective cohort',40,true),
+  ('retrospective_cohort','Retrospective cohort',50,true), ('registry','Registry study',60,true),
+  ('case_control','Case-control',70,true), ('pre_post','Pre-post analysis',80,true),
+  ('difference_in_diff','Difference-in-differences',90,true),
+  ('propensity_matched','Propensity score matching',100,true),
+  ('interrupted_ts','Interrupted time series',110,true),
+  ('regression_discontinuity','Regression discontinuity',120,true),
+  ('parametric_bootstrap','Parametric bootstrap',130,true)
+on conflict (code) do nothing;
+
+-- PII column-name patterns (was PII_PATTERNS). `pattern` is the JS regex SOURCE
+-- (no slashes/flags); the client rebuilds `new RegExp(pattern, "i")`.
+insert into pii_pattern_catalog (key, label, pattern, sort_order, active) values
+  ('name',     'name field',     '\b(first_?name|last_?name|full_?name|given_?name|family_?name)\b', 10, true),
+  ('email',    'email',          '\bemail|e_mail|e-mail\b',                                          20, true),
+  ('phone',    'phone',          '\bphone|mobile|telephone\b',                                       30, true),
+  ('address',  'postal address', '\baddress|street|postal|zip_?code|postcode\b',                     40, true),
+  ('dob',      'date of birth',  '\b(dob|date_?of_?birth|birth_?date|birthday)\b',                   50, true),
+  ('govid',    'government ID',  '\b(ssn|social_?security|national_?id|nhs_?number|nin)\b',          60, true),
+  ('passport', 'passport',       '\bpassport\b',                                                     70, true),
+  ('ip',       'IP address',     '\bip_?address\b',                                                  80, true),
+  ('device',   'device ID',      '\bdevice_?id\b',                                                   90, true)
+on conflict (key) do nothing;
+
+-- Biomarker plausibility ranges (was RANGES). `pattern` is the JS regex source.
+insert into biomarker_range_catalog (code, pattern, value_min, value_max, unit, sort_order, active) values
+  ('hba1c', 'hba1c',           4,  15,  '%',     10, true),
+  ('ldl',   '^ldl',            30, 400, 'mg/dL', 20, true),
+  ('crp',   'hs_crp|hs-crp|crp',0, 100, 'mg/L',  30, true),
+  ('bmi',   '^bmi$',           10, 70,  'kg/m²', 40, true),
+  ('age',   '^age$',           18, 100, 'years', 50, true)
+on conflict (code) do nothing;
+
+-- Variable classification groups + aliases (was GROUPS + GROUP_REMAP).
+insert into variable_group_catalog (code, label, description, alias_of, sort_order, active) values
+  ('outcomes',      'Outcomes',                 'Dependent variables measured at follow-up', NULL, 10, true),
+  ('exposure',      'Exposure / intervention',  'Primary treatment or intervention variable', NULL, 20, true),
+  ('engagement',    'Engagement & environment', 'App usage, adherence, login, recommendation completion; geography, socioeconomic context, and healthcare system variables', NULL, 30, true),
+  ('administrative','Administrative',           'Patient / member IDs, record keys, visit dates, timepoints, and columns not relevant to this study', NULL, 40, true),
+  ('other',         'Other / unclassified',     'Cannot be confidently classified', NULL, 50, true),
+  ('environment',    NULL, NULL, 'engagement',     100, true),
+  ('user_variables', NULL, NULL, 'other',          110, true),
+  ('mediators',      NULL, NULL, 'other',          120, true),
+  ('measured_confounder',   NULL, NULL, 'other',   130, true),
+  ('unmeasured_confounder', NULL, NULL, 'other',   140, true),
+  ('collider',       NULL, NULL, 'other',          150, true),
+  ('identifiers',    NULL, NULL, 'administrative', 160, true),
+  ('time',           NULL, NULL, 'administrative', 170, true),
+  ('unused',         NULL, NULL, 'administrative', 180, true)
+on conflict (code) do nothing;
+
+-- Causal roles (was ROLES + ROLE_LABEL). `selectable` marks the 8 picker roles.
+insert into variable_role_catalog (code, label, group_code, selectable, sort_order, active) values
+  ('outcome',               'Outcome',               'outcomes',       true,  10,  true),
+  ('exposure',              'Exposure',              'exposure',       true,  20,  true),
+  ('exposure_component',    'Exposure component',    'exposure',       true,  30,  true),
+  ('effect_modifier',       'Effect modifier',       'engagement',     true,  40,  true),
+  ('id',                    'ID',                    'administrative', true,  50,  true),
+  ('time',                  'Time',                  'administrative', true,  60,  true),
+  ('unused',                'Unused',                'administrative', true,  70,  true),
+  ('other',                 'Other',                 'other',          true,  80,  true),
+  ('measured_confounder',   'Measured confounder',   'other',          false, 90,  true),
+  ('unmeasured_confounder', 'Unmeasured confounder', 'other',          false, 100, true),
+  ('mediator',              'Mediator',              'other',          false, 110, true),
+  ('collider',              'Collider',              'other',          false, 120, true)
+on conflict (code) do nothing;

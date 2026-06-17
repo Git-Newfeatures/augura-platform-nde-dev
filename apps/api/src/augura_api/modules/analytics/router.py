@@ -31,3 +31,15 @@ async def activity(
     """Fil d'activité du tenant (audit trail) — accessible à tout membre, filtrable
     par étude. Alimente l'onglet History et les notifications du front."""
     return await AnalyticsService(session).activity(tenant, limit=limit, study_id=study_id)
+
+
+@router.get("/artifacts", response_model=list[schemas.ArtifactOut])
+async def artifacts(
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    limit: int = 50,
+    study_id: str | None = None,
+) -> list[schemas.ArtifactOut]:
+    """Artefacts versionnés & hashés du tenant (provenance/reproductibilité) —
+    alimente l'onglet Lineage."""
+    return await AnalyticsService(session).artifacts(tenant, limit=limit, study_id=study_id)

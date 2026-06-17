@@ -130,6 +130,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analytics/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifacts
+         * @description Artefacts versionnés & hashés du tenant (provenance/reproductibilité) —
+         *     alimente l'onglet Lineage.
+         */
+        get: operations["artifacts_analytics_artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/coverage": {
         parameters: {
             query?: never;
@@ -666,6 +687,42 @@ export interface components {
             unique_users: number;
             /** Window Days */
             window_days: number;
+        };
+        /**
+         * ArtifactOut
+         * @description Artefact versionné & hashé (colonne vertébrale reproductibilité) — alimente
+         *     l'onglet Lineage. `content` est volontairement exclu (peut être volumineux).
+         */
+        ArtifactOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Locked
+             * @default false
+             */
+            locked: boolean;
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /** Sha256 */
+            sha256: string;
+            /** Storage Ref */
+            storage_ref?: string | null;
+            /** Study Id */
+            study_id?: string | null;
+            /** Version */
+            version: number;
         };
         /** CeslSourceOut */
         CeslSourceOut: {
@@ -1921,6 +1978,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminStats"];
+                };
+            };
+        };
+    };
+    artifacts_analytics_artifacts_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                study_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

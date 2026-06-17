@@ -6,7 +6,7 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.ids import TenantId
-from augura_api.modules.analytics.models import UsageEvent
+from augura_api.modules.analytics.models import Artifact, UsageEvent
 
 
 class AnalyticsRepo:
@@ -56,5 +56,16 @@ class AnalyticsRepo:
         if study_id:
             stmt = stmt.where(UsageEvent.metadata_["study_id"].astext == study_id)
         stmt = stmt.order_by(UsageEvent.created_at.desc()).limit(limit)
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+    async def list_artifacts(
+        self, tenant_id: TenantId, *, limit: int = 50, study_id: str | None = None
+    ) -> list[Artifact]:
+        """Artefacts versionnés & hashés du tenant (provenance), le plus récent d'abord."""
+        stmt = select(Artifact).where(Artifact.org_id == tenant_id)
+        if study_id:
+            stmt = stmt.where(Artifact.study_id == study_id)
+        stmt = stmt.order_by(Artifact.created_at.desc()).limit(limit)
         res = await self.session.execute(stmt)
         return list(res.scalars().all())

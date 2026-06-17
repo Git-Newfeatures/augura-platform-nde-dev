@@ -93,19 +93,59 @@ export function StudyHistory() {
   );
 }
 
-// ── Lineage — variable trace from raw column to result ────────────────────────
-const STAGE_COLORS = ["#0F6E56", "#3172B0", "#3C3489", "#B98900", "#0F6E56"];
+// ── Lineage — versioned, content-hashed artifacts (reproducibility chain) ──────
+const ARTIFACT_LABEL = {
+  simulation_run: "Simulation run",
+  document: "Dossier",
+  dataset: "Dataset",
+};
 
 export function StudyLineage() {
+  const [artifacts, setArtifacts] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try { const a = await apiJson("/analytics/artifacts?limit=50"); if (alive) setArtifacts(a); }
+      catch { if (alive) setArtifacts([]); }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   return (
     <div className="flex flex-col gap-5">
       <PageHead icon={<><GitBranch size={13} /> Study · Provenance</>} title="Lineage"
-        sub="Trace every variable from raw dataset column through taxonomy, causal role, and model to the final result." />
-      <EmptyState
-        icon={GitBranch}
-        title="Not available yet — no live data source wired"
-        subtitle="Variable lineage will trace each result back to its source column once runs produce traceable provenance."
-      />
+        sub="Versioned, content-hashed artifacts — the reproducibility chain from data to result." />
+      {artifacts == null ? (
+        <div className="py-10 text-center text-[12px] text-muted-foreground">Loading provenance…</div>
+      ) : artifacts.length === 0 ? (
+        <EmptyState
+          icon={GitBranch}
+          title="No artifacts yet"
+          subtitle="Each simulation run and generated dossier records a versioned, hashed artifact here."
+        />
+      ) : (
+        <Card className="gap-0 overflow-hidden p-0">
+          {artifacts.map((a, i) => (
+            <div
+              key={a.id}
+              className={`flex items-center gap-3 px-4 py-3 ${i === artifacts.length - 1 ? "" : "border-b border-border/60"}`}
+            >
+              <Badge variant="secondary" className="text-primary">{ARTIFACT_LABEL[a.kind] || a.kind}</Badge>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] text-foreground">
+                  v{a.version}
+                  {a.provenance?.type && <span className="text-muted-foreground"> · {a.provenance.type}</span>}
+                  {a.locked && <span className="ml-2 text-[11px] text-[#B98900]">locked</span>}
+                </div>
+                <div className="mt-0.5 font-mono text-[11px] text-muted-foreground/70">
+                  sha256 {String(a.sha256).slice(0, 16)}…
+                </div>
+              </div>
+              <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground/70">{relTime(a.created_at)}</span>
+            </div>
+          ))}
+        </Card>
+      )}
     </div>
   );
 }

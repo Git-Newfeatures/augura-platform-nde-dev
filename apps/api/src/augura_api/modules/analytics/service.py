@@ -32,6 +32,27 @@ class AnalyticsService:
             for e in rows
         ]
 
+    async def artifacts(
+        self, tenant: CurrentTenant, *, limit: int = 50, study_id: str | None = None
+    ) -> list[schemas.ArtifactOut]:
+        rows = await AnalyticsRepo(self.session).list_artifacts(
+            tenant.tenant_id, limit=max(1, min(100, limit)), study_id=study_id
+        )
+        return [
+            schemas.ArtifactOut(
+                id=a.id,
+                kind=a.kind,
+                version=a.version,
+                sha256=a.sha256,
+                study_id=a.study_id,
+                storage_ref=a.storage_ref,
+                provenance=a.provenance,
+                locked=a.locked,
+                created_at=a.created_at,
+            )
+            for a in rows
+        ]
+
     async def admin_stats(
         self, tenant: CurrentTenant, *, window_days: int = 7
     ) -> schemas.AdminStats:

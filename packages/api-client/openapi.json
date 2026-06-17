@@ -89,6 +89,82 @@
         "title": "AdminStats",
         "type": "object"
       },
+      "ArtifactOut": {
+        "description": "Artefact versionné & hashé (colonne vertébrale reproductibilité) — alimente\nl'onglet Lineage. `content` est volontairement exclu (peut être volumineux).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "locked": {
+            "default": false,
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "storage_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Ref"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "version",
+          "sha256",
+          "created_at"
+        ],
+        "title": "ArtifactOut",
+        "type": "object"
+      },
       "CeslSourceOut": {
         "properties": {
           "base_url": {
@@ -3569,6 +3645,70 @@
           }
         },
         "summary": "Admin",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/analytics/artifacts": {
+      "get": {
+        "description": "Artefacts versionnés & hashés du tenant (provenance/reproductibilité) —\nalimente l'onglet Lineage.",
+        "operationId": "artifacts_analytics_artifacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "study_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Study Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactOut"
+                  },
+                  "title": "Response Artifacts Analytics Artifacts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Artifacts",
         "tags": [
           "analytics"
         ]

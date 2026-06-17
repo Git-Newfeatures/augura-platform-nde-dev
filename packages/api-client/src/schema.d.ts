@@ -523,6 +523,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/semantic/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Concepts */
+        get: operations["concepts_semantic_concepts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/simulations": {
         parameters: {
             query?: never;
@@ -995,6 +1012,31 @@ export interface components {
         ColumnsPut: {
             /** Columns */
             columns: components["schemas"]["ColumnIn"][];
+        };
+        /** ConceptOut */
+        ConceptOut: {
+            /** Active */
+            active: boolean;
+            /** Augura Domain */
+            augura_domain: string;
+            /** Canonical Unit */
+            canonical_unit?: string | null;
+            /** Concept Name */
+            concept_name: string;
+            /** Dq Column Role */
+            dq_column_role?: string | null;
+            /** Layer */
+            layer: number;
+            /** Local Concept Id */
+            local_concept_id: string;
+            /** Range Support Status */
+            range_support_status?: string | null;
+            /** Value Max */
+            value_max?: number | null;
+            /** Value Min */
+            value_min?: number | null;
+            /** Value Type */
+            value_type?: string | null;
         };
         /** CoverageCell */
         CoverageCell: {
@@ -2665,6 +2707,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantProfileOut"];
+                };
+            };
+        };
+    };
+    concepts_semantic_concepts_get: {
+        parameters: {
+            query?: {
+                domain?: string | null;
+                active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

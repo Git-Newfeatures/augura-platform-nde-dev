@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Component } from "react";
+import { useState, useEffect, useMemo, useRef, Component } from "react";
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -215,6 +215,60 @@ export default function LucisApp() {
     [projectId, studyRow, hasDataset, profileReady, completedTab, lockedEstimator,
      simResults, view, cqPopulation, cqExposure, selectedOutcome],
   );
+
+  // ── Durable workflow state (cross-device) via GET/PUT /studies/:id/state ──────
+  // The sessionStorage cache stays the fast local layer; the backend is the durable,
+  // versioned source of truth. Snapshot of the decision/result state (raw upload &
+  // agent logs stay session-local — too large / transient for the state record).
+  const workflowState = useMemo(() => ({
+    profileReady, e1Profile, studyType, studyDesign, studyEstimand, selectedEstimators,
+    lockedEstimator, simResults, selectedOutcome, selectedCohort, uploadedRowCount,
+    dagCache, cqExposure, cqPopulation, completedTab, variableMappings, variableCheckResult,
+  }), [profileReady, e1Profile, studyType, studyDesign, studyEstimand, selectedEstimators,
+       lockedEstimator, simResults, selectedOutcome, selectedCohort, uploadedRowCount,
+       dagCache, cqExposure, cqPopulation, completedTab, variableMappings, variableCheckResult]);
+
+  // Hydrate from the backend only when the local state is EMPTY (fresh device/session,
+  // no progress yet) — never clobbers an ongoing local session. Runs once.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!isUuidId || hydratedRef.current) return;
+    const localIsEmpty =
+      !profileReady && !completedTab && !simResults && !lockedEstimator && !e1Profile;
+    if (!localIsEmpty) { hydratedRef.current = true; return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await apiJson(`/studies/${projectId}/state`);
+        const s = res?.state;
+        if (alive && s && typeof s === "object") {
+          const set = (v, fn) => { if (v !== undefined && v !== null) fn(v); };
+          set(s.profileReady, setReady); set(s.e1Profile, setE1Profile);
+          set(s.studyType, setStudyType); set(s.studyDesign, setStudyDesign);
+          set(s.studyEstimand, setStudyEstimand); set(s.selectedEstimators, setSelectedEstimators);
+          set(s.lockedEstimator, setLockedEstimator); set(s.simResults, setSimResults);
+          set(s.selectedOutcome, setSelectedOutcome); set(s.selectedCohort, setSelectedCohort);
+          set(s.uploadedRowCount, setUploadedRowCount); set(s.dagCache, setDagCache);
+          set(s.cqExposure, setCqExposure); set(s.cqPopulation, setCqPopulation);
+          set(s.completedTab, setCompletedTab); set(s.variableMappings, setVariableMappings);
+          set(s.variableCheckResult, setVariableCheckResult);
+        }
+      } catch { /* no saved state yet → start fresh */ }
+      finally { hydratedRef.current = true; }
+    })();
+    return () => { alive = false; };
+  }, [projectId, isUuidId, profileReady, completedTab, simResults, lockedEstimator, e1Profile]);
+
+  // Persist to the backend (debounced) whenever the workflow state changes.
+  useEffect(() => {
+    if (!isUuidId) return;
+    const t = setTimeout(() => {
+      apiJson(`/studies/${projectId}/state`, {
+        method: "PUT", body: JSON.stringify({ state: workflowState }),
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [workflowState, isUuidId, projectId]);
 
   // Flat lowercased column names across all uploaded sheets — used to gate
   // hardcoded variable displays (engagement, mediators) on what is actually present.

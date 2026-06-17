@@ -28,9 +28,7 @@ def _mock_http(record: list[httpx.Request]) -> httpx.AsyncClient:
         record.append(request)
         path = request.url.path
         if path.endswith("/NCT01691846"):
-            return httpx.Response(
-                200, json={"protocolSection": _PROTOCOL, "hasResults": True}
-            )
+            return httpx.Response(200, json={"protocolSection": _PROTOCOL, "hasResults": True})
         if path.endswith("/NCT99999999"):
             return httpx.Response(404, json={"message": "not found"})
         if path.endswith("/studies"):

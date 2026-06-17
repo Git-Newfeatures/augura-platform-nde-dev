@@ -92,9 +92,7 @@ def classify_known_item(raw: str) -> KnownItem | None:
     return None
 
 
-async def resolve_pubmed_known_item(
-    item: KnownItem, pubmed: PubMedClient
-) -> list[PubMedArticle]:
+async def resolve_pubmed_known_item(item: KnownItem, pubmed: PubMedClient) -> list[PubMedArticle]:
     """Exécute un lookup exact PubMed (PMID/DOI/titre). Renvoie [] sur miss —
     jamais de repli sur la recherche topique."""
     if item.source != SOURCE_PUBMED:

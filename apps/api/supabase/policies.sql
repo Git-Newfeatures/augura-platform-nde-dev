@@ -264,4 +264,64 @@ create policy tenant_isolation on dq_bundles
     using (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
     with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 
+-- ── Corpus live (retrieve-and-freeze) ─────────────────────────────────────
+-- search_sessions / literature_events / literature_queries : isolation tenant
+-- simple (org_id = app.tenant_id), comme la base de 0002.
+do $$
+declare
+    t text;
+begin
+    foreach t in array array['search_sessions', 'literature_events', 'literature_queries']
+    loop
+        execute format('alter table %I enable row level security;', t);
+        execute format('alter table %I force row level security;', t);
+        execute format($f$
+            create policy tenant_isolation on %I
+            using (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+            with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
+        $f$, t);
+    end loop;
+end
+$$;
+
+-- ── literature_snapshots : isolation tenant + visibilité PAR ÉTUDE (Tier 3) ──
+-- L'isolation tenant (org_id) reste le premier rempart. Par-dessus, l'accès est
+-- gaté ainsi :
+--   • study_id NON NULL ⇒ visible aux MEMBRES de l'étude (study_members), PAS à
+--     tout le tenant. C'est le point critique (gate 9) : on gate par study_members,
+--     jamais par study_id seul — sinon un snapshot fuiterait entre études du même
+--     tenant. Un non-membre échoue fermé (l'EXISTS est faux ⇒ ligne invisible).
+--   • study_id NULL ⇒ snapshot standalone, visible de son seul créateur.
+-- created_by est enregistré mais n'est PAS le gate pour les snapshots d'étude.
+-- WITH CHECK : on n'écrit que pour le tenant courant, en tant que créateur, et —
+-- si rattaché à une étude — seulement si on en est membre (pas d'écriture dans
+-- l'étude d'autrui). app.user_id non posé ⇒ tout échoue fermé.
+alter table literature_snapshots enable row level security;
+alter table literature_snapshots force row level security;
+create policy snapshot_tenant_study_access on literature_snapshots
+    using (
+        org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+        and (
+            (study_id is null
+                and created_by = nullif(current_setting('app.user_id', true), '')::uuid)
+            or (study_id is not null and exists (
+                select 1 from study_members m
+                where m.study_id = literature_snapshots.study_id
+                  and m.user_id = nullif(current_setting('app.user_id', true), '')::uuid
+            ))
+        )
+    )
+    with check (
+        org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+        and created_by = nullif(current_setting('app.user_id', true), '')::uuid
+        and (
+            study_id is null
+            or exists (
+                select 1 from study_members m
+                where m.study_id = literature_snapshots.study_id
+                  and m.user_id = nullif(current_setting('app.user_id', true), '')::uuid
+            )
+        )
+    );
+
 commit;

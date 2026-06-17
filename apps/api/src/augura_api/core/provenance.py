@@ -14,9 +14,7 @@ from typing import Any
 def canonical_json(content: Any) -> str:
     """Sérialisation canonique : clés triées, séparateurs compacts, UTF-8 conservé.
     Deux contenus sémantiquement égaux produisent la même chaîne (donc le même hash)."""
-    return json.dumps(
-        content, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
+    return json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def sha256_hex(text: str) -> str:

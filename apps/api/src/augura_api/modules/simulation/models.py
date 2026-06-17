@@ -49,9 +49,7 @@ class SimulationRun(Base):
     org_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True))
     study_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True))
     params: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
-    job_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("jobs.id", ondelete="SET NULL")
-    )
+    job_id: Mapped[UUID | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
     status: Mapped[str] = mapped_column(Text, server_default=text("'queued'"))
     results: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(

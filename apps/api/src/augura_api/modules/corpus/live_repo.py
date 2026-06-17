@@ -70,9 +70,7 @@ class LiveRepo:
         study_id: UUID | None,
         query: str | None,
     ) -> SearchSession:
-        row = SearchSession(
-            org_id=tenant_id, study_id=study_id, query=query, created_by=created_by
-        )
+        row = SearchSession(org_id=tenant_id, study_id=study_id, query=query, created_by=created_by)
         self.session.add(row)
         await self.session.flush()
         await self.session.refresh(row)

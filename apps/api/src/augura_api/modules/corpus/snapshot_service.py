@@ -138,9 +138,7 @@ class LiteratureSnapshotService:
         )
         return self._to_session(row)
 
-    async def get_session(
-        self, tenant: CurrentTenant, session_id: UUID
-    ) -> schemas.SearchSession:
+    async def get_session(self, tenant: CurrentTenant, session_id: UUID) -> schemas.SearchSession:
         row = await self.repo.get_session(tenant.tenant_id, session_id)
         if row is None:
             raise NotFoundError("session introuvable", id=str(session_id))

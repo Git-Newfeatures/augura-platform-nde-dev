@@ -510,4 +510,63 @@ create table if not exists dq_constraints (
 create index if not exists taxonomy_synonyms_synonym_idx on taxonomy_synonyms (lower(synonym));
 create index if not exists taxonomy_measurement_units_concept_idx on taxonomy_measurement_units (concept_id);
 
+-- ─────────────────────────────────────────────────────────────────────────
+-- Module : corpus — recherche live (retrieve-and-freeze)
+-- Miroir de la migration alembic 0002_literature_live_search. Verbe distinct de
+-- l'ingestion : récupère + gèle un jeu de preuves (content_hash), sans toucher au
+-- corpus. Refs externes (org_id, study_id, created_by) = UUID nus (les orgs/users
+-- vivent côté auth Supabase) ; seule events.session_id est une FK intra-tables.
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table if not exists literature_snapshots (
+    id           uuid primary key default gen_random_uuid(),
+    org_id       uuid not null,
+    study_id     uuid,           -- NULL ⇒ snapshot standalone (créateur seul, cf. RLS)
+    created_by   uuid not null,
+    -- payload = l'artefact canonique EXACT qui a été haché (autorité du hash) :
+    -- {query, sources, model_version, prompt_version, study_id, created_by,
+    --  created_at, results:[…]}. Les colonnes ci-dessus le dénormalisent pour la
+    -- RLS / l'indexation / le tri ; le hash ne fait foi que sur payload.
+    payload      jsonb not null,
+    content_hash text not null,
+    created_at   timestamptz not null default now()
+);
+create index if not exists ix_literature_snapshots_org_id on literature_snapshots (org_id);
+create index if not exists ix_literature_snapshots_study_id on literature_snapshots (study_id);
+create index if not exists ix_literature_snapshots_created_by on literature_snapshots (created_by);
+
+create table if not exists search_sessions (
+    id         uuid primary key default gen_random_uuid(),
+    org_id     uuid not null,
+    study_id   uuid,
+    query      text,
+    status     text not null default 'active',
+    created_by uuid not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+create index if not exists ix_search_sessions_org_id_status on search_sessions (org_id, status);
+create index if not exists ix_search_sessions_created_by on search_sessions (created_by);
+
+create table if not exists literature_events (
+    id         uuid primary key default gen_random_uuid(),
+    session_id uuid not null references search_sessions (id) on delete cascade,
+    org_id     uuid not null,
+    event_type text not null,
+    payload    jsonb not null default '{}'::jsonb,
+    created_by uuid not null,
+    created_at timestamptz not null default now()
+);
+create index if not exists ix_literature_events_session_id on literature_events (session_id);
+
+create table if not exists literature_queries (
+    id           uuid primary key default gen_random_uuid(),
+    org_id       uuid not null,
+    source       text not null,
+    query_string text not null,
+    result       jsonb not null,
+    retrieved_at timestamptz not null default now(),
+    constraint uq_literature_queries_org_source_query unique (org_id, source, query_string)
+);
+
 commit;

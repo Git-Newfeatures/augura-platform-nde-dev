@@ -45,7 +45,9 @@ STUDY = CTGovStudy(
 
 class FakePubMed:
     def __init__(
-        self, *, search_res: list[PubMedArticle] | None = None,
+        self,
+        *,
+        search_res: list[PubMedArticle] | None = None,
         fetch_res: list[PubMedArticle] | None = None,
     ) -> None:
         self.search_res = search_res or []

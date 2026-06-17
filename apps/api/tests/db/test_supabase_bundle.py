@@ -40,6 +40,10 @@ EXPECTED_TABLES = {
     "table_archetypes",
     "dq_constraints",
     "dq_bundles",
+    "literature_snapshots",
+    "search_sessions",
+    "literature_events",
+    "literature_queries",
 }
 
 # Tables tenant-scopées qui DOIVENT porter une policy RLS.
@@ -63,6 +67,10 @@ RLS_REQUIRED = {
     "usage_events",
     "artifacts",
     "dq_bundles",
+    "literature_snapshots",
+    "search_sessions",
+    "literature_events",
+    "literature_queries",
 }
 
 
@@ -94,10 +102,10 @@ def test_schema_enables_pgvector_and_hnsw() -> None:
 
 def test_policies_enable_rls_on_every_tenant_table() -> None:
     policies = _read("policies.sql")
-    # Tables couvertes par la boucle array + les ALTER explicites.
-    array_block = re.search(r"array\[(.*?)\]", policies, re.DOTALL)
-    assert array_block is not None
-    looped = set(re.findall(r"'(\w+)'", array_block.group(1)))
+    # Tables couvertes par les boucles array (il y en a plusieurs) + les ALTER explicites.
+    array_blocks = re.findall(r"array\[(.*?)\]", policies, re.DOTALL)
+    assert array_blocks
+    looped = {name for block in array_blocks for name in re.findall(r"'(\w+)'", block)}
     explicit = set(re.findall(r"alter table (\w+) enable row level security", policies))
     covered = looped | explicit
     missing = RLS_REQUIRED - covered
@@ -130,8 +138,13 @@ def test_reference_tables_have_select_only_rls() -> None:
 def test_taxonomy_tables_have_select_only_rls() -> None:
     policies = _read("policies.sql")
     for t in (
-        "taxonomy_concepts", "taxonomy_synonyms", "taxonomy_dq_valid_values",
-        "taxonomy_measurement_units", "unit_conversions", "table_archetypes", "dq_constraints",
+        "taxonomy_concepts",
+        "taxonomy_synonyms",
+        "taxonomy_dq_valid_values",
+        "taxonomy_measurement_units",
+        "unit_conversions",
+        "table_archetypes",
+        "dq_constraints",
     ):
         assert f"alter table {t} enable row level security" in policies
         assert f"create policy backend_read on {t}" in policies

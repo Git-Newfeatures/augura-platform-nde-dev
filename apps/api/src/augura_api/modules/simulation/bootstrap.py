@@ -51,9 +51,7 @@ def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
     n = int(params.get("n") or calibration.COHORT_N)
     base_dropout = float(params.get("dropout", 0.20))
     base_effect = float(params.get("effect", DEFAULT_EFFECT))
-    sigma = calibration.sigma_for(
-        sigma=params.get("sigma"), outcome=params.get("outcome")
-    )
+    sigma = calibration.sigma_for(sigma=params.get("sigma"), outcome=params.get("outcome"))
     estimators: list[str] = list(params.get("estimators") or calibration.ESTIMATORS)
     scenarios: list[dict[str, Any]] = list(params.get("scenarios") or DEFAULT_SCENARIOS)
     n_boot = int(params.get("n_boot") or DEFAULT_N_BOOT)
@@ -81,9 +79,7 @@ def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
             treat = rng.normal(-effect, s_sigma, size=(n_boot, n_treat))
             ctrl = rng.normal(0.0, s_sigma, size=(n_boot, n_ctrl))
             diff = treat.mean(axis=1) - ctrl.mean(axis=1)
-            se = np.sqrt(
-                treat.var(axis=1, ddof=1) / n_treat + ctrl.var(axis=1, ddof=1) / n_ctrl
-            )
+            se = np.sqrt(treat.var(axis=1, ddof=1) / n_treat + ctrl.var(axis=1, ddof=1) / n_ctrl)
             # Efficience de l'estimateur : plus efficient ⇒ SE plus faible ⇒ plus de power.
             se_est = se * np.sqrt(var_mult) / np.sqrt(efficiency)
             diff_est = diff - bias_mag  # biais (orienté dans le sens de l'effet)
@@ -120,9 +116,7 @@ def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
 
     # Recommandation : meilleur estimateur du scénario baseline (power max, MSE tie-break).
     baseline_rows = [r for r in rows if r["scenario"] == (scenarios[0].get("name", "baseline"))]
-    best = (
-        max(baseline_rows, key=lambda r: (r["power"], -r["mse"])) if baseline_rows else None
-    )
+    best = max(baseline_rows, key=lambda r: (r["power"], -r["mse"])) if baseline_rows else None
     summary = {
         "cohort_name": cohort_name,
         "n": n,

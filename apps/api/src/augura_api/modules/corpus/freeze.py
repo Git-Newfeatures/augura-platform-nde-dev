@@ -34,9 +34,9 @@ def canonical_bytes(payload: dict[str, Any]) -> bytes:
     listes (ex. la liste de résultats) EST significatif et préservé tel quel.
     """
     body = {k: v for k, v in payload.items() if k != CONTENT_HASH_FIELD}
-    return json.dumps(
-        body, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-    ).encode("utf-8")
+    return json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
 
 
 def content_hash(payload: dict[str, Any]) -> str:

@@ -41,9 +41,7 @@ async def handle_bootstrap(ctx: JobContext) -> str | None:
     rows = result["rows"]
 
     if run is not None:
-        await repo.finalize_run(
-            ctx.tenant_id, run.id, status="succeeded", results=result
-        )
+        await repo.finalize_run(ctx.tenant_id, run.id, status="succeeded", results=result)
     await repo.replace_results(ctx.tenant_id, cohort_name, rows)
 
     await analytics.create_artifact(

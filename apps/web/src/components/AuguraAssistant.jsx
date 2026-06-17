@@ -4,7 +4,7 @@ import InlineChatbot from "@/components/InlineChatbot";
 
 // Global, always-mounted Augura assistant — a floating launcher (bottom-right)
 // that opens a panel wrapping the existing InlineChatbot, so it talks to the
-// real /api/anthropic backend with no new wiring.
+// real FastAPI backend (POST /agents/chat, Bearer JWT) with no new wiring.
 //
 // Two rules keep this safe as a *global* assistant (it renders on every page,
 // across every study):

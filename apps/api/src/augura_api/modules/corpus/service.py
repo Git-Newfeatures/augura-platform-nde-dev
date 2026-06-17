@@ -223,9 +223,7 @@ _QUERY_TOOL = {
     "MeSH si utile) pour la question de recherche fournie.",
     "input_schema": {
         "type": "object",
-        "properties": {
-            "query": {"type": "string", "description": "Chaîne de requête PubMed"}
-        },
+        "properties": {"query": {"type": "string", "description": "Chaîne de requête PubMed"}},
         "required": ["query"],
     },
 }

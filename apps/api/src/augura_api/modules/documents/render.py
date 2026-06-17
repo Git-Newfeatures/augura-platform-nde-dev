@@ -34,11 +34,7 @@ def _results_table(results: list[dict[str, Any]]) -> str:
     )
     body: list[str] = []
     for r in results:
-        ci = (
-            f"[{r.get('ci_lower')}, {r.get('ci_upper')}]"
-            if r.get("ci_lower") is not None
-            else "—"
-        )
+        ci = f"[{r.get('ci_lower')}, {r.get('ci_upper')}]" if r.get("ci_lower") is not None else "—"
         power = f"{r.get('power')}%" if r.get("power") is not None else "—"
         body.append(
             "<tr>"

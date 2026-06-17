@@ -218,9 +218,7 @@ async def get_session(
     return await _live_service(session).get_session(tenant, session_id)
 
 
-@router.post(
-    "/literature/sessions/{session_id}/events", response_model=schemas.LiteratureEvent
-)
+@router.post("/literature/sessions/{session_id}/events", response_model=schemas.LiteratureEvent)
 async def append_event(
     session_id: UUID,
     req: schemas.EventAppendRequest,

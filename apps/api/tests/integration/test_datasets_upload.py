@@ -62,8 +62,7 @@ async def test_upload_persists_dataset_and_profiled_columns(
         # permits inserting the row whose id is the scoped tenant.
         await session.execute(
             text(
-                "insert into orgs (id, name, slug) "
-                "values (cast(:i as uuid), 'IT', :s)"
+                "insert into orgs (id, name, slug) values (cast(:i as uuid), 'IT', :s)"
             ).bindparams(i=str(tenant), s="it-" + uuid4().hex[:8])
         )
         svc = DatasetService(DatasetRepo(session))

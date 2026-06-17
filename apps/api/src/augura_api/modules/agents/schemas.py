@@ -1,7 +1,7 @@
 """Contrats du module agents. DagResponse est validé depuis la sortie outil ET
 renvoyé tel quel au front (edges émis en {from, to} via alias)."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -144,3 +144,22 @@ class ProfilingRequest(BaseModel):
     tools: list[dict[str, Any]] = []
     messages: list[dict[str, Any]]
     product_description: str | None = None
+
+
+# ── chat (assistant inline, passerelle LLM) ────────────────────────────────
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1)
+    system: str | None = None
+    model: str | None = None
+
+
+class ChatResponse(BaseModel):
+    text: str
+    model: str

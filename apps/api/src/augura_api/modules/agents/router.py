@@ -31,6 +31,14 @@ def _service(settings: SettingsDep) -> AgentService:
     return AgentService(get_anthropic_client(settings), settings)
 
 
+@router.post("/chat", response_model=schemas.ChatResponse)
+async def chat(
+    req: schemas.ChatRequest, tenant: CurrentTenantDep, settings: SettingsDep
+) -> schemas.ChatResponse:
+    """Assistant inline : passerelle Messages Anthropic. 503 explicite si pas de clé."""
+    return await _service(settings).chat(req)
+
+
 @router.post("/dag", response_model=schemas.DagResponse)
 async def dag(
     req: schemas.DagRequest, tenant: CurrentTenantDep, settings: SettingsDep

@@ -7,6 +7,7 @@ from augura_api.core.llm.runtime import (
     AgentResult,
     AgentUpstreamError,
     LLMClient,
+    run_chat,
     run_structured_agent,
 )
 from augura_api.modules.agents import schemas
@@ -32,6 +33,25 @@ class AgentService:
     def __init__(self, client: LLMClient, settings: Settings) -> None:
         self.client = client
         self.settings = settings
+
+    _DEFAULT_CHAT_SYSTEM = (
+        "Tu es l'assistant scientifique d'Augura, plateforme de preuve clinique "
+        "(études RWE, DiGA, design causal). Réponds de façon concise, rigoureuse et "
+        "actionnable, en t'appuyant sur le contexte fourni. Si une information manque, "
+        "dis-le explicitement plutôt que d'inventer."
+    )
+
+    async def chat(self, req: schemas.ChatRequest) -> schemas.ChatResponse:
+        if not req.messages:
+            raise BadRequestError("messages est requis et non vide")
+        result = await run_chat(
+            self.client,
+            model=req.model or self.settings.agent_model_dag,
+            system=req.system or self._DEFAULT_CHAT_SYSTEM,
+            messages=[{"role": m.role, "content": m.content} for m in req.messages],
+            max_tokens=1500,
+        )
+        return schemas.ChatResponse(text=result.text, model=result.model)
 
     async def build_dag(self, req: schemas.DagRequest) -> schemas.DagResponse:
         if not req.intervention or not req.outcome:

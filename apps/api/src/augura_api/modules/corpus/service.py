@@ -170,14 +170,26 @@ class CorpusService:
             sources=[schemas.SourceCount(source_id=s, count=c) for s, c in counts],
         )
 
-    async def search(self, req: schemas.SearchRequest) -> list[schemas.SearchHit]:
-        if len(req.query_embedding) != EMBEDDING_DIM:
+    async def search(
+        self, req: schemas.SearchRequest, *, embedder: Embedder | None = None
+    ) -> list[schemas.SearchHit]:
+        embedding = req.query_embedding
+        if not embedding:
+            if not req.query:
+                raise BadRequestError("query ou query_embedding requis")
+            if embedder is None:
+                # Pas d'embedder (clé OpenAI absente) → 503 explicite plutôt que 400.
+                raise AgentUpstreamError(
+                    "recherche sémantique indisponible : embedder requis (clé OpenAI manquante)"
+                )
+            embedding = await embedder.embed(req.query)
+        if len(embedding) != EMBEDDING_DIM:
             raise BadRequestError(
                 "query_embedding de dimension inattendue",
                 expected=EMBEDDING_DIM,
-                got=len(req.query_embedding),
+                got=len(embedding),
             )
-        rows = await self.repo.search(req.query_embedding, req.match_count, req.filter)
+        rows = await self.repo.search(embedding, req.match_count, req.filter)
         return [schemas.SearchHit.model_validate(r) for r in rows]
 
 

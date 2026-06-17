@@ -1,7 +1,7 @@
 """Schémas Pydantic — le contrat public du module (frontières inter-modules)."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -29,6 +29,19 @@ class StudyCreate(BaseModel):
     category: str | None = None
     framework: str | None = None
     n_subjects: int | None = None
+
+
+class StudyUpdate(BaseModel):
+    """Mise à jour partielle d'une étude (cycle de vie + métadonnées).
+    Seuls les champs explicitement fournis sont écrits (model_dump exclude_unset)."""
+
+    name: str | None = None
+    tagline: str | None = None
+    category: str | None = None
+    framework: str | None = None
+    lead: str | None = None
+    n_subjects: int | None = None
+    status: Literal["draft", "active", "locked", "archived"] | None = None
 
 
 class StudyStateOut(BaseModel):

@@ -6,7 +6,7 @@ déjà côté Postgres, mais le repo ne s'y fie pas.
 
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.ids import StudyId, TenantId, UserId
@@ -55,6 +55,21 @@ class StudyRepo:
         await self.session.flush()
         await self.session.refresh(study)
         return study
+
+    async def update(
+        self, tenant_id: TenantId, study_id: StudyId, *, fields: dict[str, Any]
+    ) -> Study | None:
+        """Met à jour les champs fournis (déjà filtrés) + updated_at. Renvoie la ligne
+        rafraîchie (ou None si l'étude n'existe pas / hors tenant)."""
+        if fields:
+            values: dict[str, Any] = {**fields, "updated_at": text("now()")}
+            await self.session.execute(
+                update(Study)
+                .where(Study.org_id == tenant_id, Study.id == study_id)
+                .values(**values)
+            )
+            await self.session.flush()
+        return await self.get(tenant_id, study_id)
 
     async def latest_state(self, tenant_id: TenantId, study_id: StudyId) -> StudyState | None:
         res = await self.session.execute(

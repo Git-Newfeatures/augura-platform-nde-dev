@@ -68,7 +68,10 @@ class SourcesResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query_embedding: list[float]
+    # Le client fournit SOIT un texte `query` (embeddé côté serveur), SOIT un
+    # `query_embedding` pré-calculé (dim 1536). Au moins l'un des deux est requis.
+    query: str | None = Field(default=None, min_length=1, max_length=1000)
+    query_embedding: list[float] | None = None
     match_count: int = 20
     filter: dict[str, str] = {}
 

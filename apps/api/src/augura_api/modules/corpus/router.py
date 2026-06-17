@@ -55,9 +55,16 @@ async def sources(tenant: CurrentTenantDep, session: SessionDep) -> schemas.Sour
 
 @router.post("/search", response_model=list[schemas.SearchHit])
 async def search(
-    req: schemas.SearchRequest, tenant: CurrentTenantDep, session: SessionDep
+    req: schemas.SearchRequest,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
 ) -> list[schemas.SearchHit]:
-    return await _service(session).search(req)
+    # Embed-on-server si le client envoie un texte `query` sans embedding pré-calculé.
+    embedder: Embedder | None = None
+    if not req.query_embedding and req.query:
+        embedder = get_embedder(settings)  # lève 503 si la clé OpenAI manque
+    return await _service(session).search(req, embedder=embedder)
 
 
 @router.post("/literature", response_model=schemas.LiteratureSearchResult)

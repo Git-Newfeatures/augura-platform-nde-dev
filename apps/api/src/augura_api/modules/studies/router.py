@@ -36,6 +36,16 @@ async def get_study(
     return await _service(session).get_study(tenant, StudyId(study_id))
 
 
+@router.patch("/{study_id}", response_model=schemas.StudyOut)
+async def update_study(
+    study_id: UUID,
+    data: schemas.StudyUpdate,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+) -> schemas.StudyOut:
+    return await _service(session).update_study(tenant, StudyId(study_id), data)
+
+
 @router.get("/{study_id}/state", response_model=schemas.StudyStateOut)
 async def get_state(
     study_id: UUID, tenant: CurrentTenantDep, session: SessionDep

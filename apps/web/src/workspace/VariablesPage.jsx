@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { CheckCircle2, TriangleAlert, Variable, Network, Boxes } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { CheckCircle2, TriangleAlert, Variable, Network, Boxes, Library } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
@@ -7,6 +7,63 @@ import { SubTabs } from '@/cockpit/SubTabs'
 import { useCollection } from '@/workspace/dataClient'
 import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
+import { apiJson } from '@/api'
+
+// Catalogue de concepts taxonomiques (subsystem sémantique) — GET /semantic/concepts.
+function TaxonomyConcepts() {
+  const [concepts, setConcepts] = useState(null)
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try { const c = await apiJson('/semantic/concepts'); if (alive) setConcepts(Array.isArray(c) ? c : []) }
+      catch { if (alive) setConcepts([]) }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  if (concepts == null) return <Loading />
+  if (concepts.length === 0) {
+    return (
+      <EmptyState
+        icon={Library}
+        title="No taxonomy concepts yet"
+        subtitle="The semantic taxonomy (standardised clinical concepts) will appear here once seeded."
+      />
+    )
+  }
+  return (
+    <Card className="gap-0 overflow-x-auto rounded-xl border p-0">
+      <table className="w-full border-collapse text-[12.5px]">
+        <thead>
+          <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+            <th className="px-4 py-2.5 font-medium">Concept</th>
+            <th className="px-4 py-2.5 font-medium">Domain</th>
+            <th className="px-4 py-2.5 font-medium text-right">Layer</th>
+            <th className="px-4 py-2.5 font-medium">Type</th>
+            <th className="px-4 py-2.5 font-medium">Unit</th>
+            <th className="px-4 py-2.5 font-medium">Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          {concepts.map((c) => (
+            <tr key={c.local_concept_id} className="border-b border-border/60 last:border-0">
+              <td className="px-4 py-2 text-foreground">{c.concept_name}</td>
+              <td className="px-4 py-2 text-muted-foreground">{c.augura_domain}</td>
+              <td className="px-4 py-2 text-right font-mono text-muted-foreground">{c.layer}</td>
+              <td className="px-4 py-2 text-muted-foreground">{c.value_type ?? '—'}</td>
+              <td className="px-4 py-2 text-muted-foreground">{c.canonical_unit ?? '—'}</td>
+              <td className="px-4 py-2">
+                {c.dq_column_role
+                  ? <Badge variant="secondary" className="text-primary">{c.dq_column_role}</Badge>
+                  : <span className="text-muted-foreground">—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  )
+}
 
 export function VariablesPage() {
   const { data: variables, loading } = useCollection('variables')
@@ -22,12 +79,15 @@ export function VariablesPage() {
       <SubTabs
         tabs={[
           { id: 'variables', label: 'Variables' },
+          { id: 'taxonomy', label: 'Taxonomy' },
           { id: 'dags', label: 'DAGs' },
           { id: 'models', label: 'Foundation models' },
         ]}
         active={sub}
         onChange={setSub}
       />
+
+      {sub === 'taxonomy' && <TaxonomyConcepts />}
 
       {sub === 'variables' &&
         (loading ? (

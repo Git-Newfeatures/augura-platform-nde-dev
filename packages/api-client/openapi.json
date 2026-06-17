@@ -186,6 +186,68 @@
         "title": "ChatResponse",
         "type": "object"
       },
+      "CohortBiomarkerIn": {
+        "properties": {
+          "adherence_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adherence Pct"
+          },
+          "hba1c_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hba1C Pct"
+          },
+          "hs_crp_mgl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hs Crp Mgl"
+          },
+          "ldl_mgdl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ldl Mgdl"
+          },
+          "member_id": {
+            "title": "Member Id",
+            "type": "string"
+          },
+          "timepoint_months": {
+            "title": "Timepoint Months",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "member_id",
+          "timepoint_months"
+        ],
+        "title": "CohortBiomarkerIn",
+        "type": "object"
+      },
       "CohortBiomarkerOut": {
         "properties": {
           "adherence_pct": {
@@ -246,6 +308,142 @@
           "timepoint_months"
         ],
         "title": "CohortBiomarkerOut",
+        "type": "object"
+      },
+      "CohortImportRequest": {
+        "description": "Ingestion d'une cohorte longitudinale (members + biomarkers). Remplace toute\ncohorte existante de même nom pour le tenant. C'est la voie d'écriture qui manquait\naux tables cohort_members / cohort_biomarkers (lues par OutcomeSelection/Simulation).",
+        "properties": {
+          "biomarkers": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CohortBiomarkerIn"
+            },
+            "title": "Biomarkers",
+            "type": "array"
+          },
+          "cohort_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Cohort Name",
+            "type": "string"
+          },
+          "dataset_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Id"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/CohortMemberIn"
+            },
+            "minItems": 1,
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cohort_name",
+          "members"
+        ],
+        "title": "CohortImportRequest",
+        "type": "object"
+      },
+      "CohortImportResult": {
+        "properties": {
+          "biomarkers": {
+            "title": "Biomarkers",
+            "type": "integer"
+          },
+          "cohort_name": {
+            "title": "Cohort Name",
+            "type": "string"
+          },
+          "members": {
+            "title": "Members",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cohort_name",
+          "members",
+          "biomarkers"
+        ],
+        "title": "CohortImportResult",
+        "type": "object"
+      },
+      "CohortMemberIn": {
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "bmi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bmi"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "engagement_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engagement Group"
+          },
+          "member_id": {
+            "title": "Member Id",
+            "type": "string"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          }
+        },
+        "required": [
+          "member_id"
+        ],
+        "title": "CohortMemberIn",
         "type": "object"
       },
       "CohortMemberOut": {
@@ -3614,6 +3812,48 @@
           }
         },
         "summary": "List Cohorts",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/cohorts/import": {
+      "post": {
+        "description": "Ingère une cohorte longitudinale (members + biomarkers) — la voie d'écriture\ndes tables cohort_*, lues par OutcomeSelection/SimulationEngine.",
+        "operationId": "import_cohort_datasets_cohorts_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CohortImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CohortImportResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Cohort",
         "tags": [
           "datasets"
         ]

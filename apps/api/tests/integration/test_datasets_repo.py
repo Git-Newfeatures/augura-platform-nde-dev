@@ -68,3 +68,35 @@ async def test_cohort_reads(session: AsyncSession) -> None:
     assert cohorts["validation_v1"] == 6
     assert len(await repo.cohort_members(LUCIS, "validation_v1")) == 6
     assert len(await repo.cohort_biomarkers(LUCIS, "validation_v1")) == 12
+
+
+async def test_import_cohort_round_trip(session: AsyncSession) -> None:
+    repo = DatasetRepo(session)
+    name = "import_test_v1"
+    n_m, n_b = await repo.import_cohort(
+        LUCIS,
+        cohort_name=name,
+        dataset_id=None,
+        members=[
+            schemas.CohortMemberIn(member_id="m1", age=54, sex="F", engagement_group="HIGH"),
+            schemas.CohortMemberIn(member_id="m2", age=61, sex="M", engagement_group="REST"),
+        ],
+        biomarkers=[
+            schemas.CohortBiomarkerIn(member_id="m1", timepoint_months=0, hba1c_pct=8.1),
+            schemas.CohortBiomarkerIn(member_id="m1", timepoint_months=12, hba1c_pct=7.2),
+        ],
+    )
+    assert (n_m, n_b) == (2, 2)
+    assert len(await repo.cohort_members(LUCIS, name)) == 2
+    assert len(await repo.cohort_biomarkers(LUCIS, name)) == 2
+
+    # Idempotence : ré-import remplace (pas de doublon).
+    await repo.import_cohort(
+        LUCIS,
+        cohort_name=name,
+        dataset_id=None,
+        members=[schemas.CohortMemberIn(member_id="m1", age=54)],
+        biomarkers=[],
+    )
+    assert len(await repo.cohort_members(LUCIS, name)) == 1
+    assert len(await repo.cohort_biomarkers(LUCIS, name)) == 0

@@ -104,3 +104,38 @@ class CohortBiomarkerOut(BaseModel):
 class CohortSummary(BaseModel):
     cohort_name: str
     n_members: int
+
+
+class CohortMemberIn(BaseModel):
+    member_id: str
+    age: float | None = None
+    sex: str | None = None
+    bmi: float | None = None
+    engagement_group: str | None = None
+    country: str | None = None
+
+
+class CohortBiomarkerIn(BaseModel):
+    member_id: str
+    timepoint_months: int
+    hba1c_pct: float | None = None
+    ldl_mgdl: float | None = None
+    hs_crp_mgl: float | None = None
+    adherence_pct: float | None = None
+
+
+class CohortImportRequest(BaseModel):
+    """Ingestion d'une cohorte longitudinale (members + biomarkers). Remplace toute
+    cohorte existante de même nom pour le tenant. C'est la voie d'écriture qui manquait
+    aux tables cohort_members / cohort_biomarkers (lues par OutcomeSelection/Simulation)."""
+
+    cohort_name: str = Field(min_length=1, max_length=120)
+    dataset_id: UUID | None = None
+    members: list[CohortMemberIn] = Field(min_length=1)
+    biomarkers: list[CohortBiomarkerIn] = []
+
+
+class CohortImportResult(BaseModel):
+    cohort_name: str
+    members: int
+    biomarkers: int

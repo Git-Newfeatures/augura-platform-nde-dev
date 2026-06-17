@@ -39,6 +39,19 @@ async def list_cohorts(
     return await _service(session).list_cohorts(tenant)
 
 
+@router.post(
+    "/cohorts/import",
+    response_model=schemas.CohortImportResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_cohort(
+    payload: schemas.CohortImportRequest, tenant: CurrentTenantDep, session: SessionDep
+) -> schemas.CohortImportResult:
+    """Ingère une cohorte longitudinale (members + biomarkers) — la voie d'écriture
+    des tables cohort_*, lues par OutcomeSelection/SimulationEngine."""
+    return await _service(session).import_cohort(tenant, payload)
+
+
 @router.get("/cohorts/{cohort_name}/members", response_model=list[schemas.CohortMemberOut])
 async def cohort_members(
     cohort_name: str, tenant: CurrentTenantDep, session: SessionDep

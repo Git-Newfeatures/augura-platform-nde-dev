@@ -251,6 +251,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets/cohorts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Cohort
+         * @description Ingère une cohorte longitudinale (members + biomarkers) — la voie d'écriture
+         *     des tables cohort_*, lues par OutcomeSelection/SimulationEngine.
+         */
+        post: operations["import_cohort_datasets_cohorts_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/datasets/cohorts/{cohort_name}/biomarkers": {
         parameters: {
             query?: never;
@@ -644,6 +665,21 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** CohortBiomarkerIn */
+        CohortBiomarkerIn: {
+            /** Adherence Pct */
+            adherence_pct?: number | null;
+            /** Hba1C Pct */
+            hba1c_pct?: number | null;
+            /** Hs Crp Mgl */
+            hs_crp_mgl?: number | null;
+            /** Ldl Mgdl */
+            ldl_mgdl?: number | null;
+            /** Member Id */
+            member_id: string;
+            /** Timepoint Months */
+            timepoint_months: number;
+        };
         /** CohortBiomarkerOut */
         CohortBiomarkerOut: {
             /** Adherence Pct */
@@ -658,6 +694,49 @@ export interface components {
             member_id: string;
             /** Timepoint Months */
             timepoint_months: number;
+        };
+        /**
+         * CohortImportRequest
+         * @description Ingestion d'une cohorte longitudinale (members + biomarkers). Remplace toute
+         *     cohorte existante de même nom pour le tenant. C'est la voie d'écriture qui manquait
+         *     aux tables cohort_members / cohort_biomarkers (lues par OutcomeSelection/Simulation).
+         */
+        CohortImportRequest: {
+            /**
+             * Biomarkers
+             * @default []
+             */
+            biomarkers: components["schemas"]["CohortBiomarkerIn"][];
+            /** Cohort Name */
+            cohort_name: string;
+            /** Dataset Id */
+            dataset_id?: string | null;
+            /** Members */
+            members: components["schemas"]["CohortMemberIn"][];
+        };
+        /** CohortImportResult */
+        CohortImportResult: {
+            /** Biomarkers */
+            biomarkers: number;
+            /** Cohort Name */
+            cohort_name: string;
+            /** Members */
+            members: number;
+        };
+        /** CohortMemberIn */
+        CohortMemberIn: {
+            /** Age */
+            age?: number | null;
+            /** Bmi */
+            bmi?: number | null;
+            /** Country */
+            country?: string | null;
+            /** Engagement Group */
+            engagement_group?: string | null;
+            /** Member Id */
+            member_id: string;
+            /** Sex */
+            sex?: string | null;
         };
         /** CohortMemberOut */
         CohortMemberOut: {
@@ -2000,6 +2079,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CohortSummary"][];
+                };
+            };
+        };
+    };
+    import_cohort_datasets_cohorts_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CohortImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortImportResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

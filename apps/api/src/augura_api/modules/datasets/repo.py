@@ -139,3 +139,55 @@ class DatasetRepo:
             .order_by(CohortBiomarker.member_id, CohortBiomarker.timepoint_months)
         )
         return list(res.scalars().all())
+
+    async def import_cohort(
+        self,
+        tenant_id: TenantId,
+        *,
+        cohort_name: str,
+        dataset_id: UUID | None,
+        members: list[schemas.CohortMemberIn],
+        biomarkers: list[schemas.CohortBiomarkerIn],
+    ) -> tuple[int, int]:
+        """Remplace la cohorte (members + biomarkers) pour (tenant, cohort_name) — la
+        voie d'écriture des tables cohort_*. Delete-then-insert pour idempotence."""
+        await self.session.execute(
+            delete(CohortMember).where(
+                CohortMember.org_id == tenant_id, CohortMember.cohort_name == cohort_name
+            )
+        )
+        await self.session.execute(
+            delete(CohortBiomarker).where(
+                CohortBiomarker.org_id == tenant_id, CohortBiomarker.cohort_name == cohort_name
+            )
+        )
+        for m in members:
+            self.session.add(
+                CohortMember(
+                    org_id=tenant_id,
+                    dataset_id=dataset_id,
+                    cohort_name=cohort_name,
+                    member_id=m.member_id,
+                    age=m.age,
+                    sex=m.sex,
+                    bmi=m.bmi,
+                    engagement_group=m.engagement_group,
+                    country=m.country,
+                )
+            )
+        for b in biomarkers:
+            self.session.add(
+                CohortBiomarker(
+                    org_id=tenant_id,
+                    dataset_id=dataset_id,
+                    cohort_name=cohort_name,
+                    member_id=b.member_id,
+                    timepoint_months=b.timepoint_months,
+                    hba1c_pct=b.hba1c_pct,
+                    ldl_mgdl=b.ldl_mgdl,
+                    hs_crp_mgl=b.hs_crp_mgl,
+                    adherence_pct=b.adherence_pct,
+                )
+            )
+        await self.session.flush()
+        return len(members), len(biomarkers)

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from augura_api.core.errors import NotFoundError
 from augura_api.core.tenancy import CurrentTenant
+from augura_api.modules import analytics
 from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.models import Dataset
 from augura_api.modules.datasets.repo import DatasetRepo
@@ -76,3 +77,29 @@ class DatasetService:
     ) -> list[schemas.CohortBiomarkerOut]:
         rows = await self.repo.cohort_biomarkers(tenant.tenant_id, cohort_name)
         return [schemas.CohortBiomarkerOut.model_validate(r) for r in rows]
+
+    async def import_cohort(
+        self, tenant: CurrentTenant, payload: schemas.CohortImportRequest
+    ) -> schemas.CohortImportResult:
+        n_members, n_biomarkers = await self.repo.import_cohort(
+            tenant.tenant_id,
+            cohort_name=payload.cohort_name,
+            dataset_id=payload.dataset_id,
+            members=payload.members,
+            biomarkers=payload.biomarkers,
+        )
+        await analytics.log_usage(
+            self.repo.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="cohort.imported",
+            route="/datasets/cohorts/import",
+            metadata={
+                "cohort_name": payload.cohort_name,
+                "members": n_members,
+                "biomarkers": n_biomarkers,
+            },
+        )
+        return schemas.CohortImportResult(
+            cohort_name=payload.cohort_name, members=n_members, biomarkers=n_biomarkers
+        )

@@ -67,6 +67,22 @@ class SourcesResponse(BaseModel):
     sources: list[SourceCount]
 
 
+class SourceCoverageCell(BaseModel):
+    source_id: str
+    evidence_type: str
+    doc_count: int
+
+
+class SourceCoverageMeta(BaseModel):
+    total_docs: int
+    evidence_types: list[str]
+
+
+class SourceCoverageResponse(BaseModel):
+    meta: SourceCoverageMeta
+    matrix: list[SourceCoverageCell]
+
+
 class SearchRequest(BaseModel):
     # Le client fournit SOIT un texte `query` (embeddé côté serveur), SOIT un
     # `query_embedding` pré-calculé (dim 1536). Au moins l'un des deux est requis.

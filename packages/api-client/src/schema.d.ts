@@ -182,6 +182,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/corpus/source-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Source Coverage */
+        get: operations["source_coverage_corpus_source_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/sources": {
         parameters: {
             query?: never;
@@ -1382,6 +1399,28 @@ export interface components {
             /** Source Id */
             source_id: string;
         };
+        /** SourceCoverageCell */
+        SourceCoverageCell: {
+            /** Doc Count */
+            doc_count: number;
+            /** Evidence Type */
+            evidence_type: string;
+            /** Source Id */
+            source_id: string;
+        };
+        /** SourceCoverageMeta */
+        SourceCoverageMeta: {
+            /** Evidence Types */
+            evidence_types: string[];
+            /** Total Docs */
+            total_docs: number;
+        };
+        /** SourceCoverageResponse */
+        SourceCoverageResponse: {
+            /** Matrix */
+            matrix: components["schemas"]["SourceCoverageCell"][];
+            meta: components["schemas"]["SourceCoverageMeta"];
+        };
         /** SourcesResponse */
         SourcesResponse: {
             /** Sources */
@@ -1848,6 +1887,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    source_coverage_corpus_source_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceCoverageResponse"];
                 };
             };
         };

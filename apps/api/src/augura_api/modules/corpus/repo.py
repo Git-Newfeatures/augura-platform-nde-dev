@@ -72,6 +72,16 @@ class CorpusRepo:
         )
         return [(j, e, int(n)) for j, e, n in rows.all()]
 
+    async def source_coverage_counts(self) -> list[tuple[str | None, str | None, int]]:
+        """Comptage par (source_id, evidence_type) — alimente la mini-carte source×type
+        du panneau corpus (CorpusPanelEmbed)."""
+        rows = await self.session.execute(
+            select(Document.source_id, Document.evidence_type, func.count()).group_by(
+                Document.source_id, Document.evidence_type
+            )
+        )
+        return [(s, e, int(n)) for s, e, n in rows.all()]
+
     async def total_docs(self) -> int:
         return int(await self.session.scalar(select(func.count()).select_from(Document)) or 0)
 

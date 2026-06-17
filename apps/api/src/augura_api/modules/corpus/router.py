@@ -53,6 +53,13 @@ async def sources(tenant: CurrentTenantDep, session: SessionDep) -> schemas.Sour
     return await _service(session).sources()
 
 
+@router.get("/source-coverage", response_model=schemas.SourceCoverageResponse)
+async def source_coverage(
+    tenant: CurrentTenantDep, session: SessionDep
+) -> schemas.SourceCoverageResponse:
+    return await _service(session).source_coverage()
+
+
 @router.post("/search", response_model=list[schemas.SearchHit])
 async def search(
     req: schemas.SearchRequest,

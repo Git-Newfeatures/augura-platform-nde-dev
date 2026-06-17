@@ -170,6 +170,23 @@ class CorpusService:
             sources=[schemas.SourceCount(source_id=s, count=c) for s, c in counts],
         )
 
+    async def source_coverage(self) -> schemas.SourceCoverageResponse:
+        cells = await self.repo.source_coverage_counts()
+        matrix = [
+            schemas.SourceCoverageCell(
+                source_id=s or "unknown",
+                evidence_type=e or "unknown",
+                doc_count=n,
+            )
+            for s, e, n in cells
+        ]
+        evidence_types = sorted({e or "unknown" for _, e, _ in cells})
+        total = await self.repo.total_docs()
+        return schemas.SourceCoverageResponse(
+            meta=schemas.SourceCoverageMeta(total_docs=total, evidence_types=evidence_types),
+            matrix=matrix,
+        )
+
     async def search(
         self, req: schemas.SearchRequest, *, embedder: Embedder | None = None
     ) -> list[schemas.SearchHit]:

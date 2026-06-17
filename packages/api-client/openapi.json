@@ -2487,6 +2487,70 @@
         "title": "SourceCount",
         "type": "object"
       },
+      "SourceCoverageCell": {
+        "properties": {
+          "doc_count": {
+            "title": "Doc Count",
+            "type": "integer"
+          },
+          "evidence_type": {
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "evidence_type",
+          "doc_count"
+        ],
+        "title": "SourceCoverageCell",
+        "type": "object"
+      },
+      "SourceCoverageMeta": {
+        "properties": {
+          "evidence_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Types",
+            "type": "array"
+          },
+          "total_docs": {
+            "title": "Total Docs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_docs",
+          "evidence_types"
+        ],
+        "title": "SourceCoverageMeta",
+        "type": "object"
+      },
+      "SourceCoverageResponse": {
+        "properties": {
+          "matrix": {
+            "items": {
+              "$ref": "#/components/schemas/SourceCoverageCell"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/SourceCoverageMeta"
+          }
+        },
+        "required": [
+          "meta",
+          "matrix"
+        ],
+        "title": "SourceCoverageResponse",
+        "type": "object"
+      },
       "SourcesResponse": {
         "properties": {
           "sources": {
@@ -3419,6 +3483,27 @@
           }
         },
         "summary": "Search",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/source-coverage": {
+      "get": {
+        "operationId": "source_coverage_corpus_source_coverage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceCoverageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Source Coverage",
         "tags": [
           "corpus"
         ]

@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { apiJson } from "@/api";
 
 const ET_LABELS = {
   guidance:       "Guidance",
@@ -671,7 +672,7 @@ function AgentRetrievalSection({ referencedDocs, agentSources = [] }) {
 }
 
 // ── Main CorpusPanelEmbed ─────────────────────────────────────────────────────
-export function CorpusPanelEmbed({ onViewFull, referencedDocs = [], clientDomains = [], clientEvidenceTypes = [], rawRetrievalCount = 0, agentSources = [] }) {
+export function CorpusPanelEmbed({ onViewFull, referencedDocs = [], clientDomains = [], rawRetrievalCount = 0, agentSources = [] }) {
   const [sourceData,    setSourceData]    = useState(null);
   const [feedData,      setFeedData]      = useState(null);
   const [, setSourceLoading] = useState(true);
@@ -683,39 +684,34 @@ export function CorpusPanelEmbed({ onViewFull, referencedDocs = [], clientDomain
   // Section 2 collapsed by default; auto-expand when there's no agent run yet
   const [corpusExpanded, setCorpusExpanded] = useState(() => referencedDocs.length === 0);
 
-  const domainsKey       = clientDomains.join(",");
-  const evidenceTypesKey = clientEvidenceTypes.join(",");
-
-  // Fetch coverage map (source × evidence_type) — used for filter pills + feed totals
+  // Fetch coverage map (source × evidence_type) from the backend (Bearer JWT, RLS).
   useEffect(() => {
-    setSourceLoading(true);
-    const params = new URLSearchParams();
-    if (domainsKey)       params.set("domains",        domainsKey);
-    if (evidenceTypesKey) params.set("evidence_types", evidenceTypesKey);
-    const qs = params.toString() ? `?${params}` : "";
-    fetch(`/api/corpus-sources${qs}`)
-      .then(r => r.json())
-      .then(setSourceData)
-      .catch(console.error)
-      .finally(() => setSourceLoading(false));
-  }, [domainsKey, evidenceTypesKey]);
+    let alive = true;
+    (async () => {
+      setSourceLoading(true);
+      try { const d = await apiJson("/corpus/source-coverage"); if (alive) setSourceData(d); }
+      catch { if (alive) setSourceData(null); }
+      finally { if (alive) setSourceLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  // Fetch pulse feed — re-runs on filter changes
+  // Fetch the corpus feed — re-runs on filter changes. The backend supports
+  // limit + evidence_type + source_id (client handles the rest of the filtering).
   useEffect(() => {
-    setFeedLoading(true);
-    const params = new URLSearchParams();
-    params.set("limit", showMore ? "50" : "5");
-    if (domainsKey)         params.set("domains",         domainsKey);
-    if (evidenceTypesKey)   params.set("evidence_types",  evidenceTypesKey);
-    if (etFilter)           params.set("evidence_type",   etFilter);
-    if (srcFilter)          params.set("source_id",       srcFilter);
-    const url = `/api/pulse-feed?${params}`;
-    fetch(url)
-      .then(r => r.json())
-      .then(setFeedData)
-      .catch(console.error)
-      .finally(() => setFeedLoading(false));
-  }, [showMore, etFilter, srcFilter, domainsKey, evidenceTypesKey]);
+    let alive = true;
+    (async () => {
+      setFeedLoading(true);
+      const params = new URLSearchParams();
+      params.set("limit", showMore ? "50" : "5");
+      if (etFilter)  params.set("evidence_type", etFilter);
+      if (srcFilter) params.set("source_id",     srcFilter);
+      try { const d = await apiJson(`/corpus/feed?${params}`); if (alive) setFeedData(d); }
+      catch { if (alive) setFeedData(null); }
+      finally { if (alive) setFeedLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [showMore, etFilter, srcFilter]);
 
   function handleEtFilter(v)  { setEtFilter(v);  setShowMore(false); }
   function handleSrcFilter(v) { setSrcFilter(v); setShowMore(false); }

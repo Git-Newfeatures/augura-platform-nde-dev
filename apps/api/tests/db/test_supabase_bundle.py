@@ -133,3 +133,9 @@ def test_taxonomy_tables_have_select_only_rls() -> None:
     ):
         assert f"alter table {t} enable row level security" in policies
         assert f"create policy backend_read on {t}" in policies
+
+
+def test_seed_includes_semantic_taxonomy() -> None:
+    seed = _read("seed.sql").lower()
+    for t in ("taxonomy_concepts", "dq_constraints", "table_archetypes", "taxonomy_measurement_units"):
+        assert f"insert into {t} " in seed

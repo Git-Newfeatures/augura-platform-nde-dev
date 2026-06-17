@@ -494,6 +494,35 @@ SOURCE COUNTS:
   function onDone(profile) { setE1Profile(profile || null); setReady(true); setAgentStep("done"); setCompletedTab(null); go("profiling_run"); }
   function onRunStart(snapshot) { if (snapshot) setLastRunInputs(snapshot); go("profiling_run"); }
 
+  // Trigger a REAL bootstrap on the backend (POST /simulations) and wait for the job to
+  // settle (results land in simulation_results, which SimulationEngine reads). Falls
+  // through to the simulation view regardless so the user is never stuck on the loader.
+  async function runSimulation(est) {
+    completeTab("design");
+    setSelectedEstimators(est);
+    setSimLoading(true);
+    try {
+      const params = {
+        estimators: est,
+        ...(selectedOutcome ? { outcome: selectedOutcome } : {}),
+        ...(selectedCohort ? { cohort_name: selectedCohort } : {}),
+      };
+      const created = await apiJson("/simulations", {
+        method: "POST",
+        body: JSON.stringify({ study_id: isUuidId ? projectId : null, params }),
+      });
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          const job = await apiJson(`/jobs/${created.job_id}`);
+          if (job.status === "succeeded" || job.status === "failed") break;
+        } catch { /* keep polling */ }
+      }
+    } catch { /* SimulationEngine shows existing results (or an empty state) */ }
+    setSimLoading(false);
+    go("simulation");
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
 
@@ -563,12 +592,7 @@ SOURCE COUNTS:
           {view==="causal"      && <CausalModel        onBack={()=>go("outcomes")}    onNext={()=>{ completeTab("causal");     go("datacheck");   }} studyType={studyType} e1Profile={e1Profile} product={product} outcome={outcome} dagCache={dagCache} setDagCache={setDagCache} selectedOutcome={selectedOutcome} selectedCohort={selectedCohort} cqExposure={cqExposure} cqPopulation={cqPopulation} partnerLabel={defaults.partnerLabel} candidateOutcomes={defaults.endpoints ?? []} datasetVariables={datasetVariables} />}
           {view==="datacheck"   && <DataAvailability   onNext={()=>{ completeTab("datacheck");  go("studytype");   }} onBack={()=>go("causal")} product={product} users={users} outcome={outcome} selectedOutcome={selectedOutcome} selectedCohort={selectedCohort} partnerLabel={defaults.partnerLabel} hasEngagementCol={hasEngagementCol} chatProps={chatProps} datasetVariables={datasetVariables} />}
           {view==="studytype"   && <StudyType          onNext={({ approach, design, estimand })=>{ setStudyType(approach); setStudyDesign(design); setStudyEstimand(estimand); completeTab("studytype"); go("design"); }} onBack={()=>go("datacheck")} product={product} users={users} outcome={outcome} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
-          {view==="design"      && <StudyDesign        onBack={()=>go("studytype")}   onNext={(est)=>{
-            completeTab("design");
-            setSelectedEstimators(est);
-            setSimLoading(true);
-            setTimeout(() => { setSimLoading(false); go("simulation"); }, 4500);
-          }} studyType={studyType} studyDesign={studyDesign} studyEstimand={studyEstimand} partnerLabel={defaults.partnerLabel} />}
+          {view==="design"      && <StudyDesign        onBack={()=>go("studytype")}   onNext={(est)=>runSimulation(est)} studyType={studyType} studyDesign={studyDesign} studyEstimand={studyEstimand} partnerLabel={defaults.partnerLabel} />}
           {view==="simulation"  && <SimulationEngine   onBack={()=>go("design")}      onNext={(data)=>{ setLockedEstimator(data.estimator); setSimResults(data); go("results"); }} e1Profile={e1Profile} outcome={outcome} studyType={studyType} selectedEstimators={selectedEstimators} selectedCohort={selectedCohort} selectedOutcome={selectedOutcome} uploadedRowCount={uploadedRowCount} partnerLabel={defaults.partnerLabel} />}
           {view==="results"     && <ResultsView      onBack={()=>go("simulation")} onNext={()=>go("sensitivity")} simResults={simResults} dagCache={dagCache} partnerLabel={defaults.partnerLabel} />}
           {view==="sensitivity" && <ErrorBoundary><SensitivityView  simResults={simResults} onBack={()=>go("results")}      onNext={()=>go("report")} chatProps={chatProps} partnerLabel={defaults.partnerLabel} /></ErrorBoundary>}

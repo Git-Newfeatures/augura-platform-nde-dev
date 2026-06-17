@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, ArrowLeft, ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ESTIMATORS, ESTIMATOR_FILTER } from "../config";
+import { apiJson } from "@/api";
 
 const ESTIMATOR_META = {
   lme: {
@@ -62,6 +63,26 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
     if (isMediation) return;
     setEstimators((prev) => (prev.includes(key) ? prev.filter((e) => e !== key) : [...prev, key]));
   }
+
+  // Instant analytical power preview (LIVE mode — pure maths, no LLM/DB) via the
+  // /simulations/power endpoint, debounced on estimator selection.
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    if (!estimators.length) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      (async () => {
+        try {
+          const r = await apiJson("/simulations/power", {
+            method: "POST",
+            body: JSON.stringify({ estimators }),
+          });
+          if (alive) setPreview(r);
+        } catch { if (alive) setPreview(null); }
+      })();
+    }, 400);
+    return () => { alive = false; clearTimeout(t); };
+  }, [estimators]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -141,6 +162,31 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
           <strong className="font-semibold">{estimators.length} estimator{estimators.length !== 1 ? "s" : ""} selected</strong> — bias, variance, MSE and
           power will be computed in E2 simulation and compared across all selected estimators.
         </div>
+      )}
+
+      {estimators.length > 0 && preview?.estimators?.length > 0 && (
+        <Card className="gap-0 rounded-xl border p-4">
+          <div className="mb-2 text-[12.5px] font-semibold text-foreground">
+            Analytical power preview
+            <span className="ml-1 font-normal text-muted-foreground">
+              · instant estimate (n={preview.n}, threshold {preview.power_threshold}%)
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {preview.estimators.map((e) => (
+              <Badge
+                key={e.estimator}
+                variant="outline"
+                className={e.power >= preview.power_threshold ? "text-primary border-primary/30" : "text-[#B98900] border-[#B98900]/30"}
+              >
+                {e.estimator.toUpperCase()} · {e.power}%
+              </Badge>
+            ))}
+          </div>
+          <div className="mt-2 text-[11.5px] text-muted-foreground/70">
+            Closed-form estimate. Run the full bootstrap below for validated bias/MSE.
+          </div>
+        </Card>
       )}
 
       <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-4">

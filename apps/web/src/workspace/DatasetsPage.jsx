@@ -54,20 +54,26 @@ function StatusBadge({ d }) {
 
 // ── Dataset detail (inline view that replaces the list) ───────────────────────
 function DatasetDetail({ d, onBack, onOpenStudy }) {
-  // Profiled columns come from the backend (GET /datasets/:id/columns).
+  // Profiled columns + fresh single-dataset metadata from the backend.
   const [columns, setColumns] = useState(null)
+  const [meta, setMeta] = useState(null)
   useEffect(() => {
     let alive = true
     ;(async () => {
-      try {
-        const cols = await apiJson(`/datasets/${d.id}/columns`)
-        if (alive) setColumns(Array.isArray(cols) ? cols : [])
-      } catch {
-        if (alive) setColumns([])
-      }
+      const [cols, single] = await Promise.all([
+        apiJson(`/datasets/${d.id}/columns`).catch(() => []),
+        apiJson(`/datasets/${d.id}`).catch(() => null),
+      ])
+      if (!alive) return
+      setColumns(Array.isArray(cols) ? cols : [])
+      setMeta(single)
     })()
     return () => { alive = false }
   }, [d.id])
+
+  // Fresh metadata wins over the (possibly stale) list row.
+  const rowsLabel = meta?.row_count != null ? Number(meta.row_count).toLocaleString() : d.rows
+  const colsLabel = meta?.column_count != null ? meta.column_count : d.cols
 
   return (
     <div className="flex flex-col gap-4">
@@ -103,8 +109,8 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
         </div>
         <div className="mt-4 flex flex-wrap gap-x-7 gap-y-2 border-t border-border pt-3.5">
           {[
-            ['Rows', d.rows, 'text-foreground'],
-            ['Columns', d.cols, 'text-foreground'],
+            ['Rows', rowsLabel, 'text-foreground'],
+            ['Columns', colsLabel, 'text-foreground'],
           ].map(([label, value, tone]) => (
             <div key={label} className="flex items-baseline gap-1.5">
               <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">{label}</span>

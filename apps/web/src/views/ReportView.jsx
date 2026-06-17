@@ -128,8 +128,12 @@ export default function ReportView({ partnerLabel = 'Partner', chatProps = {}, o
         body: JSON.stringify({ type: "report", study_id: isUuid(studyId) ? studyId : null }),
       });
       const j = await pollJob(res.job_id);
-      if (j?.status === "failed") setMsg("Generation failed.");
-      else { setDocId(res.document_id); setMsg("Dossier ready."); }
+      if (j?.status === "failed") { setMsg("Generation failed."); return; }
+      // Confirm the document itself is ready (GET /documents/:id) before enabling download.
+      let status = "pending";
+      try { status = (await apiJson(`/documents/${res.document_id}`))?.status ?? "pending"; } catch { /* fall back to job */ }
+      if (status === "ready" || j?.status === "succeeded") { setDocId(res.document_id); setMsg("Dossier ready."); }
+      else setMsg("Still compiling — try again shortly.");
     } catch (e) {
       setMsg(String(e?.message || "").includes("401") ? "Session expired — sign in again." : "Could not generate the dossier.");
     } finally {

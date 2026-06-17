@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowLeft, ArrowRight, FolderOpen, TrendingUp, Link2, Microscope, ClipboardList, BarChart3, Scale } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InfoBar, Tag } from "../ui/components";
 import InlineChatbot from "../components/InlineChatbot";
+import { EmptyState } from "@/components/EmptyState";
+import { useReference, normStudyDesigns, normEstimands } from "@/workspace/dataClient";
 
 // Map study-design data keys → lucide icons (presentational only)
 const DESIGN_ICON = {
@@ -13,87 +15,35 @@ const DESIGN_ICON = {
   mediation: Microscope,
 };
 
-function getStudyDesigns(partnerLabel) {
-  return [
-    {
-      id: "retro_cohort",
-      name: "Retrospective Engagement Cohort",
-      icon: "📂",
-      desc: "Stratify existing users by engagement level (HIGH vs REST). Measure biomarker change between groups. Fast, no new data required.",
-      tags: [["g",`${partnerLabel} data available`], ["b","DiGA / HAS eligible"], ["a","Observational — confounding risk"]],
-      color: "#0F6E56",
-      estimands: ["ATE", "ATT"],
-    },
-    {
-      id: "pre_post",
-      name: "Pre / Post Cohort",
-      icon: "📈",
-      desc: `Compare each user's biomarkers before and after joining ${partnerLabel}. No separate control group — uses within-person change.`,
-      tags: [["g","Simple"], ["b","No external data"], ["a","No control group — regression to mean risk"]],
-      color: "#0C447C",
-      estimands: ["ATE"],
-    },
-    {
-      id: "external_matched",
-      name: "External Matched Cohort",
-      icon: "🔗",
-      desc: `Match ${partnerLabel} users to external non-users (e.g. Constances cohort). Stronger causal interpretation than internal comparison.`,
-      tags: [["b","Stronger causal claim"], ["a","Requires external dataset"], ["a","Matching complexity"]],
-      color: "#633806",
-      estimands: ["ATE", "ATT"],
-    },
-    {
-      id: "mediation",
-      name: "Causal Mediation",
-      icon: "🔬",
-      desc: "Decompose total effect into direct (platform → HbA1c) and indirect (via behaviour change). Different causal question — cannot be combined with total-effect estimators.",
-      tags: [["b","Mechanism analysis"], ["b","Scientific differentiator"], ["a","Stronger assumptions required"]],
-      color: "#2E9EAD",
-      estimands: ["MEDIATION"],
-    },
-  ];
-}
+// Per-design presentational colors (were inline in the old hard-coded designs).
+const DESIGN_COLOR = {
+  retro_cohort: '#0F6E56', pre_post: '#0C447C',
+  external_matched: '#633806', mediation: '#2E9EAD',
+};
 
-const ESTIMAND_OPTS = [
-  {
-    key: "ATE",
-    name: "ATE — Average Treatment Effect",
-    desc: "What would the effect of the intervention be if applied to the entire eligible population? Population-level causal effect — the default starting point for most causal questions.",
-    regulatory: "Conservative, broadly accepted across payer submissions (HAS, NICE DSP, DiGA).",
-    recommended: true,
-  },
-  {
-    key: "ATT",
-    name: "ATT — Average Treatment effect on the Treated",
-    desc: "What is the effect of the intervention specifically for users who actually received or engaged with it? Answers: 'did it work for the people who used it?'",
-    regulatory: "Preferred when treated and untreated populations differ structurally — common in real-world evidence.",
-    recommended: false,
-  },
-  {
-    key: "CATE",
-    name: "CATE — Conditional ATE",
-    desc: "The causal effect as a function of individual or subgroup covariates — 'which users benefit most?' Enables personalised evidence claims. Requires larger N and careful regularisation.",
-    regulatory: "Heterogeneous effects — supports subgroup and personalised claims; estimated with Causal Forest / GRF, BART, or meta-learners.",
-    recommended: false,
-    tag: "Heterogeneous effects",
-  },
-  {
-    key: "MEDIATION",
-    name: "Mediation Analysis — Direct, Indirect, Total Effects",
-    desc: "Decomposes the total effect into the direct effect (intervention → outcome bypassing the mediator) and the indirect effect (intervention → mediator → outcome). Use when the mechanism of action matters, not just the headline effect.",
-    regulatory: "Mechanism evidence — supports HTA narratives but typically paired with ATE/ATT as the primary estimand.",
-    recommended: false,
-  },
-];
+// Per-design emoji icons (were inline in the old hard-coded designs).
+const DESIGN_EMOJI = {
+  retro_cohort: '📂', pre_post: '📈',
+  external_matched: '🔗', mediation: '🔬',
+};
 
 export default function StudyType({ partnerLabel = 'Partner', chatProps = {}, onNext, onBack }) {
   const [approach, setApproach] = useState("retro");
   const [design, setDesign] = useState("retro_cohort");
   const [estimand, setEstimand] = useState("ATE");
 
+  const { data: designRows, loading: designsLoading } = useReference('study_designs');
+  const { data: estimandRows } = useReference('estimands');
+  const STUDY_DESIGNS = useMemo(
+    () => normStudyDesigns(designRows, partnerLabel).map((d) => ({
+      ...d, icon: DESIGN_EMOJI[d.id], color: DESIGN_COLOR[d.id],
+    })),
+    [designRows, partnerLabel],
+  );
+  const ESTIMAND_OPTS = useMemo(() => normEstimands(estimandRows), [estimandRows]);
+
   const retro = approach === "retro";
   const isMediation = design === "mediation";
-  const STUDY_DESIGNS = getStudyDesigns(partnerLabel);
 
   function selectDesign(id) {
     setDesign(id);
@@ -105,6 +55,16 @@ export default function StudyType({ partnerLabel = 'Partner', chatProps = {}, on
   }
 
   const designLabel  = STUDY_DESIGNS.find(d => d.id === design)?.name ?? "—";
+
+  if (designsLoading && STUDY_DESIGNS.length === 0) {
+    return (
+      <EmptyState
+        icon={FolderOpen}
+        title="Loading study designs…"
+        subtitle="Fetching study design families and estimands from the Augura reference catalog."
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

@@ -207,6 +207,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/corpus/literature/retrieve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Literature Retrieve
+         * @description Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.
+         *     Ne touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique
+         *     ⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel.
+         */
+        post: operations["literature_retrieve_corpus_literature_retrieve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/literature/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_corpus_literature_sessions_get"];
+        put?: never;
+        /** Create Session */
+        post: operations["create_session_corpus_literature_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/literature/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_corpus_literature_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/literature/sessions/{session_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Append Event */
+        post: operations["append_event_corpus_literature_sessions__session_id__events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/literature/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Snapshot
+         * @description Gèle le jeu de résultats + annotations : calcule le content_hash, épingle
+         *     model/prompt version, persiste. La réponse porte le hash (auto-vérifiable).
+         */
+        post: operations["create_snapshot_corpus_literature_snapshots_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/corpus/literature/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Snapshot
+         * @description Relit un snapshot et VÉRIFIE le content_hash (erreur dure si divergence).
+         *     Lecture base pure : zéro appel PubMed/CT.gov (rejeu reproductible).
+         */
+        get: operations["read_snapshot_corpus_literature_snapshots__snapshot_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/search": {
         parameters: {
             query?: never;
@@ -412,6 +528,23 @@ export interface paths {
         put?: never;
         /** Run Dq */
         post: operations["run_dq_datasets__dataset_id__dq_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/{dataset_id}/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Map Dataset */
+        post: operations["map_dataset_datasets__dataset_id__map_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1031,6 +1164,19 @@ export interface components {
             /** Value Kind */
             value_kind?: string | null;
         };
+        /** ColumnProposal */
+        ColumnProposal: {
+            /** Column */
+            column: string;
+            /** Confidence */
+            confidence?: number | null;
+            /** Confidence Label */
+            confidence_label: string;
+            /** Proposed Canonical Id */
+            proposed_canonical_id?: string | null;
+            /** Proposed Role */
+            proposed_role?: string | null;
+        };
         /** ColumnStat */
         ColumnStat: {
             /** Column */
@@ -1300,6 +1446,18 @@ export interface components {
             /** Variance */
             variance: number;
         };
+        /** EventAppendRequest */
+        EventAppendRequest: {
+            /** Event Type */
+            event_type: string;
+            /**
+             * Payload
+             * @default {}
+             */
+            payload: {
+                [key: string]: unknown;
+            };
+        };
         /** FeedDocument */
         FeedDocument: {
             /** Age Label */
@@ -1341,6 +1499,32 @@ export interface components {
             /** Documents */
             documents: components["schemas"]["FeedDocument"][];
             meta: components["schemas"]["FeedMeta"];
+        };
+        /**
+         * FrozenResult
+         * @description Par citation : la source, l'id, le query_string EXACT (pas la question
+         *     utilisateur), la date de récupération, l'enregistrement gelé et l'annotation.
+         */
+        FrozenResult: {
+            /** Annotation */
+            annotation?: string | null;
+            /** Id */
+            id: string;
+            /** Query String */
+            query_string: string;
+            /** Record */
+            record: {
+                [key: string]: unknown;
+            };
+            /**
+             * Retrieval Date
+             * Format: date
+             */
+            retrieval_date: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
         };
         /** GapPill */
         GapPill: {
@@ -1447,6 +1631,47 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** LiteratureEvent */
+        LiteratureEvent: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Event Type */
+            event_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
+        /** LiteratureRetrieveRequest */
+        LiteratureRetrieveRequest: {
+            /**
+             * Max Results
+             * @default 10
+             */
+            max_results: number;
+            /** Query */
+            query: string;
+            /** Sources */
+            sources?: string[] | null;
+        };
         /** LiteratureSearchRequest */
         LiteratureSearchRequest: {
             /**
@@ -1476,6 +1701,63 @@ export interface components {
             ingested: number;
             /** Query */
             query: string;
+        };
+        /**
+         * LiteratureSnapshot
+         * @description Par artefact : métadonnées de provenance + résultats gelés + content_hash.
+         *     `verified` est posé à la lecture après recalcul du hash.
+         */
+        LiteratureSnapshot: {
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Model Version */
+            model_version: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Query */
+            query: string;
+            /** Results */
+            results: components["schemas"]["FrozenResult"][];
+            /** Sources */
+            sources: string[];
+            /** Study Id */
+            study_id?: string | null;
+            /**
+             * Verified
+             * @default true
+             */
+            verified: boolean;
+        };
+        /** MapResult */
+        MapResult: {
+            /** Avg Confidence */
+            avg_confidence?: number | null;
+            /** Columns */
+            columns: components["schemas"]["ColumnProposal"][];
+            /**
+             * Dataset Id
+             * Format: uuid
+             */
+            dataset_id: string;
+            /** Mapped Count */
+            mapped_count: number;
+            /** Total Count */
+            total_count: number;
         };
         /** MeasuredVariable */
         MeasuredVariable: {
@@ -1607,6 +1889,42 @@ export interface components {
             /** Query Embedding */
             query_embedding?: number[] | null;
         };
+        /** SearchSession */
+        SearchSession: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Query */
+            query?: string | null;
+            /** Status */
+            status: string;
+            /** Study Id */
+            study_id?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SessionCreateRequest */
+        SessionCreateRequest: {
+            /** Query */
+            query?: string | null;
+            /** Study Id */
+            study_id?: string | null;
+        };
         /** Sheet */
         Sheet: {
             /**
@@ -1712,6 +2030,21 @@ export interface components {
             summary?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** SnapshotWriteRequest */
+        SnapshotWriteRequest: {
+            /** Model Version */
+            model_version: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Query */
+            query: string;
+            /** Results */
+            results: components["schemas"]["FrozenResult"][];
+            /** Sources */
+            sources: string[];
+            /** Study Id */
+            study_id?: string | null;
         };
         /** SourceCount */
         SourceCount: {
@@ -2249,6 +2582,233 @@ export interface operations {
             };
         };
     };
+    literature_retrieve_corpus_literature_retrieve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiteratureRetrieveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_corpus_literature_sessions_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSession"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_session_corpus_literature_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_corpus_literature_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    append_event_corpus_literature_sessions__session_id__events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventAppendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiteratureEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_snapshot_corpus_literature_snapshots_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnapshotWriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiteratureSnapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_snapshot_corpus_literature_snapshots__snapshot_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiteratureSnapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_corpus_search_post: {
         parameters: {
             query?: never;
@@ -2669,6 +3229,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DqRunResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    map_dataset_datasets__dataset_id__map_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MapResult"];
                 };
             };
             /** @description Validation Error */

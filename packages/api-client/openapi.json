@@ -1135,6 +1135,57 @@
         "title": "ColumnOut",
         "type": "object"
       },
+      "ColumnProposal": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "confidence_label": {
+            "title": "Confidence Label",
+            "type": "string"
+          },
+          "proposed_canonical_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Canonical Id"
+          },
+          "proposed_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Role"
+          }
+        },
+        "required": [
+          "column",
+          "confidence_label"
+        ],
+        "title": "ColumnProposal",
+        "type": "object"
+      },
       "ColumnStat": {
         "properties": {
           "column": {
@@ -1937,6 +1988,27 @@
         "title": "EstimatorPowerOut",
         "type": "object"
       },
+      "EventAppendRequest": {
+        "properties": {
+          "event_type": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Event Type",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "event_type"
+        ],
+        "title": "EventAppendRequest",
+        "type": "object"
+      },
       "FeedDocument": {
         "properties": {
           "age_label": {
@@ -2075,6 +2147,58 @@
           "documents"
         ],
         "title": "FeedResponse",
+        "type": "object"
+      },
+      "FrozenResult": {
+        "description": "Par citation : la source, l'id, le query_string EXACT (pas la question\nutilisateur), la date de récupération, l'enregistrement gelé et l'annotation.",
+        "properties": {
+          "annotation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "query_string": {
+            "title": "Query String",
+            "type": "string"
+          },
+          "record": {
+            "additionalProperties": true,
+            "title": "Record",
+            "type": "object"
+          },
+          "retrieval_date": {
+            "format": "date",
+            "title": "Retrieval Date",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "id",
+          "title",
+          "query_string",
+          "retrieval_date",
+          "record"
+        ],
+        "title": "FrozenResult",
         "type": "object"
       },
       "GapPill": {
@@ -2356,6 +2480,85 @@
         "title": "JobOut",
         "type": "object"
       },
+      "LiteratureEvent": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "event_type",
+          "payload",
+          "created_at",
+          "created_by"
+        ],
+        "title": "LiteratureEvent",
+        "type": "object"
+      },
+      "LiteratureRetrieveRequest": {
+        "properties": {
+          "max_results": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "type": "integer"
+          },
+          "query": {
+            "maxLength": 400,
+            "minLength": 2,
+            "title": "Query",
+            "type": "string"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "LiteratureRetrieveRequest",
+        "type": "object"
+      },
       "LiteratureSearchRequest": {
         "properties": {
           "expand": {
@@ -2422,6 +2625,129 @@
           "documents"
         ],
         "title": "LiteratureSearchResult",
+        "type": "object"
+      },
+      "LiteratureSnapshot": {
+        "description": "Par artefact : métadonnées de provenance + résultats gelés + content_hash.\n`verified` est posé à la lecture après recalcul du hash.",
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/FrozenResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "verified": {
+            "default": true,
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "query",
+          "sources",
+          "model_version",
+          "prompt_version",
+          "results",
+          "created_at",
+          "created_by",
+          "content_hash"
+        ],
+        "title": "LiteratureSnapshot",
+        "type": "object"
+      },
+      "MapResult": {
+        "properties": {
+          "avg_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Confidence"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnProposal"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "dataset_id": {
+            "format": "uuid",
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "mapped_count": {
+            "title": "Mapped Count",
+            "type": "integer"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "mapped_count",
+          "total_count",
+          "columns"
+        ],
+        "title": "MapResult",
         "type": "object"
       },
       "MeasuredVariable": {
@@ -2778,6 +3104,96 @@
         "title": "SearchRequest",
         "type": "object"
       },
+      "SearchSession": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "created_at",
+          "updated_at",
+          "created_by"
+        ],
+        "title": "SearchSession",
+        "type": "object"
+      },
+      "SessionCreateRequest": {
+        "properties": {
+          "query": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          }
+        },
+        "title": "SessionCreateRequest",
+        "type": "object"
+      },
       "Sheet": {
         "properties": {
           "column_stats": {
@@ -3080,6 +3496,59 @@
           "created_at"
         ],
         "title": "SimulationRunOut",
+        "type": "object"
+      },
+      "SnapshotWriteRequest": {
+        "properties": {
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          },
+          "query": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/FrozenResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          }
+        },
+        "required": [
+          "query",
+          "sources",
+          "model_version",
+          "prompt_version",
+          "results"
+        ],
+        "title": "SnapshotWriteRequest",
         "type": "object"
       },
       "SourceCount": {
@@ -4204,6 +4673,320 @@
         ]
       }
     },
+    "/corpus/literature/retrieve": {
+      "post": {
+        "description": "Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.\nNe touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique\n⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel.",
+        "operationId": "literature_retrieve_corpus_literature_retrieve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiteratureRetrieveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Literature Retrieve",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/literature/sessions": {
+      "get": {
+        "operationId": "list_sessions_corpus_literature_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SearchSession"
+                  },
+                  "title": "Response List Sessions Corpus Literature Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "corpus"
+        ]
+      },
+      "post": {
+        "operationId": "create_session_corpus_literature_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Session",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/literature/sessions/{session_id}": {
+      "get": {
+        "operationId": "get_session_corpus_literature_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/literature/sessions/{session_id}/events": {
+      "post": {
+        "operationId": "append_event_corpus_literature_sessions__session_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventAppendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiteratureEvent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Append Event",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/literature/snapshots": {
+      "post": {
+        "description": "Gèle le jeu de résultats + annotations : calcule le content_hash, épingle\nmodel/prompt version, persiste. La réponse porte le hash (auto-vérifiable).",
+        "operationId": "create_snapshot_corpus_literature_snapshots_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiteratureSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Snapshot",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
+    "/corpus/literature/snapshots/{snapshot_id}": {
+      "get": {
+        "description": "Relit un snapshot et VÉRIFIE le content_hash (erreur dure si divergence).\nLecture base pure : zéro appel PubMed/CT.gov (rejeu reproductible).",
+        "operationId": "read_snapshot_corpus_literature_snapshots__snapshot_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiteratureSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Snapshot",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
     "/corpus/search": {
       "post": {
         "operationId": "search_corpus_search_post",
@@ -4781,6 +5564,49 @@
         "summary": "Run Dq",
         "tags": [
           "dq"
+        ]
+      }
+    },
+    "/datasets/{dataset_id}/map": {
+      "post": {
+        "operationId": "map_dataset_datasets__dataset_id__map_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Map Dataset",
+        "tags": [
+          "mapping"
         ]
       }
     },

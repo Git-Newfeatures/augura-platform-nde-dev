@@ -1,129 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, ArrowRight, Target, Activity, Users, CornerDownLeft, Check, Edit3 } from "lucide-react";
 import { fetchCohort, engagementGroup } from "../workspace/cohortData";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InfoBar, Tag } from "../ui/components";
+import { EmptyState } from "@/components/EmptyState";
 import InlineChatbot from "../components/InlineChatbot";
+import { useReference, normOutcomeCatalog } from "@/workspace/dataClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 2c: OUTCOME SELECTION
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Outcome metadata keyed by Supabase column name
-// Maps validation_biomarkers column → display metadata
-const OUTCOME_CATALOG = {
-  hba1c_pct: {
-    key:"hba1c", label:"HbA1c change", unit:"%", primary:true,
-    desc:"Gold-standard cardiometabolic endpoint. Widely accepted by DiGA, NICE DSP, and HAS for digital health interventions.",
-    tags:[["g","In dataset ✓"],["g","DiGA · NICE · HAS"]], verdict:"g", verdictLabel:"★ Recommended",
-  },
-  ldl_mgdl: {
-    key:"ldl", label:"LDL-C change", unit:"mg/dL", primary:true,
-    desc:"Standard lipid endpoint. Note: medication changes are an uncontrolled confounder — sensitivity analysis required.",
-    tags:[["g","In dataset ✓"],["a","Medication confounder"]], verdict:"b", verdictLabel:"Good option",
-  },
-  hs_crp_mgl: {
-    key:"crp", label:"hs-CRP change", unit:"mg/L", primary:true,
-    desc:"Inflammatory marker. High within-person variability limits precision as a primary endpoint — better as secondary.",
-    tags:[["g","In dataset ✓"],["a","High variability"]], verdict:"a", verdictLabel:"Secondary preferred",
-  },
-  glucose_mmol: {
-    key:"glucose", label:"Fasting glucose change", unit:"mmol/L", primary:true,
-    desc:"Direct diabetes risk marker. Accepted by HAS and DiGA as a primary or co-primary endpoint.",
-    tags:[["g","In dataset ✓"],["b","HAS · DiGA"]], verdict:"b", verdictLabel:"Good option",
-  },
-  bmi: {
-    key:"bmi", label:"BMI change", unit:"kg/m²", primary:false,
-    desc:"Anthropometric endpoint. Widely used as secondary in lifestyle intervention studies.",
-    tags:[["g","In dataset ✓"],["b","Secondary / co-primary"]], verdict:"a", verdictLabel:"Secondary preferred",
-  },
-  weight_kg: {
-    key:"weight", label:"Body weight change", unit:"kg", primary:false,
-    desc:"Common secondary endpoint in lifestyle and digital health studies.",
-    tags:[["g","In dataset ✓"],["b","Secondary"]], verdict:"a", verdictLabel:"Secondary preferred",
-  },
-  sbp_mmhg: {
-    key:"sbp", label:"Systolic BP change", unit:"mmHg", primary:false,
-    desc:"Cardiovascular endpoint. Suitable as co-primary for hypertension-adjacent populations.",
-    tags:[["g","In dataset ✓"],["b","Cardiovascular"]], verdict:"a", verdictLabel:"Possible",
-  },
-  tg_mgdl: {
-    key:"tg", label:"Triglycerides change", unit:"mg/dL", primary:false,
-    desc:"Lipid panel component. Typically secondary alongside LDL-C.",
-    tags:[["g","In dataset ✓"],["b","Secondary"]], verdict:"a", verdictLabel:"Secondary preferred",
-  },
-};
-
-// Hardcoded fallback used only when no Supabase data is available
-const FALLBACK_OUTCOMES = [
-  { key:"hba1c", label:"HbA1c change", unit:"%", primary:true,
-    desc:"Gold-standard cardiometabolic endpoint. Accepted by DiGA, NICE DSP, and HAS.",
-    tags:[["b","Primary endpoint"],["g","DiGA · NICE · HAS"]], verdict:"g", verdictLabel:"★ Recommended", available:true },
-  { key:"ldl",   label:"LDL-C change", unit:"mg/dL", primary:true,
-    desc:"Standard lipid endpoint.",
-    tags:[["b","Common endpoint"],["a","Medication confounder"]], verdict:"b", verdictLabel:"Good option", available:true },
-  { key:"crp",   label:"hs-CRP change", unit:"mg/L", primary:false,
-    desc:"Inflammatory marker — secondary preferred.",
-    tags:[["b","Secondary preferred"]], verdict:"a", verdictLabel:"Secondary preferred", available:true },
-];
-
-// Per-endpoint display metadata. Used when the project's endpoints don't have
-// Supabase biomarker rows (e.g. Bloomlife), so we can still surface domain-relevant
-// candidate outcomes instead of falling back to Lucis cardiometabolic ones.
-const ENDPOINT_METADATA = {
-  hba1c:                 { label:"HbA1c change",          unit:"%",      desc:"Gold-standard cardiometabolic endpoint. Accepted by DiGA, NICE DSP, and HAS." },
-  ldl:                   { label:"LDL-C change",          unit:"mg/dL",  desc:"Standard lipid endpoint. Medication changes are an uncontrolled confounder." },
-  crp:                   { label:"hs-CRP change",         unit:"mg/L",   desc:"Inflammatory marker — high within-person variability." },
-  contraction_frequency: { label:"Uterine contraction frequency", unit:"per hr", desc:"Primary signal for preterm labor surveillance. Continuously measured by Bloomlife sensor." },
-  maternal_hr:           { label:"Maternal heart rate",    unit:"bpm",    desc:"Maternal vital sign — supports detection of cardiovascular complications." },
-  fetal_movement:        { label:"Fetal movement",         unit:"events", desc:"Fetal wellbeing indicator. Combined with FHR for surveillance scoring." },
-};
-
-function buildOutcomesFromEndpoints(endpoints) {
-  if (!endpoints?.length) return FALLBACK_OUTCOMES;
-  return endpoints.map((key, i) => {
-    const meta = ENDPOINT_METADATA[key] ?? { label: key, unit: "", desc: "Project-defined endpoint." };
-    return {
-      key, label: meta.label, unit: meta.unit, primary: true,
-      desc: meta.desc,
-      tags: i === 0 ? [["g","Primary endpoint"]] : [["b","Candidate endpoint"]],
-      verdict: i === 0 ? "g" : "b",
-      verdictLabel: i === 0 ? "★ Recommended" : "Good option",
-      available: true,
-    };
-  });
-}
-
-
-const EXPOSURE_OPTIONS = [
-  "Top quartile engagement score (Q4)",
-  "High engagement (≥3 sessions/week)",
-  "Any platform use vs none",
-];
-
-const POPULATION_OPTIONS = [
-  { group:"Condition",  items:["Prediabetic (HbA1c 5.7–6.4)","T2D (HbA1c ≥6.5)","Overweight (BMI ≥25)"] },
-  { group:"Country",    items:["France","UK","Ireland","Portugal"] },
-  { group:"Age",        items:["Adults (18–65)","Older adults (≥65)"] },
-];
-const D1_OUTCOME_MAP = {
-  hba1c:   "HbA1c % change at 12 months",
-  ldl:     "LDL-C mg/dL change at 12 months",
-  crp:     "hs-CRP mg/L change at 12 months",
-  glucose: "Fasting glucose change at 12 months",
-  bmi:     "BMI change at 12 months",
-  weight:  "Body weight change at 12 months",
-  sbp:     "Systolic BP change at 12 months",
-  tg:      "Triglycerides change at 12 months",
-};
-
-// Per-element "agent rationale" lines, keyed by element id (P / A / Y)
-const ELEMENT_RATIONALE = {
-  exposure:   "Proposed from your dataset's engagement_score column (0% missing) + the product brief's mechanism of action (adherence to recommendations → metabolic improvement).",
-  outcome:    "Proposed from your dataset's hba1c_t12 column + the prediabetes inclusion window, cross-checked against the DiGA · NICE · HAS benchmarking corpus.",
-  population: "Proposed from the eligible cohort after applying the HbA1c eligibility filter and ≥12-month follow-up criterion, matched to the product brief's target population.",
-};
 
 // Multi-select pill toggle helper
 function MultiPill({ options, selected, onToggle }) {
@@ -155,10 +42,12 @@ function ElementHeader({ icon: Icon, label, accent, rationale, editing, onEdit, 
           <Icon size={15} style={{ color: accent }} />
           {label}
         </div>
-        <div className="flex items-start gap-1.5 text-[11px] italic leading-snug text-muted-foreground">
-          <span className="not-italic" aria-hidden>🤖</span>
-          <span>{rationale}</span>
-        </div>
+        {rationale && (
+          <div className="flex items-start gap-1.5 text-[11px] italic leading-snug text-muted-foreground">
+            <span className="not-italic" aria-hidden>🤖</span>
+            <span>{rationale}</span>
+          </div>
+        )}
       </div>
       <div className="flex flex-shrink-0 items-center gap-1.5">
         <button type="button" onClick={onConfirm}
@@ -182,9 +71,14 @@ function ElementHeader({ icon: Icon, label, accent, rationale, editing, onEdit, 
   );
 }
 
-export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, selectedCohort = '', cqExposure, setCqExposure, cqPopulation, setCqPopulation, partnerLabel = 'Partner', hasEngagementCol = true, projectEndpoints = [], chatProps = {}, onNext, onBack }) {
+export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, selectedCohort = '', cqExposure, setCqExposure, cqPopulation, setCqPopulation, partnerLabel = 'Partner', hasEngagementCol = true, chatProps = {}, onNext, onBack }) {
   const [sel, setSel]         = useState(selectedOutcome ?? "hba1c");
-  const [liveStats, setLiveStats] = useState(null);
+  const [cohort, setCohort]   = useState(null); // { name, members[], biomarkers[] } | null
+
+  // ── Outcomes catalog (real-only) ────────────────────────────────────────────
+  // Display metadata comes from /reference/outcomes, keyed by Supabase column code.
+  const { data: outcomeRows, loading: outcomesLoading } = useReference('outcomes');
+  const OUTCOME_CATALOG = useMemo(() => normOutcomeCatalog(outcomeRows), [outcomeRows]);
 
   // ── Per-element agent-proposes → Confirm / Edit affordance ──────────────────
   // Each element starts CONFIRMED (agent proposal accepted). Clicking Edit reveals
@@ -200,30 +94,34 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
     setCqPopulation(prev => prev.includes(item) ? prev.filter(p => p !== item) : [...prev, item]);
   }
 
-  // Build outcome list from Supabase data — keys present in liveStats are "in dataset"
-  // Falls back to FALLBACK_OUTCOMES until Supabase query resolves
-  const OUTCOMES = liveStats
-    ? (() => {
-        // Columns queried from validation_biomarkers, in desired display order
-        const COL_ORDER = ["hba1c_pct","ldl_mgdl","hs_crp_mgl","glucose_mmol","bmi","weight_kg","sbp_mmhg","tg_mgdl"];
-        const statKey   = { hba1c_pct:"hba1c", ldl_mgdl:"ldl", hs_crp_mgl:"crp", glucose_mmol:"glucose",
-                             bmi:"bmi", weight_kg:"weight", sbp_mmhg:"sbp", tg_mgdl:"tg" };
-        const found = COL_ORDER
-          .filter(col => OUTCOME_CATALOG[col] && liveStats[statKey[col]] != null)
-          .map(col => ({ ...OUTCOME_CATALOG[col], available: true }));
-        // Add composite if all three main biomarkers present
-        const keys = found.map(f => f.key);
-        if (["hba1c","ldl","crp"].every(k => keys.includes(k))) {
-          found.push({
-            key:"composite", label:"Composite metabolic score", unit:"", primary:true,
-            desc:"Composite of HbA1c + LDL-C + hs-CRP. Stronger HTA narrative. Requires pre-specified threshold.",
-            tags:[["g","In dataset ✓"],["b","EUnetHTA aligned"],["a","Complex definition"]],
-            verdict:"a", verdictLabel:"Possible", available:true,
-          });
-        }
-        return found.length > 0 ? found : buildOutcomesFromEndpoints(projectEndpoints);
-      })()
-    : buildOutcomesFromEndpoints(projectEndpoints);
+  // Fetch the live cohort once (members + biomarkers) for availability + facets.
+  useEffect(() => {
+    let alive = true;
+    fetchCohort(selectedCohort).then((c) => { if (alive) setCohort(c); });
+    return () => { alive = false; };
+  }, [selectedCohort]);
+
+  // outcomes = catalog entries whose column is present in the cohort's biomarkers.
+  // Biomarker rows are wide (one row per member × timepoint): the biomarker columns
+  // are object keys (e.g. `hba1c_pct`), not a `name`/`column`/`code` field — so a
+  // catalog code is "present" when any biomarker row carries it with a non-null value.
+  const availableOutcomes = useMemo(() => {
+    const present = new Set();
+    for (const b of cohort?.biomarkers ?? []) {
+      for (const col of Object.keys(OUTCOME_CATALOG)) {
+        if (b?.[col] != null) present.add(col);
+      }
+    }
+    return Object.entries(OUTCOME_CATALOG)
+      .filter(([col]) => present.has(col))
+      .map(([, meta]) => ({
+        ...meta,
+        tags: [['g', 'In dataset ✓'], ...(meta.tags ?? [])],
+        available: true,
+      }));
+  }, [OUTCOME_CATALOG, cohort]);
+
+  const OUTCOMES = availableOutcomes;
 
   // If current sel is not in the loaded outcome list, fall back to first available
   const selected = OUTCOMES.find(o=>o.key===sel) ?? OUTCOMES[0];
@@ -235,48 +133,61 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
   // Sync lifted state whenever local selection changes
   useEffect(() => { setSelectedOutcome?.(sel); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    let alive = true;
-    fetchCohort(selectedCohort).then(({ members, biomarkers, name }) => {
-      if (!alive || !members.length || !biomarkers.length) return;
+  // ── Exposure facets — derived from the cohort's engagement groups ───────────
+  const EXPOSURE_OPTIONS = useMemo(() => {
+    const groups = new Set((cohort?.members ?? []).map(engagementGroup).filter(Boolean));
+    const labelFor = { high: 'High engagement', medium: 'Medium engagement', low: 'Low engagement' };
+    return [...groups].sort().map((g) => labelFor[g] ?? g);
+  }, [cohort]);
 
-      const groupMap = Object.fromEntries(members.map(m => [m.member_id, engagementGroup(m)]));
-      const t0map    = Object.fromEntries(
-        biomarkers.filter(b => b.timepoint_months === 0).map(b => [b.member_id, b])
-      );
-      const t12rows  = biomarkers.filter(b => b.timepoint_months === 12);
+  // ── Population facets — derived from whatever member fields exist ────────────
+  const POPULATION_OPTIONS = useMemo(() => {
+    const members = cohort?.members ?? [];
+    const distinct = (field) =>
+      [...new Set(members.map((m) => m?.[field]).filter((v) => v != null && v !== ''))];
+    const out = [];
+    const countries = distinct('country');
+    if (countries.length) out.push({ group: 'Country', items: countries.sort() });
+    const ages = distinct('age');
+    if (ages.length) out.push({ group: 'Age', items: ['Adults (18–65)', 'Older adults (≥65)']
+      .filter((bucket) => ages.some((a) => (bucket.startsWith('Older') ? a >= 65 : a < 65))) });
+    return out;
+  }, [cohort]);
 
-      function computeEffect(col) {
-        const out = {};
-        // clés d'affichage capitalisées (contrat inchangé) ↔ groupe backend minuscule
-        [["High", "high"], ["Medium", "medium"], ["Low", "low"]].forEach(([outKey, grp]) => {
-          const matched = t12rows.filter(b =>
-            groupMap[b.member_id] === grp &&
-            t0map[b.member_id]?.[col] != null &&
-            b[col] != null
-          );
-          if (matched.length) {
-            const delta = matched.reduce((s, b) => s + (b[col] - t0map[b.member_id][col]), 0) / matched.length;
-            out[outKey] = Math.round(delta * 100) / 100;
-          }
-        });
-        out.n = new Set(t12rows.filter(b => b[col] != null).map(b => b.member_id)).size;
-        return out;
-      }
+  // ── D1 outcome label — catalog label + follow-up window ─────────────────────
+  const followupLabel = (m) => `${m.label} at 12 months`;
+  const d1Label = (shortKey) => {
+    const meta = Object.values(OUTCOME_CATALOG).find((o) => o.key === shortKey);
+    return meta ? followupLabel(meta) : shortKey;
+  };
 
-      setLiveStats({
-        totalN:     members.length,
-        cohortName: name,
-        hba1c:      computeEffect("hba1c_pct"),
-        ldl:        computeEffect("ldl_mgdl"),
-        crp:        computeEffect("hs_crp_mgl"),
-      });
-    });
-    return () => { alive = false; };
-  }, [selectedCohort]);
+  // Per-element agent rationale, surfaced from real agent output if provided.
+  const rationale = chatProps?.rationale ?? {};
 
-  const cqOutcome  = D1_OUTCOME_MAP[sel] || "HbA1c % change at 12 months";
+  const cqOutcome  = selected ? d1Label(selected.key) : d1Label(sel);
   const cqPopStr   = cqPopulation.length ? cqPopulation.join(" · ") : "—";
+
+  // Loading affordance while the outcomes catalog resolves.
+  if (outcomesLoading && OUTCOMES.length === 0) {
+    return (
+      <EmptyState
+        icon={Target}
+        title="Loading outcomes…"
+        subtitle="Fetching the candidate outcome catalog from the Augura reference catalog."
+      />
+    );
+  }
+
+  // No catalog entry is present in this cohort's biomarkers — nothing to select.
+  if (!outcomesLoading && OUTCOMES.length === 0) {
+    return (
+      <EmptyState
+        icon={Target}
+        title="No outcomes available for this cohort"
+        subtitle="None of the reference outcome catalog's biomarkers are present in this cohort's data."
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -302,7 +213,7 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
         <Card className="gap-0 p-5">
           <ElementHeader
             icon={Activity} label="Exposure (A)" accent="#0F6E56"
-            rationale={ELEMENT_RATIONALE.exposure}
+            rationale={rationale.exposure}
             editing={editing.exposure}
             onEdit={() => startEdit("exposure")}
             onConfirm={() => confirmEl("exposure")}
@@ -356,7 +267,7 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
         <Card className="gap-0 p-5">
           <ElementHeader
             icon={Target} label="Outcome (Y) — Primary" accent="#0C447C"
-            rationale={ELEMENT_RATIONALE.outcome}
+            rationale={rationale.outcome}
             editing={editing.outcome}
             onEdit={() => startEdit("outcome")}
             onConfirm={() => confirmEl("outcome")}
@@ -430,7 +341,7 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
       <Card className="gap-0 p-5">
         <ElementHeader
           icon={Users} label="Population (P)" accent="#854F0B"
-          rationale={ELEMENT_RATIONALE.population}
+          rationale={rationale.population}
           editing={editing.population}
           onEdit={() => startEdit("population")}
           onConfirm={() => confirmEl("population")}

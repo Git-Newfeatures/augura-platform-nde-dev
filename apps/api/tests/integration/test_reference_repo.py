@@ -95,7 +95,7 @@ async def test_reference_tables_are_read_only_for_tenant(
         async with sm() as session, session.begin():
             await _scope(session, tenant, USER)
             await session.execute(
-                text(
-                    "insert into cesl_sources (code, label) values (:c, :l)"
-                ).bindparams(c="rogue-" + uuid4().hex[:6], l="nope")
+                text("insert into cesl_sources (code, label) values (:c, :l)").bindparams(
+                    c="rogue-" + uuid4().hex[:6], l="nope"
+                )
             )

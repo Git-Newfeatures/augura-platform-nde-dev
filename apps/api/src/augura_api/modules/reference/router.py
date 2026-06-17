@@ -15,9 +15,7 @@ def _service(session: SessionDep) -> ReferenceService:
 
 
 @router.get("/tenant", response_model=schemas.TenantProfileOut)
-async def tenant(
-    tenant: CurrentTenantDep, session: SessionDep
-) -> schemas.TenantProfileOut:
+async def tenant(tenant: CurrentTenantDep, session: SessionDep) -> schemas.TenantProfileOut:
     return await _service(session).tenant_profile(tenant)
 
 

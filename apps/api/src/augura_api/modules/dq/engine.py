@@ -30,14 +30,16 @@ def run_dq(
         headers: list[str] = sheet["headers"]
         rows: list[list[str]] = sheet["rows"]
         table_cols: list[dict[str, Any]] = []
+        col_data: list[dict[str, Any]] = []
         for idx, header in enumerate(headers):
             values: list[str | None] = [r[idx] if idx < len(r) else "" for r in rows]
             profile = profile_column(header, values)
-            ctx = {"table": sheet["name"], "column": header, "profile": profile}
+            ctx = {"table": sheet["name"], "column": header, "profile": profile, "values": values}
             col_findings: list[dict[str, Any]] = []
             for check in (c for c in REGISTRY if c["scope"] == "column"):
                 col_findings.extend(evaluate_check(check, ctx, audit))
             all_findings.extend(col_findings)
+            col_data.append({"column": header, "profile": profile, "values": values})
             outliers = next(
                 (f["affected_count"] for f in col_findings if f["check_id"] == "DQ_RANGE_002"), 0
             )
@@ -58,13 +60,19 @@ def run_dq(
                     "findings": col_findings,
                 }
             )
+        # Table scope
+        table_ctx = {"table": sheet["name"], "columns": col_data}
+        table_findings: list[dict[str, Any]] = []
+        for check in (c for c in REGISTRY if c["scope"] == "table"):
+            table_findings.extend(evaluate_check(check, table_ctx, audit))
+        all_findings.extend(table_findings)
         tables.append(
             {
                 "table_label": sheet["name"],
                 "grain": None,
                 "columns": table_cols,
                 "cross_column_findings": [],
-                "table_findings": [],
+                "table_findings": table_findings,
             }
         )
 
@@ -84,7 +92,7 @@ def run_dq(
             "requires_resolution": hard_total > 0,
         },
         "check_plan": {
-            "by_scope": {"file": 1, "column": 3},
+            "by_scope": {"file": 2, "column": 5, "table": 2},
             "execution": {"total_registered": len(REGISTRY), "checks": list(audit.values())},
         },
         "tables": tables,

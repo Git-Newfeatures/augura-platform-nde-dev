@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowRight, Target, Activity, Users, CornerDownLeft, Check, Edit3, GitCompare } from "lucide-react";
+import { ArrowLeft, ArrowRight, Target, Activity, Users, CornerDownLeft, Check, Edit3 } from "lucide-react";
 import { fetchCohort, engagementGroup } from "../workspace/cohortData";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -118,25 +118,11 @@ const D1_OUTCOME_MAP = {
   tg:      "Triglycerides change at 12 months",
 };
 
-// Contrast / comparator options — the comparison group definition (demo-only)
-const CONTRAST_OPTIONS = [
-  { value: "Low engagement (<30) with the same platform",
-    label: "Low engagement Lucis users (<30)",
-    sub: "Agent default · N=158 · same tool, lower use intensity · no external control needed" },
-  { value: "External comparator — standard care, no digital tool",
-    label: "External comparator (standard care)",
-    sub: "Stronger claim · requires careful matching · reference dataset available" },
-  { value: "Pre-post comparison — same users before vs after platform access",
-    label: "Pre-post comparison (before vs after access)",
-    sub: "Requires baseline period data · susceptible to secular trends" },
-];
-
-// Per-element "agent rationale" lines, keyed by element id (P / A / Y / C)
+// Per-element "agent rationale" lines, keyed by element id (P / A / Y)
 const ELEMENT_RATIONALE = {
   exposure:   "Proposed from your dataset's engagement_score column (0% missing) + the product brief's mechanism of action (adherence to recommendations → metabolic improvement).",
   outcome:    "Proposed from your dataset's hba1c_t12 column + the prediabetes inclusion window, cross-checked against the DiGA · NICE · HAS benchmarking corpus.",
   population: "Proposed from the eligible cohort after applying the HbA1c eligibility filter and ≥12-month follow-up criterion, matched to the product brief's target population.",
-  contrast:   "Proposed from your dataset structure: no unexposed control group is present — all users have platform access, so low-engagement users are the most defensible natural comparator.",
 };
 
 // Multi-select pill toggle helper
@@ -200,18 +186,12 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
   const [sel, setSel]         = useState(selectedOutcome ?? "hba1c");
   const [liveStats, setLiveStats] = useState(null);
 
-  // ── Contrast / comparator (DEMO-ONLY local state) ──────────────────────────
-  // The comparison-group definition. Does not feed downstream — surfaced in the
-  // live causal-question banner and as a confirmable agent-proposed element.
-  const [cqContrast, setCqContrast]       = useState(CONTRAST_OPTIONS[0].value);
-  const [contrastCustom, setContrastCustom] = useState("");
-
   // ── Per-element agent-proposes → Confirm / Edit affordance ──────────────────
   // Each element starts CONFIRMED (agent proposal accepted). Clicking Edit reveals
   // the existing selector/inputs for that element; Confirm collapses back to the
   // read-only summary. Visibility-only — the underlying handlers are untouched.
   const [editing, setEditing] = useState({
-    exposure: false, outcome: false, population: false, contrast: false,
+    exposure: false, outcome: false, population: false,
   });
   const startEdit  = (k) => setEditing(prev => ({ ...prev, [k]: true }));
   const confirmEl  = (k) => setEditing(prev => ({ ...prev, [k]: false }));
@@ -297,7 +277,6 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
 
   const cqOutcome  = D1_OUTCOME_MAP[sel] || "HbA1c % change at 12 months";
   const cqPopStr   = cqPopulation.length ? cqPopulation.join(" · ") : "—";
-  const cqContrastStr = (contrastCustom.trim() || cqContrast || "—");
 
   return (
     <div className="flex flex-col gap-4">
@@ -313,8 +292,7 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
         <div className="text-[17px] font-medium italic leading-[1.65] text-foreground">
           "Does <strong className="not-italic text-primary">{cqExposure}</strong> cause
           {" "}a reduction in <strong className="not-italic text-primary">{cqOutcome}</strong> in
-          {" "}<strong className="not-italic text-muted-foreground">{cqPopStr}</strong>,
-          {" "}compared to <strong className="not-italic" style={{ color: "#3C3489" }}>{cqContrastStr}</strong>?"
+          {" "}<strong className="not-italic text-muted-foreground">{cqPopStr}</strong>?"
         </div>
       </Card>
 
@@ -501,65 +479,6 @@ export default function OutcomeSelection({ selectedOutcome, setSelectedOutcome, 
           <div className="mt-2 text-[12px] text-muted-foreground">Select one or more population criteria above</div>
         )}
         </>
-        )}
-      </Card>
-
-      {/* ── Contrast / comparator (C) — full width, DEMO-ONLY ─────────────── */}
-      <Card className="gap-0 p-5">
-        <ElementHeader
-          icon={GitCompare} label="Contrast / comparator" accent="#3C3489"
-          rationale={ELEMENT_RATIONALE.contrast}
-          editing={editing.contrast}
-          onEdit={() => startEdit("contrast")}
-          onConfirm={() => confirmEl("contrast")}
-        />
-
-        {/* Confirmed summary (read-only) — shown when NOT editing */}
-        {!editing.contrast && (
-          <div className="flex items-start gap-2 rounded-lg border px-3.5 py-2.5"
-            style={{ borderColor: "#AFA9EC", background: "#EEEDFE80" }}>
-            <Check size={14} className="mt-0.5 flex-shrink-0" style={{ color: "#3C3489" }} />
-            <div className="flex-1">
-              <div className="text-[12.5px] font-medium text-foreground">{cqContrastStr}</div>
-              <div className="mt-0.5 text-[11px] font-medium" style={{ color: "#3C3489" }}>Confirmed comparison group</div>
-            </div>
-          </div>
-        )}
-
-        {/* Editable control — revealed by Edit. Demo-only; does not feed downstream. */}
-        {editing.contrast && (
-          <div className="flex flex-col gap-2">
-            {CONTRAST_OPTIONS.map(o => {
-              const active = !contrastCustom.trim() && cqContrast === o.value;
-              return (
-                <div key={o.value}
-                  onClick={() => { setCqContrast(o.value); setContrastCustom(""); }}
-                  className={`cursor-pointer rounded-lg border px-3.5 py-2.5 transition-colors ${
-                    active ? "bg-secondary/60" : "border-border hover:border-primary/40"
-                  }`}
-                  style={active ? { borderColor: "#AFA9EC", background: "#EEEDFE80" } : undefined}>
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full border-[1.5px]"
-                      style={{ borderColor: active ? "#3C3489" : "#d3d1c7", background: active ? "#3C3489" : "transparent" }}>
-                      {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                    </span>
-                    <div>
-                      <div className={`text-[12.5px] font-medium ${active ? "text-foreground" : "text-foreground/80"}`}>{o.label}</div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">{o.sub}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {/* Custom comparator input */}
-            <div className="mt-1.5">
-              <div className="mb-1.5 text-[12px] text-muted-foreground">Or describe a custom comparator</div>
-              <input type="text" value={contrastCustom}
-                onChange={(e) => setContrastCustom(e.target.value)}
-                placeholder="e.g. Matched non-users from a national registry"
-                className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-[12.5px] text-foreground outline-none focus:border-primary/40" />
-            </div>
-          </div>
         )}
       </Card>
 

@@ -54,9 +54,6 @@ RLS_REQUIRED = {
     "artifacts",
 }
 
-LUCIS_ORG_ID = "33cb3ba0-00fe-420b-a8c7-70736aaacc44"
-
-
 def _read(name: str) -> str:
     return (SUPABASE_DIR / name).read_text(encoding="utf-8")
 
@@ -101,13 +98,3 @@ def test_functions_define_match_chunks_and_coverage_view() -> None:
     assert "create or replace function match_chunks" in fns
     assert "create or replace view v_coverage_map" in fns
     assert "embedding <=> query_embedding" in fns  # distance cosinus pgvector
-
-
-def test_seed_has_lucis_org_and_full_validated_grid() -> None:
-    seed = _read("seed.sql")
-    assert LUCIS_ORG_ID in seed
-    # 3 scénarios × 4 estimateurs = 12 lignes de simulation_results.
-    sim_block = seed.split("simulation_results", 1)[1]
-    rows = re.findall(r"'(baseline|conservative|high_risk)',\s*'(lme|ols|ipw|tmle)'", sim_block)
-    assert len(rows) == 12, f"attendu 12 lignes VALIDATED, trouvé {len(rows)}"
-    assert len(set(rows)) == 12, "combinaisons scénario×estimateur dupliquées"

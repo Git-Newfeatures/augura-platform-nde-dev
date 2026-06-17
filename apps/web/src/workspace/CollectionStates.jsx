@@ -1,4 +1,4 @@
-// Shared loading / empty rendering for demo-gated workspace collections.
+// Shared loading / empty rendering for workspace collections.
 export { EmptyState } from '@/components/EmptyState'
 
 export function Loading({ label = 'Loading…' }) {

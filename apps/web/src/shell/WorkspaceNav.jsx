@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { WORKSPACE_SECTIONS } from './sections'
 import { cn } from '@/lib/utils'
-import { isMockEnabled } from '@/mocks/mockMode'
 
 export function WorkspaceNav() {
-  // Counts are demo fixtures — only meaningful when the Demo-data toggle is ON.
-  const showCounts = isMockEnabled()
   // When the tab strip overflows (tablet), show a right-edge fade so the clipped
   // tab reads as "scroll for more" instead of looking broken.
   const ref = useRef(null)
@@ -44,11 +41,6 @@ export function WorkspaceNav() {
           >
             <Icon className="h-3.5 w-3.5" />
             <span>{s.label}</span>
-            {showCounts && s.count != null && (
-              <span className="ml-0.5 rounded-full border border-border bg-muted px-1.5 text-[9.5px] font-semibold text-muted-foreground">
-                {s.count}
-              </span>
-            )}
           </NavLink>
         )
       })}

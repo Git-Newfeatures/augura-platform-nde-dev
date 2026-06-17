@@ -1,27 +1,19 @@
-import { useState } from 'react'
-import { Settings2, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Settings2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { useCollection } from '@/workspace/dataClient'
 import { useStudyNav } from '@/workspace/useStudyNav'
-import { AddItemModal } from '@/workspace/AddItemModal'
-import { addLocalItem, localId } from '@/workspace/localData'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 
 export function RunsPage() {
   const { data: runs, loading } = useCollection('runs')
-  const { data: studies } = useCollection('studies')
   const { openStudy } = useStudyNav()
-  const [adding, setAdding] = useState(false)
-  const studyOptions = studies.map((s) => s.name)
   return (
     <WorkspacePage
       eyebrow="Compute"
       title="Audit"
       sub="Simulation & analysis runs across all your studies"
-      action={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> New run</Button>}
     >
       {loading ? (
         <Loading />
@@ -30,7 +22,6 @@ export function RunsPage() {
           icon={Settings2}
           title="No runs yet"
           subtitle="Simulation and profiling runs from your studies will appear here."
-          cta={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> New run</Button>}
         />
       ) : (
         <Card className="gap-0 px-[18px] py-1">
@@ -82,33 +73,6 @@ export function RunsPage() {
             </div>
           ))}
         </Card>
-      )}
-      {adding && (
-        <AddItemModal
-          title="New run"
-          submitLabel="Add run"
-          subtitle="Record a simulation or analysis run."
-          fields={[
-            { key: 'study', label: 'Study', type: 'select', options: studyOptions, required: true },
-            { key: 'kind', label: 'Run type', placeholder: 'e.g. Power simulation', default: 'Power simulation' },
-            { key: 'estimator', label: 'Estimator', placeholder: 'e.g. LME · ATT' },
-            { key: 'mode', label: 'Mode', type: 'select', options: ['LIVE', 'VALIDATED'] },
-          ]}
-          onClose={() => setAdding(false)}
-          onSave={(f) => {
-            addLocalItem('runs', {
-              id: localId('run'),
-              study: f.study,
-              kind: f.kind || 'Simulation',
-              estimator: f.estimator || '—',
-              mode: f.mode,
-              power: 0.8,
-              state: 'done',
-              when: 'just now',
-            })
-            setAdding(false)
-          }}
-        />
       )}
     </WorkspacePage>
   )

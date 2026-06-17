@@ -17,9 +17,7 @@ class ErrorBoundary extends Component {
   }
 }
 import { useParams, useNavigate } from "react-router-dom";
-import { PROJECT_DEFAULTS, FALLBACK_PROJECT_ID, BLANK_DEFAULTS } from "./data/projectDefaults";
-import { getNewStudy } from "./workspace/newStudies";
-import { isMockEnabled } from "./mocks/mockMode";
+import { FALLBACK_PROJECT_ID, BLANK_DEFAULTS } from "./data/projectDefaults";
 import SimulationEngine from "./SimulationEngine";
 
 import ProfilingAssistant     from "./views/ProfilingAssistant";
@@ -65,13 +63,9 @@ export default function LucisApp() {
   const projectId = params.id ?? FALLBACK_PROJECT_ID;
   const splat = params["*"] || "";
   const navigate = useNavigate();
-  const createdMeta = getNewStudy(projectId);
-  const defaults = PROJECT_DEFAULTS[projectId] ?? {
-    ...BLANK_DEFAULTS,
-    displayName: createdMeta?.name || BLANK_DEFAULTS.displayName,
-    partnerLabel: createdMeta?.name || BLANK_DEFAULTS.partnerLabel,
-    tagline: createdMeta?.tagline || BLANK_DEFAULTS.tagline,
-  };
+  // Studies render with neutral defaults; real per-study metadata should be
+  // sourced from the backend study record once that endpoint is wired.
+  const defaults = BLANK_DEFAULTS;
   const SS_KEY = `augura_session_v3_${projectId}`;
   const load = (key, fallback) => ssLoad(key, fallback, SS_KEY);
 
@@ -96,12 +90,12 @@ export default function LucisApp() {
   const [lockedEstimator, setLockedEstimator] = useState(() => load("lockedEstimator", null));
   const [simResults,      setSimResults]      = useState(() => load("simResults", null));
   const [simLoading, setSimLoading] = useState(false);
-  const [selectedOutcome, setSelectedOutcome] = useState(() => load("selectedOutcome", defaults.endpoints?.[0] ?? "hba1c"));
+  const [selectedOutcome, setSelectedOutcome] = useState(() => load("selectedOutcome", defaults.endpoints?.[0] ?? ""));
   const [selectedCohort,   setSelectedCohort]   = useState(() => load("selectedCohort", defaults.defaultCohort));
   const [uploadedRowCount, setUploadedRowCount] = useState(() => load("uploadedRowCount", null));
   const [uploadedData,     setUploadedData]     = useState(() => load("uploadedData", null));
   const [dagCache, setDagCache] = useState(() => load("dagCache", null));
-  const [cqExposure, setCqExposure] = useState(() => load("cqExposure", defaults.cqExposure ?? "High engagement"));
+  const [cqExposure, setCqExposure] = useState(() => load("cqExposure", defaults.cqExposure ?? ""));
   const [cqPopulation, setCqPopulation] = useState(() => load("cqPopulation", defaults.cqPopulation ?? []));
   // Never restore "running" state — if user refreshed mid-run, reset to input
   const [agentStep, setAgentStep] = useState(() => { const s = load("agentStep", "input"); return s === "running" ? "input" : s; });
@@ -150,11 +144,10 @@ export default function LucisApp() {
       .catch(() => {});
   }, []);
 
-  // Derive clientDomains from fetched CESL profile; fall back to Lucis defaults
-  // while fetch is in flight or if tenant row is missing
+  // Clinical domains come from the fetched tenant CESL profile; empty until it loads
+  // (or if the tenant has no profile) — no hardcoded partner defaults.
   const clientDomains =
-    tenantProfile?.cesl_profile?.clinical_domain ??
-    ['cardiometabolic', 'preventive_health', 'patient_monitoring'];
+    tenantProfile?.cesl_profile?.clinical_domain ?? [];
 
   const clientEvidenceTypes =
     tenantProfile?.cesl_profile?.evidence_type ?? [];
@@ -210,28 +203,6 @@ export default function LucisApp() {
       .filter(([, d]) => d.user_decision && d.user_decision !== "pending" && d.final_role !== "unused")
       .map(([key, d]) => ({ column: key.split("::")[1], role: d.final_role, canonical_id: d.final_canonical_id || null }));
 
-    // Demo fallback: the pre-populated Lucis study lands at step 4 (Causal model)
-    // without the user walking 1b, so variableMappings is empty. Seed the known
-    // cohort variables so DAG coverage + gap detection reflect a real dataset
-    // instead of flagging every confounder as "not in dataset".
-    if (confirmed.length === 0 && isMockEnabled()) {
-      return {
-        measuredConfounders:   ["age", "sex", "bmi", "hba1c_baseline"],
-        unmeasuredConfounders: [],
-        mediators:             ["rec_adherence_pct"],
-        effectModifiers:       [],
-        exposureComponents:    ["logins_per_month", "repeat_test_flag"],
-        exposures:             ["engagement_score"],
-        outcomes: [
-          { column: "hba1c_12m", canonical_id: "hba1c_12m" },
-          { column: "ldl_12m",   canonical_id: "ldl_12m" },
-          { column: "crp_12m",   canonical_id: "crp_12m" },
-        ],
-        primaryExposure:  "engagement_score",
-        datasetQuestions: [{ question_code: "panel_structure", answer: "yes" }],
-      };
-    }
-
     return {
       measuredConfounders:   confirmed.filter(v => v.role === "measured_confounder").map(v => v.column),
       unmeasuredConfounders: confirmed.filter(v => v.role === "unmeasured_confounder").map(v => v.column),
@@ -261,14 +232,11 @@ export default function LucisApp() {
 
   // Guard: results-stage views need a completed simulation to render. Deep-linking
   // to them without simResults bounces to the Overview. Upstream steps render their
-  // own initial/empty state, so they stay freely navigable (incl. from the Overview
-  // map, whose curated demo states don't carry live workflow gating).
+  // own initial/empty state, so they stay freely navigable.
   useEffect(() => {
     if (view === "cockpit") return;
     const needsSim = ["results", "sensitivity", "report", "monitoring"].includes(view);
-    // In demo mode every step is walkable, so don't bounce results-stage views —
-    // they render with their own demo fallbacks when no simulation has been run.
-    if (needsSim && !simResults && !isMockEnabled()) {
+    if (needsSim && !simResults) {
       navigate(`/studies/${projectId}`, { replace: true });
     }
   }, [view, simResults]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -507,7 +475,7 @@ SOURCE COUNTS:
             onBack={() => go("assistant")}
             onRunProfiling={() => { setAgentStep("input"); setPendingRunToken(t => t + 1); go("profiling_run"); }}
           />}
-          {view==="profiling_run" && <ProfilingRun steps={agentSteps} agentStep={agentStep} e1Profile={e1Profile} product={product} users={users} outcome={outcome} onViewProfile={()=>go("profile")} profileReady={profileReady} chatProps={chatProps} onDevSkip={isMockEnabled() ? onDone : null} clientDomains={clientDomains} clientEvidenceTypes={clientEvidenceTypes} lastRunInputs={lastRunInputs} onReRun={() => { setAgentStep("input"); setPendingRunToken(t => t + 1); go("profiling_run"); }} agentSources={agentSources} />}
+          {view==="profiling_run" && <ProfilingRun steps={agentSteps} agentStep={agentStep} e1Profile={e1Profile} product={product} users={users} outcome={outcome} onViewProfile={()=>go("profile")} profileReady={profileReady} chatProps={chatProps} clientDomains={clientDomains} clientEvidenceTypes={clientEvidenceTypes} lastRunInputs={lastRunInputs} onReRun={() => { setAgentStep("input"); setPendingRunToken(t => t + 1); go("profiling_run"); }} agentSources={agentSources} />}
           {view==="profile"     && <ProductProfile     onNext={()=>{ completeTab("profile");    go("outcomes");    }} e1Profile={e1Profile} product={product} users={users} outcome={outcome} partnerLabel={defaults.partnerLabel} benchmarkMeta={defaults.benchmarkMeta} chatProps={chatProps} />}
           {view==="outcomes"    && <OutcomeSelection   onNext={()=>{ completeTab("outcomes");   go("causal");      }} onBack={()=>go("profile")} product={product} users={users} outcome={outcome} selectedOutcome={selectedOutcome} setSelectedOutcome={setSelectedOutcome} selectedCohort={selectedCohort} cqExposure={cqExposure} setCqExposure={setCqExposure} cqPopulation={cqPopulation} setCqPopulation={setCqPopulation} partnerLabel={defaults.partnerLabel} hasEngagementCol={hasEngagementCol} projectEndpoints={defaults.endpoints ?? []} chatProps={chatProps} />}
           {view==="causal"      && <CausalModel        onBack={()=>go("outcomes")}    onNext={()=>{ completeTab("causal");     go("datacheck");   }} studyType={studyType} e1Profile={e1Profile} product={product} outcome={outcome} dagCache={dagCache} setDagCache={setDagCache} selectedOutcome={selectedOutcome} selectedCohort={selectedCohort} cqExposure={cqExposure} cqPopulation={cqPopulation} partnerLabel={defaults.partnerLabel} candidateOutcomes={defaults.endpoints ?? []} datasetVariables={datasetVariables} />}

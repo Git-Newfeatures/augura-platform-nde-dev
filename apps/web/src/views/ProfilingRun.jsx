@@ -81,27 +81,6 @@ function parseSteps(steps) {
   return { initDone, sources, synthStarted, synthData, synthStream, completionLine, totalDocs };
 }
 
-const DEV_MOCK_PROFILE = {
-  agent_reasoning: "Sample profile — benchmarked against the Augura corpus. Run the live agent for a client-specific profile.",
-  risk_dimensions: [
-    { name:"Safety Signals & Failure Modes",               score:40,  rationale:"Low adverse event rate across comparable SaMD products." },
-    { name:"Generalizability, Equity & Robustness Risk",   score:80,  rationale:"Studies concentrated on high-SES employer cohorts." },
-    { name:"Implementation & Adoption Risk",               score:80,  rationale:"Median 40–60% engagement drop-off at 12 weeks in comparable DTx." },
-    { name:"Limited Actionability & Intervention Linkage", score:60,  rationale:"Recommendation specificity varies across modules." },
-    { name:"Limited Scalability & Market Breadth",         score:60,  rationale:"B2B contracting dependency limits access." },
-    { name:"Limited Reproducibility & Consistency",        score:80,  rationale:"Effect sizes heterogeneous across studies." },
-  ],
-  opportunity_dimensions: [
-    { name:"Clinical Need & Indication Strength",        score:100, rationale:"374M adults globally with IFG/IGT (IDF 2021)." },
-    { name:"Evidence Strength & Credibility",            score:60,  rationale:"41% prospective/RCT designs in corpus." },
-    { name:"Effect Size & Outcome Impact Signal",        score:80,  rationale:"HbA1c reductions of 0.3–0.5% in high-engagement cohorts." },
-    { name:"Actionability & Intervention Linkage",       score:60,  rationale:"Protocolized interventions outperform vague lifestyle advice 2×." },
-    { name:"Reproducibility & Consistency of Evidence",  score:60,  rationale:"I² >60% in comparable meta-analyses." },
-    { name:"Regulatory & Reimbursement Pathway Clarity", score:80,  rationale:"DiGA provisional listing achievable within 12 months." },
-  ],
-  feasibility_score: 72,
-};
-
 export default function ProfilingRun({ steps = [], agentStep, e1Profile, chatProps = {}, clientDomains, clientEvidenceTypes, lastRunInputs = null, onReRun = null, agentSources = [] }) {
   const isDone    = agentStep === "done";
   const isRunning = agentStep === "running";

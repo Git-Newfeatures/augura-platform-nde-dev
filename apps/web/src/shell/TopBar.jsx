@@ -114,7 +114,7 @@ export function TopBar({ email = '', onSearch }) {
             <div className="absolute right-0 top-[42px] z-50 w-56 rounded-xl border border-border bg-card p-1.5 shadow-lg">
               <div className="px-2.5 py-2">
                 <div className="text-[13px] font-medium text-foreground">{name}</div>
-                <div className="truncate text-[11.5px] text-muted-foreground">{email || 'Demo session'}</div>
+                <div className="truncate text-[11.5px] text-muted-foreground">{email}</div>
               </div>
               <div className="my-1 border-t border-border" />
               {isAdmin && (

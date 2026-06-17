@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { supabase } from './supabase'
-import { isMockEnabled } from './mocks/mockMode'
 import AuguraLogin from './AuguraLogin'
 import ResetPassword from './ResetPassword'
 import LucisApp from './LucisApp'
@@ -40,13 +39,9 @@ function AuthenticatedApp() {
 
   const hash = new URLSearchParams(window.location.hash.slice(1))
   if (hash.get('type') === 'recovery') return <ResetPassword />
-  // Demo is the default everywhere (see mockMode.isMockEnabled): the deployed app
-  // is a walkable demo with no login wall. The login gate applies ONLY in real
-  // mode (explicit opt-in via the TopBar toggle, ?real=1, or VITE_REAL_MODE).
-  if (!isMockEnabled()) {
-    if (session === undefined) return null
-    if (!session) return <AuguraLogin onSession={setSession} />
-  }
+  // Login gate: block the app shell until a Supabase session resolves.
+  if (session === undefined) return null
+  if (!session) return <AuguraLogin onSession={setSession} />
 
   return (
     <Routes>

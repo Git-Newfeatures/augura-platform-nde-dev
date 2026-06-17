@@ -1,31 +1,15 @@
-// dataClient.js — the single demo-vs-real data gate for the Evidence Workspace.
+// dataClient.js — the real data layer for the Evidence Workspace.
 //
-//   Demo-data toggle ON  → return the fixtures verbatim (fake data everywhere).
-//   Demo-data toggle OFF → fetch the real collection through the FastAPI backend
-//                          (apiJson → Authorization: Bearer <supabase jwt> →
-//                          tenant-scoped RLS → Postgres). An empty/missing
-//                          collection yields [] so the UI renders an EmptyState
-//                          ("blank when not wired"). The front no longer talks to
-//                          PostgREST directly — every read crosses the backend.
+//   Every collection is fetched through the FastAPI backend (apiJson →
+//   Authorization: Bearer <supabase jwt> → tenant-scoped RLS → Postgres).
+//   An empty/missing collection yields [] so the UI renders an EmptyState
+//   ("blank when not wired"). The front never talks to PostgREST directly —
+//   every read crosses the backend.
 import { useState, useEffect } from 'react'
 import { apiJson } from '@/api'
-import { isMockEnabled } from '@/mocks/mockMode'
-import { RUNS, DATASETS, CORPUS, DOSSIERS, VARIABLES, CORPUS_COVERAGE } from './workspaceData'
-import { getAllStudies, studyFromRow } from '@/cockpit/cockpitData'
-import { getLocalItems, DATA_CHANGED_EVENT } from './localData'
-
-const FIXTURES = {
-  studies:         () => getAllStudies(),
-  runs:            () => RUNS,
-  datasets:        () => DATASETS,
-  dossiers:        () => DOSSIERS,
-  variables:       () => VARIABLES,
-  corpus_sources:  () => CORPUS.sources,
-  corpus_coverage: () => CORPUS_COVERAGE,
-}
+import { studyFromRow } from '@/cockpit/cockpitData'
 
 // ── Normalizers : backend response → the exact shape each workspace view renders.
-// The fixtures in workspaceData.js are the contract; these map live data onto it.
 
 const SOURCE_META = {
   pubmed:         { name: 'PubMed',             icon: 'book'   },
@@ -126,52 +110,32 @@ const FETCHERS = {
   variables:       async () => [],
 }
 
-const fixtureFor = (name) => (FIXTURES[name] ? FIXTURES[name]() : [])
-
-// Prepend user-added local items (from the "Add …" buttons) to whatever the base
-// source returned. Studies are skipped — getAllStudies() already merges created ones.
-const withLocal = (name, base) =>
-  name === 'studies' ? base : [...getLocalItems(name), ...base]
-
 /**
- * Returns { data, loading, demo } for a workspace collection.
- * `data` is always an array. In demo mode it resolves synchronously. Re-reads when
- * a local item is added anywhere in the app (DATA_CHANGED_EVENT).
+ * Returns { data, loading } for a workspace collection. `data` is always an array;
+ * the backend (or an empty/unwired collection) yields [] so the UI renders an
+ * EmptyState rather than crashing.
  */
 export function useCollection(name) {
-  const demo = isMockEnabled()
-  const [version, setVersion] = useState(0)
-  const [data, setData] = useState(() => (demo ? withLocal(name, fixtureFor(name)) : null))
-  const [loading, setLoading] = useState(!demo)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const bump = () => setVersion((v) => v + 1)
-    window.addEventListener(DATA_CHANGED_EVENT, bump)
-    return () => window.removeEventListener(DATA_CHANGED_EVENT, bump)
-  }, [])
-
-  useEffect(() => {
-    if (demo) {
-      setData(withLocal(name, fixtureFor(name)))
-      setLoading(false)
-      return
-    }
     let alive = true
     setLoading(true)
     ;(async () => {
       try {
         const fetcher = FETCHERS[name]
         const base = fetcher ? await fetcher() : []
-        if (alive) setData(withLocal(name, base))
+        if (alive) setData(base)
       } catch {
         // Backend unreachable or non-2xx → blank (EmptyState), never crash the view.
-        if (alive) setData(withLocal(name, []))
+        if (alive) setData([])
       } finally {
         if (alive) setLoading(false)
       }
     })()
     return () => { alive = false }
-  }, [name, demo, version])
+  }, [name])
 
-  return { data: data ?? [], loading, demo }
+  return { data: data ?? [], loading }
 }

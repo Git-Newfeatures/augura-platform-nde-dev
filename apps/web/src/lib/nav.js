@@ -79,7 +79,7 @@ export function isViewAccessible(view, ctx) {
 // click lands. Icon names resolve via cockpit/icons.jsx <Ico/>.
 export const WORKFLOW = [
   { key: "input",     label: "Data input",      icon: "upload",   sub: "Cohort upload · column verification", views: ["assistant", "dataset_verify"], primaryView: "assistant" },
-  // Profiling is agent-first (the flow Romain reviewed): the step lands on the
+  // Profiling is agent-first: the step lands on the
   // agent-run log, which offers a Run button when no run happened yet; the
   // populated Benchmark Profiling (profile) is the next view in the sequence.
   { key: "profiling", label: "Profiling",       icon: "brain",    sub: "Agentic product & corpus profiling",  views: ["profiling_run", "profile"],     primaryView: "profiling_run" },

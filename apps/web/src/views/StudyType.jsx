@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, FolderOpen, TrendingUp, Link2, Microscope, ClipboardList, BarChart3, Scale } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { InfoBar, Tag, Radar } from "../ui/components";
+import { InfoBar, Tag } from "../ui/components";
 import InlineChatbot from "../components/InlineChatbot";
 
 // Map study-design data keys → lucide icons (presentational only)
@@ -104,52 +104,12 @@ export default function StudyType({ partnerLabel = 'Partner', chatProps = {} }) 
     }
   }
 
-  // Compute feasibility radar rows (used by sidebar) — declared once, reused
-  const feasibilityRows = retro ? [
-    {
-      name: "Data feasibility",
-      score: design === "external_matched" ? 3 : design === "pre_post" ? 2 : 1,
-      rationale: design === "external_matched"
-        ? "Requires linking to an external dataset (e.g. Constances). Data availability cannot be guaranteed without prior access confirmation."
-        : "All required variables are present in the dataset. No new data collection needed. Primary risk is T12 outcome completeness (benchmark: 75–85% for comparable digital health cohorts).",
-    },
-    {
-      name: "Dropout / retention",
-      score: design === "pre_post" ? 2 : 3,
-      rationale: "CT.gov benchmark: median 22% dropout at 12 months across comparable digital health retrospective studies. Missing-at-random (MAR) assumption will be assessed in sensitivity analyses.",
-    },
-    {
-      name: "Confounding control",
-      score: design === "external_matched" ? 2 : design === "mediation" ? 2 : 3,
-      rationale: design === "mediation"
-        ? "Mediation analysis requires sequential ignorability — a stronger assumption than standard confounding control. Key unmeasured confounder: health motivation."
-        : "Key measured confounders (age, sex, BMI, baseline HbA1c) are all present. Primary residual risk: concurrent employer wellness initiatives not captured in dataset. Adjustment strategy defined in the causal model step.",
-    },
-    {
-      name: "Internal validity",
-      score: design === "mediation" ? 2 : design === "external_matched" ? 2 : 3,
-      rationale: "Retrospective observational designs have moderate internal validity risk — self-selection into high engagement is the main threat. Multiple estimators will be compared to assess robustness of the findings.",
-    },
-    {
-      name: "Timeline",
-      score: design === "external_matched" ? 4 : 2,
-      rationale: design === "external_matched"
-        ? "External data linkage negotiations typically add 3–6 months overhead. CT.gov benchmark for comparable external-match studies: 6–10 months total."
-        : "CT.gov benchmark for comparable retrospective studies using existing data: median 3–5 months from data freeze to analysis completion.",
-    },
-    {
-      name: "External validity",
-      score: design === "external_matched" ? 2 : 3,
-      rationale: "PubMed: 15–25% effect size heterogeneity across European sites in comparable studies. Multi-country cohort (France, UK, Ireland, Portugal) strengthens generalisability vs single-site designs.",
-    },
-  ] : [];
-
   const designLabel  = STUDY_DESIGNS.find(d => d.id === design)?.name ?? "—";
 
   return (
     <div className="flex flex-col gap-5">
       <InfoBar sources={[`${partnerLabel} dataset`,"Augura corpus"]}>
-        <strong>Study design.</strong> Configure your study in three steps. The feasibility risk profile on the right updates live as you change study type, design family, and estimand.
+        <strong>Study design.</strong> Configure your study in three steps — study type, design family, and estimand. Your configuration summary updates on the right.
       </InfoBar>
 
       {/* Two-column shell: main content (steps) | sticky feasibility sidebar */}
@@ -339,36 +299,12 @@ export default function StudyType({ partnerLabel = 'Partner', chatProps = {} }) 
           {retro ? (
             <Card className="gap-0 p-5">
               <div className="mb-1.5 text-[13px] font-semibold text-foreground">
-                Study feasibility risk
+                Your study configuration
               </div>
               <div className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
-                Scored from ClinicalTrials.gov and PubMed benchmarks. Higher = higher risk. /5.
+                Summary of the design choices for this study.
               </div>
 
-              <div className="mb-4 flex justify-center">
-                <Radar size={220}
-                  labels={["Feasibility","Dropout /\nretention","Confounding\ncontrol","Internal\nvalidity","Timeline","External\nvalidity"]}
-                  maxVal={5}
-                  datasets={[{ data: feasibilityRows.map(r => r.score), stroke:"#7B5EA7" }]}
-                />
-              </div>
-
-              {/* Compact score rows with progress bars */}
-              <div className="mb-4 flex flex-col gap-2">
-                {feasibilityRows.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[12px]">
-                    <span className="flex-1 text-foreground">{d.name}</span>
-                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[#e8e6df]">
-                      <div className="h-full bg-[#7B5EA7]" style={{ width:`${(d.score/5)*100}%` }} />
-                    </div>
-                    <span className="min-w-[28px] text-right font-mono text-[11px] text-muted-foreground">
-                      {d.score}/5
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Selection summary */}
               <div className="flex flex-col gap-2 border-t border-border pt-3.5">
                 {[
                   ["Type",     "Retrospective"],
@@ -386,7 +322,7 @@ export default function StudyType({ partnerLabel = 'Partner', chatProps = {} }) 
             </Card>
           ) : (
             <Card className="gap-0 p-5 text-[12px] leading-relaxed text-muted-foreground">
-              Feasibility risk profile is computed for retrospective designs only. Switch to retrospective in Step 1 to see live updates as you change study design and estimand.
+              Your study configuration summary is shown for retrospective designs. Switch to retrospective in Step 1 to configure the design family and estimand.
             </Card>
           )}
         </div>

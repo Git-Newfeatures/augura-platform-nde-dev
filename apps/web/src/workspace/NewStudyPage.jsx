@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, ClipboardList } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { addNewStudy, slugify } from '@/workspace/newStudies'
+import { slugify } from '@/lib/utils'
 
 const FRAMEWORKS = ['DiGA', 'CONSORT-AI', 'EU MDR', 'NICE DSP', 'EUnetHTA', 'FDA SaMD']
 
@@ -35,15 +35,9 @@ export function NewStudyPage() {
   function create() {
     if (!canCreate) return
     const id = slugify(name)
-    addNewStudy({
-      id,
-      name: name.trim(),
-      tagline: tagline.trim() || 'Evidence study',
-      category: category.trim() || 'Uncategorised',
-      framework,
-      n: 0,
-    })
-    // Land on the new study's first workflow step (cohort upload).
+    // No backend /studies POST yet, so creation does not persist; the form
+    // still validates input and lands on the new study's first workflow step
+    // (cohort upload).
     navigate(`/studies/${id}/workflow/assistant`)
   }
 

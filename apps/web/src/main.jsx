@@ -5,8 +5,8 @@ import '@fontsource-variable/geist-mono'
 import './index.css'
 import App from './App.jsx'
 
-// Pas d'installMockFetch : apps/web parle au vrai backend FastAPI (VITE_API_URL)
-// avec le JWT Supabase (voir src/api.js). lucis-dashboard reste la démo mockée.
+// apps/web parle au vrai backend FastAPI (VITE_API_URL) avec le JWT Supabase
+// (voir src/api.js). Aucune couche mock : données réelles uniquement.
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

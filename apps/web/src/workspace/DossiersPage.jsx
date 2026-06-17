@@ -1,27 +1,19 @@
-import { useState } from 'react'
-import { Lock, FileText, Plus } from 'lucide-react'
+import { Lock, FileText } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { useCollection } from '@/workspace/dataClient'
 import { useStudyNav } from '@/workspace/useStudyNav'
-import { AddItemModal } from '@/workspace/AddItemModal'
-import { addLocalItem, localId } from '@/workspace/localData'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 
 export function DossiersPage() {
   const { data: dossiers, loading } = useCollection('dossiers')
-  const { data: studies } = useCollection('studies')
   const { openStudy } = useStudyNav()
-  const [adding, setAdding] = useState(false)
-  const studyOptions = studies.map((s) => s.name)
   return (
     <WorkspacePage
       eyebrow="Output"
       title="Dossiers"
       sub="Submission-ready evidence packages across your studies"
-      action={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> Add dossier</Button>}
     >
       {loading ? (
         <Loading />
@@ -30,7 +22,6 @@ export function DossiersPage() {
           icon={FileText}
           title="No dossiers yet"
           subtitle="Generate a dossier from one of your studies to get started."
-          cta={<Button onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5" /> Add dossier</Button>}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -79,28 +70,6 @@ export function DossiersPage() {
             </Card>
           ))}
         </div>
-      )}
-      {adding && (
-        <AddItemModal
-          title="Add dossier"
-          submitLabel="Add dossier"
-          subtitle="Start a submission-ready evidence package for a study."
-          fields={[
-            { key: 'study', label: 'Study', type: 'select', options: studyOptions, required: true },
-            { key: 'framework', label: 'Framework', type: 'select', options: ['DiGA', 'CONSORT-AI', 'EU MDR', 'NICE DSP', 'EUnetHTA', 'FDA SaMD'] },
-          ]}
-          onClose={() => setAdding(false)}
-          onSave={(f) => {
-            addLocalItem('dossiers', {
-              id: localId('dos'),
-              name: `${f.study || 'Study'} — ${f.framework} dossier`,
-              framework: f.framework,
-              state: 'draft',
-              pct: 0,
-            })
-            setAdding(false)
-          }}
-        />
       )}
     </WorkspacePage>
   )

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, ArrowRight, RotateCcw, Undo2, RefreshCw, ChevronUp, ChevronDown, AlertTriangle, Ban, Info, Check, X, Circle, Network, GitFork, PenLine, Save, Send, MessageSquare } from "lucide-react";
+import { ArrowLeft, ArrowRight, RotateCcw, Undo2, RefreshCw, ChevronUp, ChevronDown, AlertTriangle, Ban, Info, Check, X, Circle, Network, MessageSquare } from "lucide-react";
 import { apiJson } from "../api";
 import { fetchCohort, isHighEngager } from "../workspace/cohortData";
 import { C, FONT, MONO } from "../theme";
@@ -28,27 +28,6 @@ const ROLE_STYLE = {
   effect_modifier:       { fill: "#FDECEA", stroke: "#E24B4A", text: "#7A2020", solid: false, label: "Effect mod."   },
   collider:              { fill: "#FDECEA", stroke: "#E24B4A", text: "#7A2020", solid: false, label: "Collider ⛔"   },
 };
-
-// ── Demo starter templates (Fork-from-template entry) ─────────────────────────
-// Vetted DAG templates suggested for this study's indication / exposure-outcome
-// pair. Forking is demo-only — picking one runs the existing agent so the user
-// lands on a populated graph. Mirrors the sketch's dag-template-picker.
-const DAG_TEMPLATES = [
-  {
-    id: "dag:cm-hba1c-v2.3",
-    title: "HbA1c control · standard adjustment",
-    meta: "14 nodes · last reviewed by Romain · 12 May",
-    badge: "Peer-reviewed · Augura std.",
-    tone: "review",
-  },
-  {
-    id: "dag:cm-crp-v0.9",
-    title: "CRP / inflammation marker",
-    meta: "9 nodes · related indication",
-    badge: "Internal review",
-    tone: "internal",
-  },
-];
 
 // Suggestion pills + system prompt for the embedded DAG assistant.
 const DAG_CHAT_SUGGESTIONS = [
@@ -305,21 +284,11 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
   const dagFromAgent = dagSource === "agent" || dagSource === "cache";
   const [showEdit,    setShowEdit]     = useState(false);
 
-  // ── Additive demo UI state (no backend) ───────────────────────────────────
-  // Entry-point picker shown in the empty state; template list expands inline.
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [scratchNote,   setScratchNote]   = useState(false);
   // Collapsible embedded DAG assistant (closed by default to stay out of the way).
   const [chatOpen,      setChatOpen]      = useState(false);
   // Local, DAG-scoped chat history so this panel's conversation stays separate
   // from the global Augura assistant. Falls back to chatProps if a host wires it.
   const [dagChat,       setDagChat]        = useState([]);
-  // Inline confirmation flash for the version-action row (Save / template / review).
-  const [versionMsg,    setVersionMsg]     = useState(null);
-  function flashVersion(msg) {
-    setVersionMsg(msg);
-    setTimeout(() => setVersionMsg(null), 2600);
-  }
 
   // Gap detection state — populated before DAG call, displayed as data gap warnings
   const [gapVariables,  setGapVariables]  = useState([]);
@@ -356,8 +325,8 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
   const D1_POPULATION = cqPopulation?.length
     ? cqPopulation.join(" · ") + (cohort ? ` · N=${cohort.total}` : "")
     : cohort
-      ? `Prediabetic adults (HbA1c 5.7–6.4) · N=${cohort.total} · France / UK / Ireland / Portugal`
-      : "Prediabetic adults (HbA1c 5.7–6.4) · France / UK / Ireland / Portugal";
+      ? `the study population · N=${cohort.total}`
+      : "the study population";
 
   async function runDag() {
     setDagLoading(true);
@@ -374,7 +343,7 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
     const outcomeLabel = OUTCOME_LABEL_MAP[selectedOutcome] || outcome || "HbA1c change at 12 months";
     const population   = cqPopulation?.length
       ? `${cqPopulation.join(", ")}, longitudinal digital health cohort`
-      : "Prediabetic adults (HbA1c 5.7–6.4), N=200, France/UK/Ireland/Portugal, longitudinal digital health cohort";
+      : "the study population, longitudinal digital health cohort";
     const productDocs  = product ? product.slice(0, 500) : "";
 
     // Flatten confirmed measured variables to pass to gap detection
@@ -683,64 +652,7 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
                   className="gap-1.5 border-primary/40 bg-secondary font-semibold text-primary">
                   <RotateCcw size={15} /> {dagError ? "Try again" : "Generate DAG"}
                 </Button>
-                <Button variant="outline"
-                  onClick={() => { setScratchNote(false); setShowTemplates(v => !v); }}
-                  className="gap-1.5 border-border font-medium text-foreground/80">
-                  <GitFork size={15} /> Fork from template
-                </Button>
-                <Button variant="outline"
-                  onClick={() => { setShowTemplates(false); setScratchNote(true); }}
-                  className="gap-1.5 border-border font-medium text-foreground/80">
-                  <PenLine size={15} /> Build from scratch
-                </Button>
               </div>
-
-              {/* Fork-from-template picker (demo) — forking runs the existing agent */}
-              {showTemplates && (
-                <div className="mt-4 w-full max-w-[560px] rounded-lg border border-border bg-card p-3 text-left">
-                  <div className="mb-2 text-[12px] text-muted-foreground">
-                    Suggested templates for this study&apos;s indication and exposure-outcome pair
-                    (cardiometabolic · monitoring intensity → {{ hba1c:"HbA1c", ldl:"LDL-C", crp:"hs-CRP" }[selectedOutcome] ?? "outcome"}).
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {DAG_TEMPLATES.map(t => (
-                      <button key={t.id} type="button"
-                        onClick={() => { setShowTemplates(false); setDagData(null); setDagDataLocal(null); runDag(); }}
-                        title={`Fork ${t.id} (demo — runs the agent to populate the graph)`}
-                        className="grid cursor-pointer grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-border bg-muted/30 p-[8px_12px] text-left hover:border-primary/40 hover:bg-secondary">
-                        <div className="min-w-0">
-                          <div className="truncate text-[12.5px] font-semibold text-foreground">{t.title}</div>
-                          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{t.id} · {t.meta}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`hidden whitespace-nowrap rounded-full border px-2 py-px text-[10.5px] font-semibold sm:inline ${
-                            t.tone === "review"
-                              ? "border-primary/40 bg-secondary text-[#27500A]"
-                              : "border-[#EF9F27] bg-[#FAEEDA] text-[#633806]"
-                          }`}>{t.badge}</span>
-                          <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-primary">
-                            <GitFork size={12} /> Fork
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-2 text-center text-[11px] text-muted-foreground">
-                    Forking captures lineage and keeps you aligned with peer-reviewed structure.
-                  </div>
-                </div>
-              )}
-
-              {/* Build-from-scratch note (demo) — starts an empty canvas message */}
-              {scratchNote && (
-                <div className="mt-4 flex w-full max-w-[560px] items-start gap-2 rounded-lg border border-border bg-muted/30 p-[10px_14px] text-left text-[12px] text-muted-foreground">
-                  <PenLine size={14} className="mt-0.5 flex-shrink-0 text-primary" />
-                  <span>
-                    Empty canvas ready. Add exposure, outcome, and covariate nodes manually — or ask the
-                    DAG assistant below to scaffold them. (Demo: manual canvas editing is mocked.)
-                  </span>
-                </div>
-              )}
             </div>
           )}
 
@@ -933,49 +845,7 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
         </div>
       </div>
 
-      {/* Version actions — snapshot / promote / submit this DAG (demo, no backend) */}
-      {hasDag && (
-        <Card className="gap-0 rounded-xl border border-border p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="mb-0.5 text-[13px] font-semibold text-foreground">
-                Save &amp; promote this DAG
-              </div>
-              <div className="text-[12px] text-muted-foreground">
-                Snapshot a new version, propose it as a team template, or submit for peer review.
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm"
-                onClick={() => flashVersion("Snapshotted as a new draft version (demo).")}
-                className="h-auto gap-1.5 border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80">
-                <Save size={13} /> Save version
-              </Button>
-              <Button variant="outline" size="sm"
-                onClick={() => flashVersion("Proposed as a reusable team template (demo).")}
-                className="h-auto gap-1.5 border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80">
-                <GitFork size={13} /> Save as template
-              </Button>
-              <Button variant="outline" size="sm"
-                onClick={() => flashVersion("Submitted for peer review by Romain + Marie-Laure (demo).")}
-                className="h-auto gap-1.5 border-primary/40 bg-secondary px-2.5 py-1.5 text-[12px] font-semibold text-primary">
-                <Send size={13} /> Submit for peer review
-              </Button>
-            </div>
-          </div>
-          {versionMsg ? (
-            <div className="mt-3 flex items-center gap-1.5 rounded-md border border-primary/40 bg-secondary p-[6px_12px] text-[12px] font-medium text-[#27500A]">
-              <Check size={13} className="flex-shrink-0" /> {versionMsg}
-            </div>
-          ) : (
-            <div className="mt-3 border-t border-border pt-3 text-[11.5px] text-muted-foreground">
-              Templates become reusable across studies. Peer-reviewed status requires clinical + statistical sign-off.
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Embedded DAG assistant — collapsible chat about the causal model (demo) */}
+      {/* Embedded DAG assistant — collapsible chat about the causal model */}
       <Card className="gap-0 rounded-xl border border-border p-0">
         <button type="button"
           onClick={() => setChatOpen(v => !v)}

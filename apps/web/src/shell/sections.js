@@ -8,11 +8,11 @@ import {
 } from 'lucide-react'
 
 // Single source of truth for the top-level workspace navigation.
-// `count` is optional (string or number); `subtle` dims the tab (see sketch).
+// `subtle` dims the tab (see sketch).
 export const WORKSPACE_SECTIONS = [
-  { id: 'studies',   label: 'Studies',            path: '/studies',   icon: ClipboardList, count: 2 },
-  { id: 'datasets',  label: 'Data',               path: '/datasets',  icon: Database,      count: 4 },
-  { id: 'corpus',    label: 'Literature',         path: '/corpus',    icon: Library,       count: '1.2k' },
+  { id: 'studies',   label: 'Studies',            path: '/studies',   icon: ClipboardList },
+  { id: 'datasets',  label: 'Data',               path: '/datasets',  icon: Database },
+  { id: 'corpus',    label: 'Literature',         path: '/corpus',    icon: Library },
   { id: 'variables', label: 'Variables & Models', path: '/variables', icon: Variable },
   { id: 'runs',      label: 'Audit',              path: '/runs',      icon: Settings2, subtle: true },
   { id: 'dossiers',  label: 'Dossiers',           path: '/dossiers',  icon: FileText },

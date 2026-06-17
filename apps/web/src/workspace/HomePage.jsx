@@ -12,52 +12,6 @@ import { Loading, EmptyState } from '@/workspace/CollectionStates'
 
 // ── Local viz helpers ──────────────────────────────────────────────────────
 
-function Sparkline({ data, color = 'currentColor', className = '' }) {
-  if (!data || !data.length) return null
-  const w = 70
-  const h = 30
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-  const step = w / Math.max(1, data.length - 1)
-  const pts = data
-    .map((v, i) => {
-      const x = i * step
-      const y = h - ((v - min) / range) * (h - 4) - 2
-      return `${x},${y}`
-    })
-    .join(' ')
-  const fillPts = [
-    ...data.map((v, i) => {
-      const x = i * step
-      const y = h - ((v - min) / range) * (h - 4) - 2
-      return `${x},${y}`
-    }),
-    `${w},${h}`,
-    `0,${h}`,
-  ].join(' ')
-
-  return (
-    <svg
-      width={w}
-      height={h}
-      viewBox={`0 0 ${w} ${h}`}
-      className={className}
-      style={{ display: 'block', overflow: 'visible' }}
-    >
-      <polygon points={fillPts} fill={color} opacity={0.12} />
-      <polyline
-        points={pts}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 function StepDots({ steps }) {
   const COLOR = {
     done:    'bg-primary',
@@ -287,32 +241,24 @@ export function HomePage() {
       value: String(studies.length),
       sub: 'across your workspace',
       Icon: ClipboardList,
-      spark: [3, 4, 4, 5, 6, 6, 7],
-      color: 'var(--color-primary)',
     },
     {
       label: 'Audit',
       value: String(runs.length),
       sub: runningNow ? `${runningNow} running now` : 'all complete',
       Icon: Activity,
-      spark: [2, 3, 2, 4, 5, 7, 6],
-      color: '#3172B0',
     },
     {
       label: 'Cohort subjects',
       value: totalSubjects.toLocaleString(),
       sub: `across ${studies.length} stud${studies.length === 1 ? 'y' : 'ies'}`,
       Icon: Database,
-      spark: [4, 4, 5, 5, 6, 6, 7],
-      color: 'var(--color-muted-foreground)',
     },
     {
       label: 'Open flags',
       value: String(allActions.length),
       sub: allActions.length ? 'need attention' : 'all clear',
       Icon: Flag,
-      spark: [1, 2, 2, 3, 3, 3, 3],
-      color: '#B98900',
     },
   ]
 
@@ -353,14 +299,11 @@ export function HomePage() {
               <span className="text-[11.5px] font-medium text-muted-foreground">{m.label}</span>
               <m.Icon size={15} className="text-muted-foreground/50" />
             </div>
-            <div className="mt-2 flex items-end justify-between">
-              <div>
-                <div className="font-mono text-[26px] font-medium leading-none tracking-[-0.01em] text-foreground">
-                  {m.value}
-                </div>
-                <div className="mt-1.5 text-[11.5px] text-muted-foreground/70">{m.sub}</div>
+            <div className="mt-2">
+              <div className="font-mono text-[26px] font-medium leading-none tracking-[-0.01em] text-foreground">
+                {m.value}
               </div>
-              <Sparkline data={m.spark} color={m.color} />
+              <div className="mt-1.5 text-[11.5px] text-muted-foreground/70">{m.sub}</div>
             </div>
           </Card>
         ))}

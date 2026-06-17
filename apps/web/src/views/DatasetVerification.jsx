@@ -2,30 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Check, AlertTriangle, ChevronDown, ChevronUp, Database, Sparkles } from "lucide-react";
 import { Card, Tag } from "../ui/components";
 import { Button } from "@/components/ui/button";
-import { useCollection } from "@/workspace/dataClient";
-import { isMockEnabled } from "@/mocks/mockMode";
+import ExcelUpload from "@/components/ExcelUpload";
 import { apiJson } from "@/api";
-
-// Realistic cardiometabolic column pool — sliced to the selected dataset's column
-// count so the agent classification matches it (e.g. a 47-col dataset → 47 columns).
-const COHORT_COLUMN_POOL = [
-  "member_id", "visit_date", "timepoint_months", "age", "sex", "bmi", "engagement_score",
-  "hba1c_baseline", "hba1c_12m", "ldl_12m", "crp_12m",
-  "rec_adherence_pct", "logins_per_month", "sessions_per_week", "repeat_test_flag", "recommendations_followed",
-  "weight_kg", "height_cm", "waist_cm", "systolic_bp", "diastolic_bp",
-  "ldl_baseline", "hdl_baseline", "hdl_12m", "triglycerides_baseline", "triglycerides_12m",
-  "total_cholesterol_baseline", "total_cholesterol_12m", "glucose_fasting_baseline", "glucose_fasting_12m",
-  "insulin_baseline", "homa_ir", "hs_crp_baseline", "egfr", "alt", "ast",
-  "smoking_status", "alcohol_units_week", "physical_activity_min", "diet_quality", "sleep_hours",
-  "perceived_stress", "household_income", "education_level", "employment_status", "country", "country_hdi",
-  "comorbidity_count", "medication_count", "statin_use", "antihypertensive_use",
-];
-function cohortHeaders(nCols) {
-  const n = Math.max(1, Number(nCols) || 11);
-  const out = COHORT_COLUMN_POOL.slice(0, n);
-  while (out.length < n) out.push(`feature_${out.length + 1}`);
-  return out;
-}
 
 // ── PII column-name scan ──────────────────────────────────────────────────────
 const PII_PATTERNS = [
@@ -377,12 +355,6 @@ export default function DatasetVerification({
 
   const piiScan = uploadedData ? scanForPII(uploadedData.sheets) : null;
 
-  const { data: datasets } = useCollection("datasets");
-  const [pickedId, setPickedId] = useState("");
-  // Reflect the active dataset in the picker even if local pick state is lost
-  // (e.g. StrictMode remount) — match the attached cohort name back to its dataset.
-  const selectedDatasetId = pickedId || (uploadedData ? (datasets.find(d => d.name === selectedCohort)?.id ?? "") : "");
-
   const productDescription = [
     product  && `PRODUCT:\n${product}`,
     users    && `USERS:\n${users}`,
@@ -410,8 +382,6 @@ export default function DatasetVerification({
     if (!uploadedData) return;
     setLoading(true); setError(null);
     try {
-      // Simulated agent latency in demo so the "Analysing…" / Re-run state is visible.
-      if (isMockEnabled()) await new Promise(r => setTimeout(r, 1100));
       const payload = {
         projectId: tenantSlug,
         product_description: productDescription,
@@ -452,25 +422,11 @@ export default function DatasetVerification({
     }
   }, [uploadedData, result, loading, error, piiScan, autoRan]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Selecting a dataset feeds canned cohort columns to the variable-check agent —
-  // the demo flow replaces file upload with picking an existing cohort dataset.
-  function handleDatasetSelect(id) {
-    setPickedId(id);
-    if (!id) { handleUpload(null); return; }
-    const ds = datasets.find(d => d.id === id);
-    const rowCount = parseInt(String(ds?.rows ?? "").replace(/[^\d]/g, ""), 10) || null;
+  // Reset cached results when a freshly uploaded file replaces the prior one.
+  function handleUploadAndReset(data) {
     setResult(null); setError(null); setAutoRan(false);
-    onUploadData({ filename: `${ds?.name ?? "cohort"}.csv`, sheets: [{ name: "cohort", headers: cohortHeaders(ds?.cols), data: [], column_stats: [] }] });
-    if (onCohortSelect) onCohortSelect(ds?.name ?? "cohort", rowCount);
+    handleUpload(data);
   }
-
-  // Pre-select the Lucis cohort in demo so 1b lands populated (no upload needed).
-  useEffect(() => {
-    if (isMockEnabled() && !uploadedData && !pickedId && datasets.length) {
-      const lucis = datasets.find(d => /lucis_study_cohort/i.test(d.name)) || datasets.find(d => /lucis/i.test(d.name)) || datasets[0];
-      if (lucis) handleDatasetSelect(lucis.id);
-    }
-  }, [datasets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onDecide(match, patch) {
     const key = `${match.sheet}::${match.column}`;
@@ -524,7 +480,7 @@ export default function DatasetVerification({
       <div>
         <div className="text-[13px] font-semibold text-primary">1b · Dataset & data structure</div>
         <div className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-          Select the cohort dataset to profile. The agent maps each column to a canonical outcome or proposes its causal role, grouped by type. Confirm or correct — then run profiling.
+          Upload the cohort dataset to profile. The agent maps each column to a canonical outcome or proposes its causal role, grouped by type. Confirm or correct — then run profiling.
         </div>
       </div>
 
@@ -533,17 +489,8 @@ export default function DatasetVerification({
         <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
           <Database size={15} className="text-muted-foreground" /> Cohort dataset
         </div>
-        <div className="text-[12.5px] text-muted-foreground">Attach the cohort dataset the agent should profile. Columns are classified below.</div>
-        <select
-          value={selectedDatasetId}
-          onChange={(e) => handleDatasetSelect(e.target.value)}
-          className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
-        >
-          <option value="">— Select a dataset —</option>
-          {datasets.map((d) => (
-            <option key={d.id} value={d.id}>{d.name} · {d.rows} rows · {d.cols} cols</option>
-          ))}
-        </select>
+        <div className="text-[12.5px] text-muted-foreground">Upload the cohort dataset the agent should profile. Columns are classified below.</div>
+        <ExcelUpload onData={handleUploadAndReset} uploadedData={uploadedData} />
 
         {uploadedData && (
           <div className="flex flex-col gap-2">
@@ -750,7 +697,7 @@ export default function DatasetVerification({
       {!uploadedData && (
         <Card className="rounded-xl p-5">
           <div className="text-[12.5px] leading-relaxed text-muted-foreground">
-            Select a dataset above to begin. The agent will identify each column's role
+            Upload a cohort dataset above to begin. The agent will identify each column's role
             and group — outcomes matched against <strong>cesl_outcome</strong>,
             engagement / demographics / confounders grouped automatically.
             Light data-quality signals (missingness, value type, range) feed the agent's confidence.

@@ -2,32 +2,29 @@
  * Augura E2 — Simulation Engine
  * ================================
  * Simulation Workspace layout:
- *   - Three scenario tabs: Baseline / Conservative / Optimised
- *   - Left panel: simulation parameters (read-only in validated mode)
+ *   - Scenario tabs derived from the LIVE backend results (fetchSimulationResults)
+ *   - Left panel: simulation parameters (read-only)
  *   - Right panel: estimator comparison table + Bias vs MSE scatter chart
  *   - Expandable: digital twin concept explanation
  *   - Regulatory verdict + simulation assistant chat
- *   - Analytical exploration mode (via "Explore" tab, with sliders)
  *
- * Two computation modes:
- *   VALIDATED — pre-computed bootstrap results (Supabase or config.js fallback)
- *   LIVE      — analytical approximation, runs in <1ms on every slider change
+ * Data source:
+ *   LIVE — pre-computed bootstrap results served by the backend (Supabase via
+ *          fetchSimulationResults). When no live rows are available, the
+ *          Results area renders an empty state — no fabricated fallbacks.
  *
  * Parameters pre-populated from E1 output (e1Profile prop).
  */
 
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, ArrowRight, Lock, Check, ChevronDown, ChevronRight, FlaskConical } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lock, FlaskConical } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SubTabs } from "@/cockpit/SubTabs";
 import { fetchCohort, fetchSimulationResults, engagementGroup } from "./workspace/cohortData";
 import {
-  COHORT_N, TREAT_PROP, TRUE_EFFECT,
   POWER_THRESHOLD, POWER_MARGINAL_FLOOR,
-  BASE_BIAS, EST_EFFICIENCY,
-  ESTIMATORS, VALIDATED, ESTIMATOR_FILTER,
+  ESTIMATORS, ESTIMATOR_FILTER,
 } from "./config";
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
@@ -44,68 +41,26 @@ const C = {
   red: "#C0392B", redLt: "#FEF1F1",
 };
 
-// Bootstrap constants (from run_bootstrap.py — not in config.js to avoid Romain sign-off)
-const SYNTH_N    = 10_000;  // Synthetic patients generated per bootstrap iteration
-const BOOT_ITERS = 1_000;   // Number of bootstrap resamples
-
 // Estimator dot colours for scatter chart
 const EST_COLORS = {
   lme: "#0C447C", ols: "#1D9E75", ipw: "#854F0B",
   mediation: "#E24B4A", tmle: "#4B3070", did: "#0F6E56",
 };
 
-// Covariates adjusted — D3 decision
-const COVARIATES = ["Age", "Sex", "BMI", "Baseline HbA1c", "Medication changes"];
-
-// Human-readable scenario tab labels
+// Human-readable scenario tab labels (keyed by the backend `scenario` value).
+// Unknown scenarios fall back to a title-cased version of their raw key.
 const SCENARIO_LABELS = {
-  baseline:     "Simulation 1 — Baseline",
-  conservative: "Simulation 2 — Conservative",
-  high_risk:    "Simulation 3 — Optimized",
+  baseline:     "Baseline",
+  conservative: "Conservative",
+  high_risk:    "Optimized",
+  optimised:    "Optimized",
+  optimized:    "Optimized",
 };
-
-// ── Power computation (analytical) ────────────────────────────────────────────
-function normalCDF(z) {
-  const t = 1 / (1 + 0.2316419 * Math.abs(z));
-  const d = 0.3989423 * Math.exp(-z * z / 2);
-  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-  return z > 0 ? 1 - p : p;
-}
-
-function computeAnalytical(params) {
-  const t0 = performance.now();
-  const { n, dropout, effectAssumed, sigma } = params;
-  // sigma passed directly as residual SD — no SIGMA_NOISE lookup
-  // (SIGMA_NOISE kept in config.js for Romain sign-off, not used in analytical mode)
-  const nEff   = n * (1 - dropout);
-  const nTreat = nEff * TREAT_PROP;
-  const nCtrl  = nEff * (1 - TREAT_PROP);
-
-  if (nTreat < 5 || nCtrl < 5) return null;
-
-  const se     = sigma / Math.sqrt(nEff * TREAT_PROP * (1 - TREAT_PROP));
-  const zEff   = Math.abs(effectAssumed) / se;
-  const rawPow = normalCDF(zEff - 1.96) * 100;
-  const halfCI = 1.96 * se;
-
-  const all = {};
-  for (const est of ESTIMATORS) {
-    const power    = Math.min(99.9, Math.max(0.1, rawPow * EST_EFFICIENCY[est.key]));
-    const bias     = BASE_BIAS[est.key] * (1 + dropout * 1.6);
-    const variance = se * se * (est.key === "ipw" ? 1.3 : est.key === "lme" ? 0.9 : 1.0);
-    const mse      = bias * bias + variance;
-    all[est.key] = {
-      power:    Math.round(power * 10) / 10,
-      bias:     +bias.toFixed(4),
-      variance: +variance.toFixed(4),
-      mse:      +mse.toFixed(4),
-      effect:   +(-effectAssumed).toFixed(3),
-      ci:       [+(-effectAssumed - halfCI).toFixed(2), +(-effectAssumed + halfCI).toFixed(2)],
-    };
-  }
-
-  const ms = Math.round((performance.now() - t0) * 1000) / 1000;
-  return { all, ms, mode: "analytical", timestamp: new Date() };
+function scenarioLabel(key) {
+  if (SCENARIO_LABELS[key]) return SCENARIO_LABELS[key];
+  return String(key)
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ── Verdict for each estimator ────────────────────────────────────────────────
@@ -154,12 +109,14 @@ function verdictFor(power, dropout) {
   };
   if (power >= POWER_MARGINAL_FLOOR) return {
     icon: "⚠️", title: "Marginal — additional justification needed",
-    body: `Power of ${power}% is ${gap} pp below the 80% threshold. Reviewers may accept with protocol-level justification. Recommended: reduce dropout below ${Math.round(dropout * 100 - 5)}% or use the Optimized subgroup scenario.`,
+    body: `Power of ${power}% is ${gap} pp below the 80% threshold. Reviewers may accept with protocol-level justification. Recommended: ${
+      dropout != null ? `reduce dropout below ${Math.round(dropout * 100 - 5)}%` : "reduce dropout"
+    } or use the Optimized subgroup scenario.`,
     bg: "#FFF8E6", border: "#EF9F27", titleColor: "#633806", bodyColor: "#7A4A10",
   };
   return {
     icon: "❌", title: "Below regulatory threshold",
-    body: `Power of ${power}% is ${gap} pp below the minimum required. This design cannot support an HAS/DiGA submission as-is. Options: target the high-risk subgroup (N≈510), reduce expected dropout, or extend follow-up.`,
+    body: `Power of ${power}% is ${gap} pp below the minimum required. This design cannot support an HAS/DiGA submission as-is. Options: target a higher-risk subgroup, reduce expected dropout, or extend follow-up.`,
     bg: "#FEF1F1", border: "#E24B4A", titleColor: "#7A2020", bodyColor: "#8B3030",
   };
 }
@@ -294,27 +251,6 @@ function ScatterChart({ rows, estimators, activeKey, onSelect }) {
   );
 }
 
-// ── Slider (for analytical explore mode) ─────────────────────────────────────
-function Slider({ label, value, min, max, step, format, onChange }) {
-  return (
-    <div className="mb-3">
-      <div className="mb-1 flex justify-between">
-        <span className="text-[11px] text-muted-foreground">{label}</span>
-        <span className="font-mono text-[11px] font-semibold text-foreground">
-          {format ? format(value) : value}
-        </span>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className="w-full cursor-pointer" style={{ accentColor: C.blue }} />
-      <div className="mt-0.5 flex justify-between">
-        <span className="font-mono text-[9px] text-muted-foreground/60">{format ? format(min) : min}</span>
-        <span className="font-mono text-[9px] text-muted-foreground/60">{format ? format(max) : max}</span>
-      </div>
-    </div>
-  );
-}
-
 // ── Outcome label map (mirrors Outcome Selection in E1) ───────────────────────
 const OUTCOME_LABELS = {
   hba1c: "HbA1c change · 12 months",
@@ -331,164 +267,20 @@ const STUDY_TYPE_LABELS = {
 // ── Interpretability stars ────────────────────────────────────────────────────
 function stars(n) { return "★".repeat(n) + "☆".repeat(5 - n); }
 
-// ── Simulation pipeline (documentation of the statistical method) ──────────────
-// Purely descriptive accordion mirroring the 7-stage pipeline from the reference
-// sketch. No computation — all stages are "done" in the demo. Self-contained:
-// owns its own expand/collapse state, reads nothing from the engine's live state.
-const PIPELINE_STAGES = [
-  {
-    num: "1",
-    title: "Dataset validation",
-    status: "Complete",
-    body: "Confirms the validation dataset is well-formed before any modelling: binary exposure, continuous outcome, no constant columns. The real dataset is held immutable and never altered by the simulation.",
-    metrics: [
-      ["Observations (n)", "824"],
-      ["P(A=1) — high engagement", "44.7%"],
-      ["Outcome type", "Continuous"],
-      ["Missing values", "6.1% (Y only) · MI applied"],
-      ["Random seed", "42601"],
-    ],
-  },
-  {
-    num: "2",
-    title: "Nuisance model fitting (SuperLearner, K=5 cross-fitting)",
-    status: "Complete",
-    body: "Fits the propensity score π̂(X) and outcome model μ̂(A,X) with a cross-fitted SuperLearner ensemble. Counterfactuals μ̂(1,X) and μ̂(0,X) are predicted for every row to anchor the reference effect.",
-    metrics: [
-      ["Ensemble", "SuperLearner · K=5 cross-fitting"],
-      ["Learners", "GLM · GBM · random forest · LASSO"],
-      ["π̂(X) AUC (cross-validated)", "0.74"],
-      ["μ̂(A,X) R² (cross-validated)", "0.61"],
-      ["Positivity violations", "0 rows"],
-    ],
-  },
-  {
-    num: "3",
-    title: "Reference true effect δ* and scenario grid",
-    status: "Complete",
-    body: "Derives the reference ATE δ* = (1/n)Σ [μ̂(1,Xᵢ) − μ̂(0,Xᵢ)] from the fitted outcome model — anchored in the data, not injected. Builds a 5-point effect-size grid spanning the null to 2δ*.",
-    metrics: [
-      ["Reference true effect δ*", "−0.336 HbA1c units"],
-      ["Heterogeneity SD of τᵢ", "0.118"],
-      ["Scenario grid", "S0 (null) → S4 (2δ*) · 5 scenarios"],
-      ["Replications per scenario", "B=500"],
-    ],
-  },
-  {
-    num: "4–5",
-    title: "Simulation loop results & performance metrics (B=500)",
-    status: "Complete · 2,500 replicates",
-    body: "Runs the Monte-Carlo loop across all five scenarios and records the standard finite-sample performance metrics per estimator, each reported with its Monte-Carlo standard error (MCSE).",
-    metrics: [
-      ["Monte-Carlo replications", "B=500 × 5 scenarios"],
-      ["Metrics per estimator", "bias · variance · MSE · coverage · power"],
-      ["Type I error (null, S0)", "target ≈ 5%"],
-      ["Coverage", "target ≈ 95%"],
-    ],
-  },
-  {
-    num: "6",
-    title: "Structured evaluation & estimator recommendation",
-    status: "Recommendation ready",
-    body: "Applies a 6-stage decision funnel — Type I error filter → MSE ranking at δ* → ranking stability → bias–variance decomposition → power tiebreaker → coverage calibration — to select the recommended estimator.",
-    metrics: [
-      ["Recommended estimator", "Mixed-effects regression (LME)"],
-      ["MSE at δ*", "0.035 (lowest)"],
-      ["Ranking stability", "Spearman ρ > 0.95 across S1–S4"],
-      ["Power at δ*", "87% (highest)"],
-    ],
-  },
-  {
-    num: "7",
-    title: "Sample-size secondary analysis (diagnostic)",
-    status: "Complete",
-    body: "A diagnostic power-vs-N sweep that distinguishes finite-sample bias from asymptotic bias and flags subgroup-size risk. Bias that vanishes by 5n is finite-sample; a ranking reversal at n/2 warns against small subgroups.",
-    metrics: [
-      ["Power vs N curve", "n/2 → 5n sweep at δ*"],
-      ["MSE at n = 824 (real)", "0.035"],
-      ["MSE at 5n = 4,120", "0.009"],
-      ["Ranking reversal", "none — recommendation stable"],
-    ],
-  },
-];
-
-function PipelineStage({ stage, open, onToggle }) {
+// ── Empty state ────────────────────────────────────────────────────────────────
+// Shown whenever the live backend (fetchSimulationResults) returns no rows.
+// There are no fabricated fallback numbers — the UI stays honest about the
+// absence of validated results rather than rendering demo data.
+function EmptyState({ icon, title, body }) {
   return (
-    <Card className="gap-0 overflow-hidden rounded-xl border-border bg-card p-0">
-      {/* Header row — number chip · title · status · chevron */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 border-none bg-transparent px-4 py-3 text-left transition-colors hover:bg-muted/40">
-        {/* Number chip (all "done" in demo) */}
-        <span
-          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px] text-[10px] font-bold"
-          style={{ background: C.greenLt, color: "#085041", borderColor: C.greenMd }}>
-          {stage.num}
-        </span>
-        <span className="min-w-0 flex-1 text-[13px] font-semibold text-foreground">
-          Step {stage.num} — {stage.title}
-        </span>
-        <span
-          className="hidden items-center gap-1 whitespace-nowrap rounded-full border-[0.5px] px-2 py-0.5 text-[10px] font-medium sm:inline-flex"
-          style={{ background: C.greenLt, color: "#085041", borderColor: C.greenMd }}>
-          <Check size={11} /> {stage.status}
-        </span>
-        {open
-          ? <ChevronDown size={15} className="flex-shrink-0 text-muted-foreground/60" />
-          : <ChevronRight size={15} className="flex-shrink-0 text-muted-foreground/60" />}
-      </button>
-
-      {/* Expandable body — description + demo metrics */}
-      {open && (
-        <div className="border-t-[0.5px] border-border bg-muted/40 px-4 pb-4 pt-3">
-          <div className="text-[12.5px] leading-relaxed text-muted-foreground">
-            {stage.body}
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {stage.metrics.map(([label, value]) => (
-              <div key={label}
-                className="flex items-center justify-between gap-3 rounded-[7px] border-[0.5px] border-border bg-card px-[10px] py-[6px]">
-                <span className="text-[11px] text-muted-foreground">{label}</span>
-                <span className="text-right font-mono text-[11px] font-semibold text-foreground">{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+    <Card className="flex flex-col items-center justify-center gap-2 rounded-[10px] border-dashed border-border bg-muted/40 px-6 py-12 text-center">
+      <div className="flex items-center gap-2 text-[14px] font-semibold text-foreground">
+        {icon ?? <FlaskConical size={16} style={{ color: C.faint }} />} {title}
+      </div>
+      <div className="max-w-md text-[12px] leading-relaxed text-muted-foreground">
+        {body}
+      </div>
     </Card>
-  );
-}
-
-function SimulationPipeline() {
-  // First stage open by default; toggling collapses any open stage.
-  const [openNum, setOpenNum] = useState(PIPELINE_STAGES[0].num);
-  return (
-    <div className="flex flex-col">
-      {/* Section header */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
-          <FlaskConical size={16} style={{ color: C.green }} />
-          Simulation pipeline
-        </div>
-        <div className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-          The statistical method behind the validated results — a seven-stage pipeline from dataset
-          validation through estimator recommendation and sample-size diagnostics. Expand any stage for details.
-        </div>
-      </div>
-
-      {/* Accordion */}
-      <div className="flex flex-col gap-2.5">
-        {PIPELINE_STAGES.map(stage => (
-          <PipelineStage
-            key={stage.num}
-            stage={stage}
-            open={openNum === stage.num}
-            onToggle={() => setOpenNum(cur => (cur === stage.num ? null : stage.num))}
-          />
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -500,7 +292,9 @@ export default function SimulationEngine({
   uploadedRowCount,  // row count from uploaded Excel file — highest-priority N override
   partnerLabel = 'Partner',
 }) {
-  // ── Cohort — live from validation dataset, fallback to config.js ──────────────
+  // ── Cohort — live from the validation dataset (fetchCohort) only ──────────────
+  // No COHORT_N fallback: when the backend returns no cohort, liveCohort stays
+  // null and the UI guards for the missing N rather than fabricating one.
   const [liveCohort, setLiveCohort] = useState(null);
 
   useEffect(() => {
@@ -511,7 +305,8 @@ export default function SimulationEngine({
       const highN  = members.filter(m => engagementGroup(m) === "high").length;
       const treatP = Math.round((highN / total) * 1000) / 1000;
 
-      let att = TRUE_EFFECT;
+      // Observed ATT derived from the live biomarkers (null when unavailable).
+      let att = null;
       if (biomarkers.length) {
         const groupMap = Object.fromEntries(members.map(m => [m.member_id, engagementGroup(m)]));
         const t0map    = Object.fromEntries(
@@ -534,7 +329,8 @@ export default function SimulationEngine({
     return () => { alive = false; };
   }, [selectedCohort]);
 
-  const cohortN      = uploadedRowCount ?? liveCohort?.total ?? COHORT_N;
+  // Live N only — may be null until the cohort (or an uploaded file) is available.
+  const cohortN = uploadedRowCount ?? liveCohort?.total ?? null;
 
   // Priority: selectedOutcome key (from E1 Outcome Selection)
   //   > e1Profile.primary_outcome_label (from E1 agent)
@@ -559,19 +355,19 @@ export default function SimulationEngine({
     ? filteredEstimators
     : ESTIMATORS.filter(e => allowedKeys.includes(e.key));
 
-  // ── Parameters (analytical / mirrored from validated scenario) ───────────────
-  const [dropout,       setDropout]   = useState(0.20);
-  const [effectAssumed, setEffect]    = useState(0.30);
-  const [sigma,         setSigma]     = useState(0.12);      // residual SD — measured from partner cohort
+  // ── Scenario parameters (mirrored from the active live scenario, if provided) ─
+  // These come from the backend rows when present; they are null otherwise and
+  // simply render as "—" rather than defaulting to fabricated demo values.
+  const [dropout,       setDropout] = useState(null);
+  const [effectAssumed, setEffect]  = useState(null);
 
   const defaultEst = compEstimators.find(e => e.recommended)?.key
     ?? compEstimators[0]?.key ?? "lme";
   const [estimator,     setEstimator] = useState(defaultEst);
 
-  // ── Mode + results ────────────────────────────────────────────────────────────
+  // ── Results (live, read-model) ────────────────────────────────────────────────
   const [result,       setResult]       = useState(null);
-  const [mode,         setMode]         = useState("validated");
-  const [validatedKey, setValidatedKey] = useState("baseline");
+  const [activeScenario, setActiveScenario] = useState(null);
   const [liveData,     setLiveData]     = useState(null);
 
   // ── Locking gate ─────────────────────────────────────────────────────────────
@@ -580,12 +376,7 @@ export default function SimulationEngine({
 
   // ── UI toggles ────────────────────────────────────────────────────────────────
   const [showConcept,    setShowConcept]    = useState(false);
-  const [showAnalytical, setShowAnalytical] = useState(false);
   const [showChat,       setShowChat]       = useState(false);
-
-  // ── Sub-tab: Results (existing UI) vs Pipeline (method documentation) ─────────
-  // Purely presentational — does not touch any computation, mode, or scenario state.
-  const [subTab, setSubTab] = useState("results");
 
   // ── Chat ──────────────────────────────────────────────────────────────────────
   const chatRef = useRef(null);
@@ -596,33 +387,30 @@ export default function SimulationEngine({
   const [inp,         setInp]         = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
-  // ── Load baseline on mount ────────────────────────────────────────────────────
-  useEffect(() => {
-    loadValidated("baseline");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── Analytical: recompute on every param change ───────────────────────────────
-  useEffect(() => {
-    if (mode !== "analytical") return;
-    const r = computeAnalytical({ n: cohortN, dropout, effectAssumed, sigma });
-    setResult(r);
-  }, [cohortN, dropout, effectAssumed, sigma, mode]);
-
-  // ── Backend: résultats de bootstrap VALIDATED (read-model, scopé tenant) ──────
+  // ── Backend: live bootstrap results (read-model, scopé tenant) ────────────────
   useEffect(() => {
     let alive = true;
-    fetchSimulationResults().then((rows) => {
-      if (alive && rows?.length) setLiveData(rows);
+    fetchSimulationResults(selectedCohort).then((rows) => {
+      if (alive) setLiveData(Array.isArray(rows) ? rows : []);
     });
     return () => { alive = false; };
-  }, []);
+  }, [selectedCohort]);
 
-  // Re-load when Supabase data arrives (replaces config.js fallback values)
+  // Distinct scenarios present in the live rows, in first-seen order.
+  const scenarioKeys = liveData
+    ? [...new Set(liveData.map(r => r.scenario).filter(Boolean))]
+    : [];
+  const hasLiveResults = scenarioKeys.length > 0;
+
+  // Load the first live scenario once data arrives (or re-sync when it changes).
   useEffect(() => {
-    if (liveData && mode === "validated" && validatedKey) {
-      loadValidated(validatedKey);
+    if (!hasLiveResults) {
+      setResult(null);
+      setActiveScenario(null);
+      return;
     }
+    const next = scenarioKeys.includes(activeScenario) ? activeScenario : scenarioKeys[0];
+    loadScenario(next);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveData]);
 
@@ -630,38 +418,46 @@ export default function SimulationEngine({
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [msgs]);
 
-  // ── Load a validated scenario ─────────────────────────────────────────────────
-  function loadValidated(key) {
-    setValidatedKey(key);
-    setMode("validated");
-    setShowAnalytical(false);
-    const scen = VALIDATED[key];
-    setDropout(scen.dropout);
-    setEffect(scen.effect);
+  // ── Load a live scenario (from fetchSimulationResults rows) ───────────────────
+  // Builds the per-estimator result map straight from the backend contract
+  // (SimulationResultOut: scenario · estimator · power · effect_size · ci_*).
+  // Fields the read-model does not carry (bias/variance/mse) are left null and
+  // render as "—" — never reconstructed from removed demo coefficients.
+  function loadScenario(key) {
+    setActiveScenario(key);
 
-    const rows = liveData?.filter(r => r.scenario_name === key);
+    const rows = liveData?.filter(r => r.scenario === key) ?? [];
+    if (!rows.length) {
+      setResult(null);
+      setDropout(null);
+      setEffect(null);
+      return;
+    }
+
+    // Scenario-level params come from the rows when present (read-model may omit them).
+    const refRow = rows.find(r => r.estimator === "lme") ?? rows[0];
+    setDropout(refRow?.dropout ?? null);
+    setEffect(refRow?.effect_size != null ? Math.abs(refRow.effect_size) : null);
+
     const all  = {};
-    // Pick any row to read the actual N from — all estimators for a scenario share the same n_total
-    const refRow = rows?.find(r => r.estimator === "lme") ?? rows?.[0];
     for (const est of ESTIMATORS) {
-      if (rows?.length) {
-        const row = rows.find(r => r.estimator === est.key);
-        if (row) {
-          all[est.key] = {
-            power: row.power, bias: row.bias, variance: row.variance,
-            mse: row.mse, effect: row.mean_estimate,
-            ci: [row.ci_lower, row.ci_upper],
-          };
-          continue;
-        }
-      }
-      all[est.key] = scen.results[est.key] ?? null;
+      const row = rows.find(r => r.estimator === est.key);
+      all[est.key] = row
+        ? {
+            power:    row.power ?? null,
+            bias:     row.bias ?? null,
+            variance: row.variance ?? null,
+            mse:      row.mse ?? null,
+            effect:   row.effect_size ?? null,
+            ci:       [row.ci_lower ?? null, row.ci_upper ?? null],
+          }
+        : null;
     }
     setResult({
-      all, mode: "validated", ms: null, timestamp: new Date(),
-      source: rows?.length ? "Supabase" : "fallback",
-      // Store the bootstrap's actual N so the display reflects what was really run,
-      // not the full-cohort N (which differs for subgroup scenarios like high_risk)
+      all, timestamp: new Date(),
+      source: "live",
+      // The bootstrap's own N when the read-model reports it; otherwise null and
+      // the display falls back to the live cohort N (never a hardcoded value).
       bootstrapN: refRow?.n_total ?? null,
       bootstrapNTreatment: refRow?.n_treatment ?? null,
     });
@@ -680,10 +476,10 @@ export default function SimulationEngine({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001", max_tokens: 200,
-          system: `Augura E2 simulation assistant. ${partnerLabel} (N=${cohortN}).
-Current: ${estimator} estimator, ${Math.round(dropout * 100)}% dropout, effect assumed ${effectAssumed}.
-Result: power ${cur2?.power}%, MSE ${cur2?.mse?.toFixed(4)}, bias ${cur2?.bias?.toFixed(4)}.
-Mode: ${mode}. Regulatory target: HAS/DiGA (80% power threshold).
+          system: `Augura E2 simulation assistant. ${partnerLabel} (N=${cohortN ?? "unknown"}).
+Current: ${estimator} estimator${dropout != null ? `, ${Math.round(dropout * 100)}% dropout` : ""}${effectAssumed != null ? `, effect assumed ${effectAssumed}` : ""}.
+Result: power ${cur2?.power ?? "n/a"}%, MSE ${cur2?.mse != null ? cur2.mse.toFixed(4) : "n/a"}, bias ${cur2?.bias != null ? cur2.bias.toFixed(4) : "n/a"}.
+Source: live backend results. Regulatory target: HAS/DiGA (80% power threshold).
 Answer in under 90 words. Be direct. Use plain language (no jargon without explanation).`,
           messages: [{ role: "user", content: q }],
         }),
@@ -700,29 +496,11 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
   // ── Derived ───────────────────────────────────────────────────────────────────
   const cur     = result?.all?.[estimator];
   const allRows = result?.all ?? {};
-  const pcol    = cur ? powerColor(cur.power) : C.faint;
-  const scen    = VALIDATED[validatedKey];
+  const pcol    = cur?.power != null ? powerColor(cur.power) : C.faint;
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col">
-
-      {/* ── SUB-TABS: Results (existing simulation UI) · Pipeline (method docs) ── */}
-      <SubTabs
-        tabs={[
-          { id: "results",  label: "Results" },
-          { id: "pipeline", label: "Pipeline", icon: <FlaskConical size={13} /> },
-        ]}
-        active={subTab}
-        onChange={setSubTab}
-      />
-
-      {/* ── PIPELINE TAB — additive method documentation, no computation ── */}
-      {subTab === "pipeline" && <SimulationPipeline />}
-
-      {/* ── RESULTS TAB — existing simulation UI, unchanged ── */}
-      {subTab === "results" && (
-      <>
 
       {/* ── HEADER ── */}
       <div className="mb-4 flex items-start justify-between">
@@ -741,12 +519,9 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
           <Badge variant="outline" className="rounded-full border-border bg-muted/40 px-2.5 py-[3px] text-[11px] font-medium text-muted-foreground">
             {compEstimators.length} estimator{compEstimators.length !== 1 ? "s" : ""} selected
           </Badge>
-          {mode === "validated" && result?.source && (
-            <Badge variant="outline" className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              result.source === "Supabase"
-                ? "border-secondary bg-secondary text-[#085041]"
-                : "border-border bg-muted/40 text-muted-foreground/60"}`}>
-              {result.source === "Supabase" ? "● live" : "◌ fallback"}
+          {result?.source === "live" && (
+            <Badge variant="outline" className="rounded-full border-secondary bg-secondary px-2 py-0.5 text-[10px] font-medium text-[#085041]">
+              ● live
             </Badge>
           )}
         </div>
@@ -796,62 +571,48 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
         )}
       </div>
 
-      {/* ── SCENARIO TABS ── */}
+      {/* ── EMPTY STATE — no live results ── */}
+      {/* When the backend (fetchSimulationResults) returns no rows, we render an
+          honest empty state instead of fabricated demo scenarios/numbers. */}
+      {!hasLiveResults ? (
+        <EmptyState
+          title="No validated simulation results yet"
+          body={`Once a bootstrap run has been validated for the ${partnerLabel} cohort, its scenarios and estimator comparison will appear here. Nothing is shown until live results are available.`}
+        />
+      ) : (
+      <>
+
+      {/* ── SCENARIO TABS — derived from live backend results ── */}
       <div className="mb-2 flex flex-wrap gap-2">
-        {Object.entries(VALIDATED).map(([key]) => {
-          const isSel = validatedKey === key && mode === "validated";
+        {scenarioKeys.map((key) => {
+          const isSel = activeScenario === key;
           return (
-            <button key={key} onClick={() => loadValidated(key)}
+            <button key={key} onClick={() => loadScenario(key)}
               className={`rounded-full border-[1.5px] px-[18px] py-[7px] text-[12px] transition-all ${
                 isSel
                   ? "border-foreground bg-foreground font-semibold text-white"
                   : "border-border bg-card font-normal text-muted-foreground"}`}>
-              {SCENARIO_LABELS[key]}
+              {scenarioLabel(key)}
             </button>
           );
         })}
-        <button
-          onClick={() => {
-            setMode("analytical");
-            setValidatedKey(null);
-            setShowAnalytical(true);
-            const r = computeAnalytical({ n: cohortN, dropout, effectAssumed, sigma });
-            setResult(r);
-          }}
-          className={`ml-1 rounded-full border-[1.5px] px-[18px] py-[7px] text-[12px] transition-all ${
-            mode === "analytical"
-              ? "border-[#3172B0] bg-secondary font-semibold text-[#3172B0]"
-              : "border-border bg-transparent font-normal text-muted-foreground/60"}`}>
-          ⊞ Explore
-        </button>
       </div>
 
-      {/* Scenario description + parameter summary */}
-      {mode === "validated" && scen && (
-        <Card className="mb-3.5 gap-0 rounded-[10px] border-border bg-muted/40 p-[10px_14px]">
-          <div className="mb-2 text-[12px] italic text-muted-foreground">
-            {scen.description}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: "Sample size (N)", value: scen.n.toLocaleString() },
-              { label: "Assumed dropout", value: `${Math.round(scen.dropout * 100)}%` },
-              { label: "Assumed effect (ATT)", value: `−${scen.effect} HbA1c units` },
-              { label: "Noise level", value: scen.noise.charAt(0).toUpperCase() + scen.noise.slice(1) },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-[7px] border-[0.5px] border-border bg-card p-[5px_10px]">
-                <div className="mb-0.5 font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground/60">{label}</div>
-                <div className="font-mono text-[12px] font-semibold text-foreground">{value}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-      {mode === "analytical" && (
-        <div className="mb-3.5 text-[12px] italic text-[#3172B0]">
-          Analytical approximation — adjust parameters to explore power live
+      {/* Scenario parameter summary — only the values the read-model actually carries */}
+      <Card className="mb-3.5 gap-0 rounded-[10px] border-border bg-muted/40 p-[10px_14px]">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "Sample size (N)", value: cohortN != null ? cohortN.toLocaleString() : "—" },
+            { label: "Assumed dropout", value: dropout != null ? `${Math.round(dropout * 100)}%` : "—" },
+            { label: "Assumed effect (ATT)", value: effectAssumed != null ? `−${effectAssumed} HbA1c units` : "—" },
+          ].map(({ label, value }) => (
+            <div key={label} className="rounded-[7px] border-[0.5px] border-border bg-card p-[5px_10px]">
+              <div className="mb-0.5 font-mono text-[9px] uppercase tracking-[0.06em] text-muted-foreground/60">{label}</div>
+              <div className="font-mono text-[12px] font-semibold text-foreground">{value}</div>
+            </div>
+          ))}
         </div>
-      )}
+      </Card>
 
       {/* ── CONCEPT EXPLANATION (expandable) ── */}
       <Card className="mb-3.5 gap-0 overflow-hidden rounded-[10px] border-border bg-muted/40 p-0">
@@ -869,17 +630,17 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
               {
                 icon: "🧬",
                 title: "Digital twin",
-                body: `We fit statistical models to the real ${partnerLabel} dataset (N=${cohortN.toLocaleString()} patients). These capture the distribution of age, BMI, HbA1c, and treatment response. We then generate ${SYNTH_N.toLocaleString()} virtual patients who statistically mirror your real cohort — this is the "digital twin". It lets us run experiments we can't run on real patients.`,
+                body: `We fit statistical models to the real ${partnerLabel} dataset${cohortN != null ? ` (N=${cohortN.toLocaleString()} patients)` : ""}. These capture the distribution of age, BMI, HbA1c, and treatment response. We then generate virtual patients who statistically mirror your real cohort — this is the "digital twin". It lets us run experiments we can't run on real patients.`,
               },
               {
                 icon: "🔁",
-                title: `${BOOT_ITERS.toLocaleString()} repeated studies`,
-                body: `We run the full study ${BOOT_ITERS.toLocaleString()} times on the digital twin, each time drawing a random sample. Each "study" runs every estimator and records whether it detected the real effect at p<0.05. The power % = how often the estimator succeeded. This is more reliable than a formula because it uses your actual data distribution.`,
+                title: "Repeated studies",
+                body: `We run the full study many times on the digital twin, each time drawing a random sample. Each "study" runs every estimator and records whether it detected the real effect at p<0.05. The power % = how often the estimator succeeded. This is more reliable than a formula because it uses your actual data distribution.`,
               },
               {
                 icon: "📊",
                 title: "Bias, Variance, MSE",
-                body: `Bias = how far the estimator is from the true effect on average (across all 1,000 runs). Variance = how much results fluctuate. MSE (mean squared error) = bias² + variance — the single best summary of estimator quality. Lower = better. The scatter chart shows both at a glance: lower-left estimators are more accurate and consistent.`,
+                body: `Bias = how far the estimator is from the true effect on average across all runs. Variance = how much results fluctuate. MSE (mean squared error) = bias² + variance — the single best summary of estimator quality. Lower = better. The scatter chart shows both at a glance: lower-left estimators are more accurate and consistent.`,
               },
             ].map(({ icon, title, body }) => (
               <div key={title} className="rounded-lg border-[0.5px] border-border bg-card p-[10px_12px]">
@@ -893,33 +654,6 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
         )}
       </Card>
 
-      {/* ── ANALYTICAL EXPLORE PANEL ── */}
-      {mode === "analytical" && showAnalytical && (
-        <Card className="mb-3.5 gap-0 rounded-[10px] border-[#85B7EB] bg-secondary p-[14px_16px]">
-          <div className="mb-3 text-[11px] font-semibold text-[#3172B0]">
-            ⊞ Explore analytically — adjust parameters, results update live
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <Slider label="Assumed HbA1c effect" value={effectAssumed}
-              min={0.10} max={0.60} step={0.01}
-              format={v => `-${v.toFixed(2)} units`}
-              onChange={v => setEffect(v)} />
-            <Slider label="Dropout rate" value={dropout}
-              min={0} max={0.50} step={0.01}
-              format={v => `${Math.round(v * 100)}%`}
-              onChange={v => setDropout(v)} />
-            <Slider label="Residual noise (σ)" value={sigma}
-              min={0.10} max={0.80} step={0.05}
-              format={v => `σ = ${v.toFixed(2)}`}
-              onChange={v => setSigma(v)} />
-          </div>
-          <div className="mt-1.5 text-[10px] italic text-[#4B6D9A]"
-            title={`σ = residual standard deviation of HbA1c outcomes after adjusting for age, BMI, sex, and baseline HbA1c. Measured from the ${partnerLabel} validation cohort: σ≈0.12 (HIGH group), σ≈0.16 (REST group). Published real-world prediabetes literature reports σ=0.35–0.55 (Khunti et al. 2020, Diabetes Care). Higher σ = noisier real-world data = lower statistical power.`}>
-            σ=0.12 measured from {partnerLabel} cohort · Literature range 0.35–0.55 · hover for details
-          </div>
-        </Card>
-      )}
-
       {/* ── TWO-COLUMN LAYOUT ── */}
       <div className="grid grid-cols-1 items-start gap-3.5 lg:grid-cols-[310px_1fr]">
 
@@ -930,24 +664,16 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
             Simulation parameters
           </div>
 
-          {/* Parameters list */}
+          {/* Parameters list — live values only; unknowns render as "—" */}
           {[
             {
               label: "Source cohort",
-              value: `Prediabetes N=${(result?.bootstrapN ?? cohortN).toLocaleString()}`,
+              value: (result?.bootstrapN ?? cohortN) != null
+                ? `Prediabetes N=${(result?.bootstrapN ?? cohortN).toLocaleString()}`
+                : "—",
               tip: result?.bootstrapN && result.bootstrapN !== cohortN
-                ? `Bootstrap ran on N=${result.bootstrapN} (subgroup filter applied). Full cohort is N=${cohortN}.`
+                ? `Bootstrap ran on N=${result.bootstrapN} (subgroup filter applied)${cohortN != null ? `. Full cohort is N=${cohortN}.` : "."}`
                 : `Real-world ${partnerLabel} validation dataset`,
-            },
-            {
-              label: "Synthetic cohort size",
-              value: SYNTH_N.toLocaleString(),
-              tip: `${SYNTH_N.toLocaleString()} virtual patients generated per bootstrap run from the fitted data distribution`,
-            },
-            {
-              label: "Repeated studies",
-              value: BOOT_ITERS.toLocaleString(),
-              tip: `${BOOT_ITERS.toLocaleString()} bootstrap iterations — power = % of runs where the effect is detected at p<0.05`,
             },
             {
               label: "Follow-up window",
@@ -956,13 +682,13 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
             },
             {
               label: `Assumed ${selectedOutcome === "ldl" ? "LDL" : selectedOutcome === "crp" ? "CRP" : "HbA1c"} effect`,
-              value: mode === "validated" && scen ? `-${scen.effect.toFixed(2)} units` : `-${effectAssumed.toFixed(2)} units`,
+              value: effectAssumed != null ? `-${effectAssumed.toFixed(2)} units` : "—",
               tip: `Expected ATT — average ${outcomeLabel} reduction for High-engagers vs Rest`,
             },
             {
               label: "Dropout rate",
-              value: `${Math.round(dropout * 100)}%`,
-              orange: dropout > 0.25,
+              value: dropout != null ? `${Math.round(dropout * 100)}%` : "—",
+              orange: dropout != null && dropout > 0.25,
               tip: "Patients lost to follow-up before T12 — highlighted in orange above 25%",
             },
           ].map(({ label, value, orange, tip }) => (
@@ -973,20 +699,6 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
               <span className={`font-mono text-[12px] font-semibold ${orange ? "text-[#B98900]" : "text-foreground"}`}>{value}</span>
             </div>
           ))}
-
-          {/* Covariates */}
-          <div className="mt-3 border-t-[0.5px] border-dashed border-border pt-2.5">
-            <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.05em] text-muted-foreground/60">
-              Covariates adjusted
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {COVARIATES.map(c => (
-                <span key={c} className="rounded-full border-[0.5px] border-border bg-muted/40 px-[9px] py-0.5 text-[10.5px] text-muted-foreground">
-                  {c}
-                </span>
-              ))}
-            </div>
-          </div>
 
           {/* Selected estimator box */}
           <div className={`mt-3.5 rounded-lg border-[0.5px] p-[10px_12px] ${
@@ -1019,7 +731,7 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
           )}
 
           {/* Power summary */}
-          {cur && (
+          {cur?.power != null && (
             <div className="mt-3 border-t-[0.5px] border-dashed border-border pt-2.5">
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-[0.05em] text-muted-foreground/60">
@@ -1053,12 +765,14 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
               <div className="mt-2 flex gap-2">
                 <div className="flex-1 rounded-md bg-muted/40 p-[5px_8px]">
                   <div className="font-mono text-[9px] uppercase text-muted-foreground/60">Effect</div>
-                  <div className="mt-px font-mono text-[11px] font-semibold text-foreground">{cur.effect} HbA1c</div>
+                  <div className="mt-px font-mono text-[11px] font-semibold text-foreground">
+                    {cur.effect != null ? `${cur.effect} HbA1c` : "—"}
+                  </div>
                 </div>
                 <div className="flex-1 rounded-md bg-muted/40 p-[5px_8px]">
                   <div className="font-mono text-[9px] uppercase text-muted-foreground/60">95% CI</div>
                   <div className="mt-px font-mono text-[11px] font-semibold text-foreground">
-                    [{cur.ci?.[0]}, {cur.ci?.[1]}]
+                    {cur.ci?.[0] != null && cur.ci?.[1] != null ? `[${cur.ci[0]}, ${cur.ci[1]}]` : "—"}
                   </div>
                 </div>
               </div>
@@ -1168,11 +882,8 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
 
             {/* Footer note */}
             <div className="mt-2 border-t-[0.5px] border-border pt-2 text-[10px] italic text-muted-foreground/60">
-              {mode === "validated"
-                ? `Pre-computed parametric bootstrap · N=${BOOT_ITERS.toLocaleString()} iterations · Python 3.12 · scikit-learn 1.4`
-                : `Analytical approximation · calibrated to bootstrap baseline`}
-              {result?.source === "Supabase" && " · ● Supabase live data"}
-              {result?.ms != null && ` · ⚡ ${result.ms < 1 ? "< 1 ms" : `${result.ms.toFixed(1)} ms`}`}
+              Pre-computed parametric bootstrap — validated results served from the backend
+              {result?.source === "live" && " · ● live data"}
             </div>
           </Card>
 
@@ -1201,7 +912,7 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
       </div>
 
       {/* ── REGULATORY VERDICT ── */}
-      {cur && (() => {
+      {cur?.power != null && (() => {
         const v = verdictFor(cur.power, dropout);
         return (
           <div className="mt-3.5 rounded-[10px] border-[0.5px] p-[12px_16px]"
@@ -1228,7 +939,10 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
         </div>
       )}
 
-      {/* ── SIMULATION ASSISTANT CHAT (collapsible) ── */}
+      </>
+      )}
+
+      {/* ── SIMULATION ASSISTANT CHAT (collapsible) — always available ── */}
       <Card className="mt-3 gap-0 overflow-hidden rounded-[10px] border-border bg-card p-0">
         <button onClick={() => setShowChat(v => !v)}
           className="flex w-full items-center justify-between border-none bg-transparent p-[11px_14px]">
@@ -1308,8 +1022,8 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
                     ciLower: result.all[lockedEstimator].ci?.[0],
                     ciUpper: result.all[lockedEstimator].ci?.[1] }
                 : null,
-              mode: result?.mode ?? "live",
-              source: result?.source ?? "analytical",
+              mode: "live",
+              source: result?.source ?? "live",
             })}
             disabled={!lockedEstimator}
             title={!lockedEstimator ? "Lock an estimator first" : ""}>
@@ -1324,19 +1038,15 @@ Answer in under 90 words. Be direct. Use plain language (no jargon without expla
       {/* ── FOOTER ── */}
       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5">
         <span className="font-mono text-[10px] text-muted-foreground/60">
-          {mode === "validated"
-            ? `Bootstrap · N=${BOOT_ITERS.toLocaleString()} iterations · Python 3.12 · scikit-learn 1.4`
-            : "Analytical approximation · calibrated to bootstrap baseline"}
+          Bootstrap validation · results served from the backend
         </span>
         {result?.timestamp && (
           <span className="font-mono text-[10px] text-muted-foreground/60">
-            Computed {result.timestamp.toLocaleTimeString()}
+            Loaded {result.timestamp.toLocaleTimeString()}
           </span>
         )}
       </div>
 
-      </>
-      )}
     </div>
   );
 }

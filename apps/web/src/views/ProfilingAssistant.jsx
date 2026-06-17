@@ -1,40 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { isMockEnabled } from "@/mocks/mockMode";
 import { Sparkles, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InfoBar } from "../ui/components";
-
-// ── Demo profile — bypasses the E1 agent for fast demos ──────────────────────
-const DEMO_PROFILE = {
-  pubmed_evidence_count: 701,
-  risk_signal: "LOW",
-  study_designs: ["retrospective_cohort", "pre_post", "external_matched"],
-  risk_dimensions: [
-    { name:"Safety Signals & Failure Modes",               score:2, rationale:"Low MAUDE adverse event rate for comparable SaMD/DTx products. No FDA recalls identified." },
-    { name:"Generalizability, Equity & Robustness Risk",   score:4, rationale:"Evidence concentrated in high-SES employer cohorts; no independent external validation published." },
-    { name:"Implementation & Adoption Risk",               score:4, rationale:"Digital therapeutics show 40–60% engagement drop-off at 12 weeks; alert fatigue is a known risk." },
-    { name:"Limited Actionability & Intervention Linkage", score:3, rationale:"Recommendation specificity varies; protocolized arms outperform vague lifestyle advice in RCTs." },
-    { name:"Limited Scalability & Market Breadth",         score:3, rationale:"Large target population but B2B contracting dependency; mainly urban/academic trial sites so far." },
-    { name:"Limited Reproducibility & Consistency of Evidence", score:4, rationale:"Heterogeneous effect sizes across DTx studies; most evidence is single-team with no independent replication." },
-  ],
-  opportunity_dimensions: [
-    { name:"Clinical Need & Indication Strength",        score:5, rationale:"Prediabetes and cardiometabolic risk represent a major disease burden. Digital platforms address a clear unmet gap in scalable preventive care." },
-    { name:"Evidence Strength & Credibility",            score:3, rationale:"701-document corpus contains 286 prospective/RCT designs (41%); most digital preventive health evidence remains observational." },
-    { name:"Effect Size & Outcome Impact Signal",        score:4, rationale:"HbA1c reductions of 0.3–0.5% in high-engagement cohorts are clinically meaningful and comparable to first-line pharmacological thresholds." },
-    { name:"Actionability & Intervention Linkage",       score:3, rationale:"Recommendation modules linked to measurable behaviour change targets; protocolization could be strengthened." },
-    { name:"Reproducibility & Consistency of Evidence",  score:3, rationale:"Directionally consistent results but high heterogeneity (I²>60%); limited independent external replication." },
-    { name:"Regulatory & Reimbursement Pathway Clarity", score:4, rationale:"DiGA Germany fastest pathway (Lykon precedent); EU MDR Art. 22 wellness and HAS DSN also applicable." },
-  ],
-  // Documents the agent "retrieved" this run — populates the Corpus Intelligence panel.
-  referenced_docs: [
-    { source_id: "pubmed",         evidence_type: "rct",           title: "Digital lifestyle intervention and HbA1c in prediabetes: a randomized trial" },
-    { source_id: "pubmed",         evidence_type: "meta_analysis", title: "Engagement with digital therapeutics and glycaemic outcomes: a systematic review" },
-    { source_id: "clinicaltrials", evidence_type: "rct",           title: "Remote coaching for cardiometabolic risk reduction" },
-    { source_id: "maude",          evidence_type: "adverse_event", title: "Adverse-event reports for wellness SaMD (cardiometabolic category)" },
-    { source_id: "guidance",       evidence_type: "guidance",      title: "FDA — General Wellness: Policy for Low Risk Devices" },
-  ],
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 0: PROFILING ASSISTANT
@@ -440,50 +408,7 @@ CRITICAL: Return raw JSON only. No markdown fences. No \`\`\`json. No \`\`\` wra
     throw new Error("API unavailable after retries — please try again in a moment");
   }
 
-  // Demo profiling — a scripted, animated run over canned data. Never hits the
-  // network, never fails. Used whenever the Demo-data toggle is on.
-  async function runDemoAnimation() {
-    setStep("running"); setSteps([]); setAgentError(null); setBannerDismissed(false);
-    onRunStart?.({ product, users, projectId: tenantSlug, ranAt: new Date().toISOString() });
-    const addLine = (t, replaceLast = false) => setSteps(p => {
-      const repl = replaceLast && p.length && String(p[p.length - 1]).startsWith("__SYNTHSTREAM:");
-      const next = repl ? [...p.slice(0, -1), t] : [...p, t];
-      onStepsChange?.(next);
-      return next;
-    });
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    const SOURCES = [
-      { name: "search_pubmed",         q: "prediabetes digital therapeutic HbA1c engagement", n: 42 },
-      { name: "search_clinicaltrials", q: "lifestyle intervention cardiometabolic remote",     n: 18 },
-      { name: "search_maude",          q: "wellness SaMD / DTx adverse events",                 n: 3  },
-      { name: "search_fda_guidance",   q: "general wellness software · SaMD intended use",      n: 7  },
-    ];
-    addLine("__INIT__");
-    await sleep(500);
-    for (const s of SOURCES) {
-      addLine(`__QUERY:${s.name}:${s.q}__`);
-      await sleep(700);
-      addLine(`__RESULT:${s.name}:${s.n}__`);
-      await sleep(300);
-    }
-    addLine("__SYNTH__");
-    const synth = "Benchmarking Lucis against 47 comparable preventive-health products across 70 retrieved documents — scoring regulatory, evidence and safety dimensions.";
-    const words = synth.split(" ");
-    let acc = "";
-    for (let i = 0; i < words.length; i++) {
-      acc += (i ? " " : "") + words[i];
-      addLine(`__SYNTHSTREAM:${acc}__`, i > 0);
-      await sleep(40);
-    }
-    await sleep(500);
-    addLine(`__SYNTHDATA:${JSON.stringify({ design: "Retrospective cohort", endpoint: "HbA1c change at 12 months" })}__`);
-    addLine(`✓ Profile complete — ${DEMO_PROFILE.pubmed_evidence_count} comparable studies · MAUDE ${DEMO_PROFILE.risk_signal.toLowerCase()} risk · ${DEMO_PROFILE.study_designs.length} study designs ready`);
-    setStep("done");
-    onDone?.(DEMO_PROFILE);
-  }
-
   async function run() {
-    if (isMockEnabled()) return runDemoAnimation();
     setStep("running"); setSteps([]); setAgentError(null); setBannerDismissed(false);
     onRunStart?.({ product, users, projectId: tenantSlug, ranAt: new Date().toISOString() });
     // E1 profiling reasons about the literature/corpus only — not the user's

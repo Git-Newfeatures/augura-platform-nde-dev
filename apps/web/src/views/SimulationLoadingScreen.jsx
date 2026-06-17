@@ -5,9 +5,9 @@ import { Check } from "lucide-react";
 export default function SimulationLoadingScreen({ estimators, studyType }) {
   const [step, setStep] = useState(0);
   const steps = [
-    "Applying DAG adjustment set (Age, Sex, BMI, HbA1c₀)",
+    "Applying the confirmed DAG adjustment set",
     `Loading ${estimators?.length ?? 4} estimator${estimators?.length !== 1 ? "s" : ""} for ${studyType === "retro" ? "retrospective" : "prospective"} study`,
-    "Calibrating bootstrap scenarios (N=1,000 iterations)",
+    "Calibrating bootstrap scenarios",
     "Initialising analytical engine · ready",
   ];
   useEffect(() => {

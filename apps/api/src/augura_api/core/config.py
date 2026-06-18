@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # CORS — origines autorisées pour le front (apps/web). Liste séparée par des
     # virgules : AUGURA_CORS_ORIGINS="https://app.augura.io,https://staging…".
     cors_origins: str = _CORS_DEV_DEFAULT
+    # Regex d'origine optionnelle, en plus de la liste explicite. Indispensable pour
+    # les previews Vercel dynamiques : AUGURA_CORS_ORIGIN_REGEX='^https://.*\.vercel\.app$'.
+    cors_origin_regex: str | None = None
 
     # Infra — optionnels au boot (le healthcheck n'en a pas besoin) ; les
     # composants qui les consomment échouent franchement s'ils manquent.
@@ -78,10 +81,14 @@ class Settings(BaseSettings):
     def _require_explicit_prod_cors(self) -> "Settings":
         # En prod, la valeur localhost par défaut rejetterait le vrai front
         # (allow_credentials=True ⇒ pas de wildcard possible) : fail-fast au boot.
-        if self.env == "prod" and self.cors_origins == _CORS_DEV_DEFAULT:
+        if (
+            self.env == "prod"
+            and self.cors_origins == _CORS_DEV_DEFAULT
+            and not self.cors_origin_regex
+        ):
             raise ValueError(
-                "AUGURA_CORS_ORIGINS doit être défini explicitement en prod "
-                "(origine(s) du front), pas la valeur localhost par défaut."
+                "AUGURA_CORS_ORIGINS ou AUGURA_CORS_ORIGIN_REGEX doit être défini "
+                "explicitement en prod (origine(s) du front), pas la valeur localhost par défaut."
             )
         return self
 

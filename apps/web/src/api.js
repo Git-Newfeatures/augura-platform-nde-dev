@@ -7,14 +7,16 @@
 // Supabase REST directes. Les types canoniques vivent dans packages/api-client.
 import { supabase } from './supabase'
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+// Repli prod = backend Modal. Surchargé par VITE_API_URL quand il est défini
+// (http://localhost:8000 en dev via .env.local, ou une env var du projet Vercel).
+// Évite que le build prod tape en relatif sur l'origine du front → 404.
+const FALLBACK_API_BASE = 'https://quentin-45919--augura-api-api.modal.run'
+const API_BASE = import.meta.env.VITE_API_URL || FALLBACK_API_BASE
 
-// Sans VITE_API_URL, les appels deviennent relatifs (mêmes origines) — un oubli de
-// config en build, pas un mode voulu. On le signale au lieu de l'avaler en silence.
-if (!API_BASE) {
+if (!import.meta.env.VITE_API_URL) {
   console.warn(
-    '[augura] VITE_API_URL is empty — API calls will be relative to the web origin. ' +
-      'Set VITE_API_URL (e.g. http://localhost:8000 in dev, the Modal domain in prod).',
+    `[augura] VITE_API_URL non défini — repli sur le backend Modal par défaut (${FALLBACK_API_BASE}). ` +
+      'Définis VITE_API_URL pour cibler un autre backend (ex. http://localhost:8000 en dev).',
   )
 }
 

@@ -7,14 +7,15 @@
 #   MODAL_TOKEN_ID / MODAL_TOKEN_SECRET dans l'env.
 #
 # Usage :
-#   bash scripts/deploy_modal.sh 'https://<app>.vercel.app[,https://autre-origine]'
+#   bash scripts/deploy_modal.sh                       # CORS = regex *.vercel.app (prod + previews)
+#   bash scripts/deploy_modal.sh 'https://app.augura.io' # + un domaine custom explicite
 #
-# L'argument = origine(s) du front Vercel (obligatoire : en prod l'API refuse de
-# booter sans AUGURA_CORS_ORIGINS explicite — fail-fast).
+# Le CORS couvre par défaut toutes les origines Vercel (prod + previews dynamiques)
+# via AUGURA_CORS_ORIGIN_REGEX. L'argument optionnel ajoute un domaine explicite.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-FRONT_ORIGIN="${1:?Usage: deploy_modal.sh '<https://votre-app.vercel.app[,...]>'}"
+FRONT_ORIGIN="${1:-}"   # optionnel : domaine custom en plus des previews Vercel
 [ -f .env ] || { echo "apps/api/.env introuvable (valeurs prod requises)"; exit 1; }
 
 # Charge AUGURA_* + clés LLM depuis .env sans les afficher.
@@ -31,10 +32,11 @@ ANTHRO="${AUGURA_ANTHROPIC_API_KEY:-${ANTHROPIC_API_KEY:-}}"
 OPENAI="${AUGURA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 [ -n "$OPENAI" ] && EXTRA+=("AUGURA_OPENAI_API_KEY=${OPENAI}")
 
-echo "[1/3] secret Modal 'augura-api' (env=prod, cors=${FRONT_ORIGIN})"
+echo "[1/3] secret Modal 'augura-api' (env=prod, cors regex=*.vercel.app${FRONT_ORIGIN:+ + $FRONT_ORIGIN})"
 modal secret create augura-api --force \
   AUGURA_ENV=prod \
   AUGURA_DATABASE_URL="${AUGURA_DATABASE_URL:?AUGURA_DATABASE_URL manquant dans .env}" \
+  AUGURA_CORS_ORIGIN_REGEX='^https://.*\.vercel\.app$' \
   AUGURA_CORS_ORIGINS="${FRONT_ORIGIN}" \
   AUGURA_SUPABASE_JWT_AUDIENCE="${AUGURA_SUPABASE_JWT_AUDIENCE:-authenticated}" \
   "${EXTRA[@]}"

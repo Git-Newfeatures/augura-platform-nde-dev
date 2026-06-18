@@ -165,6 +165,57 @@
         "title": "ArtifactOut",
         "type": "object"
       },
+      "BiomarkerRangeOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Max"
+          },
+          "value_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Min"
+          }
+        },
+        "required": [
+          "code",
+          "pattern"
+        ],
+        "title": "BiomarkerRangeOut",
+        "type": "object"
+      },
       "Body_upload_dataset_datasets_upload_post": {
         "properties": {
           "file": {
@@ -218,6 +269,17 @@
           "code": {
             "title": "Code",
             "type": "string"
+          },
+          "default_evidence_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Evidence Type"
           },
           "description": {
             "anyOf": [
@@ -346,6 +408,41 @@
           "model"
         ],
         "title": "ChatResponse",
+        "type": "object"
+      },
+      "CodeLabelOut": {
+        "description": "Shared shape for evidence-types, domains, jurisdictions, literature designs.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "sort_order"
+        ],
+        "title": "CodeLabelOut",
         "type": "object"
       },
       "CohortBiomarkerIn": {
@@ -1910,6 +2007,30 @@
         "title": "DqBundleOut",
         "type": "object"
       },
+      "DqRulesOut": {
+        "properties": {
+          "biomarker_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/BiomarkerRangeOut"
+            },
+            "title": "Biomarker Ranges",
+            "type": "array"
+          },
+          "pii_patterns": {
+            "items": {
+              "$ref": "#/components/schemas/PiiPatternOut"
+            },
+            "title": "Pii Patterns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pii_patterns",
+          "biomarker_ranges"
+        ],
+        "title": "DqRulesOut",
+        "type": "object"
+      },
       "DqRunResult": {
         "properties": {
           "bundle_id": {
@@ -1938,6 +2059,134 @@
           "status"
         ],
         "title": "DqRunResult",
+        "type": "object"
+      },
+      "EstimandOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "recommended": {
+            "default": false,
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "regulatory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regulatory"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "sort_order"
+        ],
+        "title": "EstimandOut",
+        "type": "object"
+      },
+      "EstimatorOut": {
+        "properties": {
+          "bootstrap_pending": {
+            "default": false,
+            "title": "Bootstrap Pending",
+            "type": "boolean"
+          },
+          "eligible_study_types": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Eligible Study Types",
+            "type": "array"
+          },
+          "interpretability": {
+            "default": 0,
+            "title": "Interpretability",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "recommended": {
+            "default": false,
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "short": {
+            "title": "Short",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "stability": {
+            "default": true,
+            "title": "Stability",
+            "type": "boolean"
+          },
+          "tooltip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooltip"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "short",
+          "sort_order"
+        ],
+        "title": "EstimatorOut",
         "type": "object"
       },
       "EstimatorPowerOut": {
@@ -2147,6 +2396,29 @@
           "documents"
         ],
         "title": "FeedResponse",
+        "type": "object"
+      },
+      "FrameworkOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "sort_order"
+        ],
+        "title": "FrameworkOut",
         "type": "object"
       },
       "FrozenResult": {
@@ -2818,6 +3090,112 @@
         "title": "MissingVariable",
         "type": "object"
       },
+      "OutcomeOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_primary": {
+            "default": false,
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "regulatory_tags": {
+            "default": [],
+            "items": {},
+            "title": "Regulatory Tags",
+            "type": "array"
+          },
+          "short_key": {
+            "title": "Short Key",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          },
+          "verdict_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict Label"
+          }
+        },
+        "required": [
+          "code",
+          "short_key",
+          "label",
+          "sort_order"
+        ],
+        "title": "OutcomeOut",
+        "type": "object"
+      },
+      "PiiPatternOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "pattern"
+        ],
+        "title": "PiiPatternOut",
+        "type": "object"
+      },
       "PowerRequest": {
         "properties": {
           "dropout": {
@@ -3004,6 +3382,55 @@
           "created_at"
         ],
         "title": "RecentEvent",
+        "type": "object"
+      },
+      "RelationOut": {
+        "description": "Relation causale de l'ontologie (B1) — sortie de GET /semantic/relations.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "default_strength": {
+            "title": "Default Strength",
+            "type": "string"
+          },
+          "mechanism_summary": {
+            "title": "Mechanism Summary",
+            "type": "string"
+          },
+          "object_concept_id": {
+            "title": "Object Concept Id",
+            "type": "string"
+          },
+          "polarity": {
+            "title": "Polarity",
+            "type": "string"
+          },
+          "predicate": {
+            "title": "Predicate",
+            "type": "string"
+          },
+          "relation_id": {
+            "title": "Relation Id",
+            "type": "string"
+          },
+          "subject_concept_id": {
+            "title": "Subject Concept Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation_id",
+          "subject_concept_id",
+          "predicate",
+          "object_concept_id",
+          "polarity",
+          "default_strength",
+          "mechanism_summary",
+          "active"
+        ],
+        "title": "RelationOut",
         "type": "object"
       },
       "SearchHit": {
@@ -3722,6 +4149,25 @@
             "title": "Code",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "estimands": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Estimands",
+            "type": "array"
+          },
           "group_name": {
             "anyOf": [
               {
@@ -3740,6 +4186,12 @@
           "sort_order": {
             "title": "Sort Order",
             "type": "integer"
+          },
+          "tags": {
+            "default": [],
+            "items": {},
+            "title": "Tags",
+            "type": "array"
           }
         },
         "required": [
@@ -4130,6 +4582,107 @@
           "matches"
         ],
         "title": "VariableCheckResponse",
+        "type": "object"
+      },
+      "VariableGroupOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "VariableGroupOut",
+        "type": "object"
+      },
+      "VariableRoleOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "group_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Code"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "selectable": {
+            "default": true,
+            "title": "Selectable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "VariableRoleOut",
+        "type": "object"
+      },
+      "VariableRolesOut": {
+        "properties": {
+          "group_aliases": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Group Aliases",
+            "type": "object"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/VariableGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/VariableRoleOut"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups",
+          "roles",
+          "group_aliases"
+        ],
+        "title": "VariableRolesOut",
         "type": "object"
       }
     }
@@ -5849,6 +6402,227 @@
         ]
       }
     },
+    "/reference/domains": {
+      "get": {
+        "operationId": "domains_reference_domains_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeLabelOut"
+                  },
+                  "title": "Response Domains Reference Domains Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Domains",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/dq-rules": {
+      "get": {
+        "operationId": "dq_rules_reference_dq_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DqRulesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dq Rules",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/estimands": {
+      "get": {
+        "operationId": "estimands_reference_estimands_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EstimandOut"
+                  },
+                  "title": "Response Estimands Reference Estimands Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Estimands",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/estimators": {
+      "get": {
+        "operationId": "estimators_reference_estimators_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EstimatorOut"
+                  },
+                  "title": "Response Estimators Reference Estimators Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Estimators",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/evidence-types": {
+      "get": {
+        "operationId": "evidence_types_reference_evidence_types_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeLabelOut"
+                  },
+                  "title": "Response Evidence Types Reference Evidence Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Evidence Types",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/frameworks": {
+      "get": {
+        "operationId": "frameworks_reference_frameworks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FrameworkOut"
+                  },
+                  "title": "Response Frameworks Reference Frameworks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Frameworks",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/jurisdictions": {
+      "get": {
+        "operationId": "jurisdictions_reference_jurisdictions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeLabelOut"
+                  },
+                  "title": "Response Jurisdictions Reference Jurisdictions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Jurisdictions",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/literature-study-designs": {
+      "get": {
+        "operationId": "literature_study_designs_reference_literature_study_designs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeLabelOut"
+                  },
+                  "title": "Response Literature Study Designs Reference Literature Study Designs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Literature Study Designs",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/outcomes": {
+      "get": {
+        "operationId": "outcomes_reference_outcomes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OutcomeOut"
+                  },
+                  "title": "Response Outcomes Reference Outcomes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Outcomes",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
     "/reference/study-designs": {
       "get": {
         "operationId": "study_designs_reference_study_designs_get",
@@ -5890,6 +6664,27 @@
           }
         },
         "summary": "Tenant",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/reference/variable-roles": {
+      "get": {
+        "operationId": "variable_roles_reference_variable_roles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariableRolesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Variable Roles",
         "tags": [
           "reference"
         ]
@@ -5953,6 +6748,60 @@
           }
         },
         "summary": "Concepts",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/relations": {
+      "get": {
+        "description": "Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id).",
+        "operationId": "relations_semantic_relations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "concept_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Concept Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RelationOut"
+                  },
+                  "title": "Response Relations Semantic Relations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Relations",
         "tags": [
           "semantic"
         ]

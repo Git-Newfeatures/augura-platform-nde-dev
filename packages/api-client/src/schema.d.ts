@@ -657,6 +657,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reference/domains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Domains */
+        get: operations["domains_reference_domains_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/dq-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dq Rules */
+        get: operations["dq_rules_reference_dq_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/estimands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimands */
+        get: operations["estimands_reference_estimands_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/estimators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estimators */
+        get: operations["estimators_reference_estimators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/evidence-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Evidence Types */
+        get: operations["evidence_types_reference_evidence_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/frameworks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Frameworks */
+        get: operations["frameworks_reference_frameworks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/jurisdictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jurisdictions */
+        get: operations["jurisdictions_reference_jurisdictions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/literature-study-designs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Literature Study Designs */
+        get: operations["literature_study_designs_reference_literature_study_designs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reference/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Outcomes */
+        get: operations["outcomes_reference_outcomes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reference/study-designs": {
         parameters: {
             query?: never;
@@ -691,6 +844,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reference/variable-roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Variable Roles */
+        get: operations["variable_roles_reference_variable_roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/semantic/concepts": {
         parameters: {
             query?: never;
@@ -700,6 +870,26 @@ export interface paths {
         };
         /** Concepts */
         get: operations["concepts_semantic_concepts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/semantic/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Relations
+         * @description Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id).
+         */
+        get: operations["relations_semantic_relations_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -909,6 +1099,19 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** BiomarkerRangeOut */
+        BiomarkerRangeOut: {
+            /** Code */
+            code: string;
+            /** Pattern */
+            pattern: string;
+            /** Unit */
+            unit?: string | null;
+            /** Value Max */
+            value_max?: number | null;
+            /** Value Min */
+            value_min?: number | null;
+        };
         /** Body_upload_dataset_datasets_upload_post */
         Body_upload_dataset_datasets_upload_post: {
             /** File */
@@ -924,6 +1127,8 @@ export interface components {
             base_url?: string | null;
             /** Code */
             code: string;
+            /** Default Evidence Type */
+            default_evidence_type?: string | null;
             /** Description */
             description?: string | null;
             /** Doc Type */
@@ -960,6 +1165,20 @@ export interface components {
             model: string;
             /** Text */
             text: string;
+        };
+        /**
+         * CodeLabelOut
+         * @description Shared shape for evidence-types, domains, jurisdictions, literature designs.
+         */
+        CodeLabelOut: {
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /** Label */
+            label: string;
+            /** Sort Order */
+            sort_order: number;
         };
         /** CohortBiomarkerIn */
         CohortBiomarkerIn: {
@@ -1415,6 +1634,13 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** DqRulesOut */
+        DqRulesOut: {
+            /** Biomarker Ranges */
+            biomarker_ranges: components["schemas"]["BiomarkerRangeOut"][];
+            /** Pii Patterns */
+            pii_patterns: components["schemas"]["PiiPatternOut"][];
+        };
         /** DqRunResult */
         DqRunResult: {
             /**
@@ -1426,6 +1652,64 @@ export interface components {
             overall_score?: number | null;
             /** Status */
             status: string;
+        };
+        /** EstimandOut */
+        EstimandOut: {
+            /** Description */
+            description?: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /** Regulatory */
+            regulatory?: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /** Tag */
+            tag?: string | null;
+        };
+        /** EstimatorOut */
+        EstimatorOut: {
+            /**
+             * Bootstrap Pending
+             * @default false
+             */
+            bootstrap_pending: boolean;
+            /**
+             * Eligible Study Types
+             * @default []
+             */
+            eligible_study_types: string[];
+            /**
+             * Interpretability
+             * @default 0
+             */
+            interpretability: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Recommended
+             * @default false
+             */
+            recommended: boolean;
+            /** Short */
+            short: string;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Stability
+             * @default true
+             */
+            stability: boolean;
+            /** Tooltip */
+            tooltip?: string | null;
         };
         /** EstimatorPowerOut */
         EstimatorPowerOut: {
@@ -1499,6 +1783,15 @@ export interface components {
             /** Documents */
             documents: components["schemas"]["FeedDocument"][];
             meta: components["schemas"]["FeedMeta"];
+        };
+        /** FrameworkOut */
+        FrameworkOut: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Sort Order */
+            sort_order: number;
         };
         /**
          * FrozenResult
@@ -1781,6 +2074,44 @@ export interface components {
             /** Severity */
             severity: string;
         };
+        /** OutcomeOut */
+        OutcomeOut: {
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+            /** Label */
+            label: string;
+            /**
+             * Regulatory Tags
+             * @default []
+             */
+            regulatory_tags: unknown[];
+            /** Short Key */
+            short_key: string;
+            /** Sort Order */
+            sort_order: number;
+            /** Unit */
+            unit?: string | null;
+            /** Verdict */
+            verdict?: string | null;
+            /** Verdict Label */
+            verdict_label?: string | null;
+        };
+        /** PiiPatternOut */
+        PiiPatternOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Pattern */
+            pattern: string;
+        };
         /** PowerRequest */
         PowerRequest: {
             /**
@@ -1848,6 +2179,28 @@ export interface components {
             route?: string | null;
             /** User Id */
             user_id?: string | null;
+        };
+        /**
+         * RelationOut
+         * @description Relation causale de l'ontologie (B1) — sortie de GET /semantic/relations.
+         */
+        RelationOut: {
+            /** Active */
+            active: boolean;
+            /** Default Strength */
+            default_strength: string;
+            /** Mechanism Summary */
+            mechanism_summary: string;
+            /** Object Concept Id */
+            object_concept_id: string;
+            /** Polarity */
+            polarity: string;
+            /** Predicate */
+            predicate: string;
+            /** Relation Id */
+            relation_id: string;
+            /** Subject Concept Id */
+            subject_concept_id: string;
         };
         /** SearchHit */
         SearchHit: {
@@ -2101,12 +2454,24 @@ export interface components {
         StudyDesignOut: {
             /** Code */
             code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Estimands
+             * @default []
+             */
+            estimands: string[];
             /** Group Name */
             group_name?: string | null;
             /** Label */
             label: string;
             /** Sort Order */
             sort_order: number;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: unknown[];
         };
         /** StudyOut */
         StudyOut: {
@@ -2234,6 +2599,40 @@ export interface components {
             dataset_questions?: components["schemas"]["DatasetQuestion"][] | null;
             /** Matches */
             matches: components["schemas"]["ColumnMatch"][];
+        };
+        /** VariableGroupOut */
+        VariableGroupOut: {
+            /** Code */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /** Label */
+            label?: string | null;
+        };
+        /** VariableRoleOut */
+        VariableRoleOut: {
+            /** Code */
+            code: string;
+            /** Group Code */
+            group_code?: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Selectable
+             * @default true
+             */
+            selectable: boolean;
+        };
+        /** VariableRolesOut */
+        VariableRolesOut: {
+            /** Group Aliases */
+            group_aliases: {
+                [key: string]: string;
+            };
+            /** Groups */
+            groups: components["schemas"]["VariableGroupOut"][];
+            /** Roles */
+            roles: components["schemas"]["VariableRoleOut"][];
         };
     };
     responses: never;
@@ -3461,6 +3860,186 @@ export interface operations {
             };
         };
     };
+    domains_reference_domains_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeLabelOut"][];
+                };
+            };
+        };
+    };
+    dq_rules_reference_dq_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DqRulesOut"];
+                };
+            };
+        };
+    };
+    estimands_reference_estimands_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimandOut"][];
+                };
+            };
+        };
+    };
+    estimators_reference_estimators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimatorOut"][];
+                };
+            };
+        };
+    };
+    evidence_types_reference_evidence_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeLabelOut"][];
+                };
+            };
+        };
+    };
+    frameworks_reference_frameworks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameworkOut"][];
+                };
+            };
+        };
+    };
+    jurisdictions_reference_jurisdictions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeLabelOut"][];
+                };
+            };
+        };
+    };
+    literature_study_designs_reference_literature_study_designs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeLabelOut"][];
+                };
+            };
+        };
+    };
+    outcomes_reference_outcomes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutcomeOut"][];
+                };
+            };
+        };
+    };
     study_designs_reference_study_designs_get: {
         parameters: {
             query?: never;
@@ -3501,6 +4080,26 @@ export interface operations {
             };
         };
     };
+    variable_roles_reference_variable_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariableRolesOut"];
+                };
+            };
+        };
+    };
     concepts_semantic_concepts_get: {
         parameters: {
             query?: {
@@ -3520,6 +4119,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConceptOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relations_semantic_relations_get: {
+        parameters: {
+            query?: {
+                concept_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationOut"][];
                 };
             };
             /** @description Validation Error */

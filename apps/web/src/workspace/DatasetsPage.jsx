@@ -13,6 +13,7 @@ import {
   Check,
   AlertTriangle,
   Plus,
+  X,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -673,32 +674,131 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
   )
 }
 
-// ── Add-dataset screen (green CTA target) — the upload dropzone, wired so a
-// successful upload drops straight into the new dataset's detail view. ─────────
-function AddDatasetView({ onBack, onUploaded }) {
+// ── Add-dataset modal (green CTA target) — registers a dataset like Nico's
+// legacy form (name + study), but with the file: one POST /datasets/upload
+// creates + profiles it, then we land in the new dataset's full detail view. ──
+const MODAL_INPUT_CLS =
+  'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground ' +
+  'placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15'
+
+function AddDatasetModal({ studies, onClose, onUploaded }) {
+  const [name, setName] = useState('')
+  const [studyId, setStudyId] = useState('')
+  const [file, setFile] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const fileRef = useRef(null)
+
+  function pickFile(f) {
+    if (!f) return
+    setFile(f)
+    if (!name.trim()) setName(f.name.replace(/\.(csv|xlsx|xls)$/i, ''))
+  }
+
+  async function submit() {
+    if (!file || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await uploadDataset(file, {
+        name: name.trim() || undefined,
+        studyId: studyId || undefined,
+      })
+      onUploaded(result)
+    } catch (e) {
+      setError(String(e?.message || e))
+      setBusy(false)
+    }
+  }
+
   return (
-    <WorkspacePage
-      eyebrow="Library · Cohorts"
-      title="Add dataset"
-      sub="Upload a CSV or Excel file — it's parsed and profiled server-side, then registered as a new dataset."
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(15,14,12,0.34)] p-4 backdrop-blur-[2px]"
+      onClick={onClose}
     >
-      <div className="flex flex-col gap-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary transition-colors hover:text-primary/80"
-        >
-          <ArrowLeft size={14} /> Back to datasets
-        </button>
-        <UploadPanel columns={null} onUploaded={onUploaded} />
-      </div>
-    </WorkspacePage>
+      <Card className="w-full max-w-[460px] gap-0 overflow-hidden p-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-border p-5">
+          <div>
+            <h2 className="text-[16px] font-semibold text-foreground">Add dataset</h2>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              Register a cohort dataset — the file is parsed and profiled server-side.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4 p-5">
+          <label className="block">
+            <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Dataset name</div>
+            <input
+              className={MODAL_INPUT_CLS}
+              placeholder="e.g. cohort_2026"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Study</div>
+            <select className={MODAL_INPUT_CLS} value={studyId} onChange={(e) => setStudyId(e.target.value)}>
+              <option value="">— No study —</option>
+              {(studies || []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <div className="mb-1.5 text-[12.5px] font-medium text-foreground">
+              File <span className="text-[#C0392B]">*</span>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={(e) => pickFile(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/80"
+            >
+              <Upload size={15} className="flex-shrink-0" />
+              {file ? (
+                <span className="truncate font-mono text-foreground">{file.name}</span>
+              ) : (
+                'Choose CSV or Excel file'
+              )}
+            </button>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">.csv · .xlsx · .xls</p>
+          </label>
+          {error && <div className="text-[12px] text-destructive">{error}</div>}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-border p-5">
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button disabled={!file || busy} onClick={submit}>
+            {busy ? 'Uploading…' : 'Add dataset'}
+          </Button>
+        </div>
+      </Card>
+    </div>
   )
 }
 
 export function DatasetsPage() {
   const [reloadToken, setReloadToken] = useState(0)
   const { data: datasets, loading } = useCollection('datasets', reloadToken)
+  const { data: studies } = useCollection('studies')
   const { openStudy } = useStudyNav()
   const [selectedDataset, setSelectedDataset] = useState(null)
   const [adding, setAdding] = useState(false)
@@ -727,10 +827,6 @@ export function DatasetsPage() {
       <Plus className="h-3.5 w-3.5" /> Add dataset
     </Button>
   )
-
-  if (adding) {
-    return <AddDatasetView onBack={() => setAdding(false)} onUploaded={handleUploaded} />
-  }
 
   if (selectedDataset) {
     return (
@@ -797,6 +893,13 @@ export function DatasetsPage() {
             </div>
           ))}
         </Card>
+      )}
+      {adding && (
+        <AddDatasetModal
+          studies={studies}
+          onClose={() => setAdding(false)}
+          onUploaded={handleUploaded}
+        />
       )}
     </WorkspacePage>
   )

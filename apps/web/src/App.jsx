@@ -8,6 +8,7 @@ import { AppShell } from './shell/AppShell'
 import { DatasetsPage } from './workspace/DatasetsPage'
 import { CorpusPage } from './workspace/CorpusPage'
 import { VariablesPage } from './workspace/VariablesPage'
+import { CausalModelingPage } from './workspace/CausalModelingPage'
 import { SemanticLayerPage } from './workspace/SemanticLayerPage'
 import { RunsPage } from './workspace/RunsPage'
 import { DossiersPage } from './workspace/DossiersPage'
@@ -54,6 +55,7 @@ function AuthenticatedApp() {
         <Route path="/intake" element={<IntakeApp />} />
         <Route path="/corpus" element={<CorpusPage />} />
         <Route path="/variables" element={<VariablesPage />} />
+        <Route path="/causal" element={<CausalModelingPage />} />
         <Route path="/semantic" element={<SemanticLayerPage />} />
         <Route path="/runs" element={<RunsPage />} />
         <Route path="/dossiers" element={<DossiersPage />} />

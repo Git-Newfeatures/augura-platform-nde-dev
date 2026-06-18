@@ -6,31 +6,15 @@ import { Button } from "@/components/ui/button";
 import { useReference, normEstimators, estimatorFilter } from "@/workspace/dataClient";
 import { apiJson } from "@/api";
 
-const ESTIMATOR_META = {
-  lme: {
-    desc: "Best fit for longitudinal biomarker data with repeated measurements per user. Accounts for individual-level variation over time.",
-    tags: [["g", "Recommended"], ["b", "Handles missing data"], ["b", "Longitudinal"]],
-  },
-  ols: {
-    desc: "Simpler benchmark model. Adjusted for all measured confounders. Interpretable coefficients. Best used alongside LME to check robustness.",
-    tags: [["a", "Benchmark"], ["b", "Interpretable"]],
-  },
-  ipw: {
-    desc: "Reweights users by inverse probability of group assignment. Balances covariate distributions between HIGH and REST groups.",
-    tags: [["b", "Covariate balance"], ["a", "Higher variance"]],
-  },
-  mediation: {
-    desc: "Baron-Kenny framework + ACME estimation. Decomposes direct and indirect effects. Cannot be combined with total-effect estimators on the same estimand.",
-    tags: [["b", "Mechanism analysis"], ["a", "Requires mediator variables"]],
-  },
-  tmle: {
-    desc: "Doubly robust — valid if either the outcome model or propensity model is correctly specified. Most robust to unmeasured confounding.",
-    tags: [["b", "Doubly robust"], ["p", "Advanced"]],
-  },
-  did: {
-    desc: "Compares change over time between groups rather than absolute levels. Controls for stable baseline differences. Requires parallel trends assumption.",
-    tags: [["b", "Time-invariant control"], ["a", "Parallel trends required"]],
-  },
+// Tags-only presentation map (generic signal labels). Estimator DESCRIPTIONS are
+// sourced live from the /reference/estimators catalog tooltip, not hardcoded here.
+const ESTIMATOR_TAGS = {
+  lme: [["g", "Recommended"], ["b", "Handles missing data"], ["b", "Longitudinal"]],
+  ols: [["a", "Benchmark"], ["b", "Interpretable"]],
+  ipw: [["b", "Covariate balance"], ["a", "Higher variance"]],
+  mediation: [["b", "Mechanism analysis"], ["a", "Requires mediator variables"]],
+  tmle: [["b", "Doubly robust"], ["p", "Advanced"]],
+  did: [["b", "Time-invariant control"], ["a", "Parallel trends required"]],
 };
 
 // Accent tones for the small meta tags (brand signal palette).
@@ -127,7 +111,8 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
         <div className="flex flex-col gap-2">
           {visibleEstimators.map((e) => {
             const checked = estimators.includes(e.key);
-            const meta = ESTIMATOR_META[e.key] ?? { desc: "", tags: [] };
+            const desc = e.tooltip ?? "";
+            const tags = ESTIMATOR_TAGS[e.key] ?? [];
             return (
               <button
                 key={e.key}
@@ -152,9 +137,9 @@ export default function StudyDesign({ studyType, studyDesign = "retro_cohort", s
                       {e.bootstrapPending && <Tone c="a">Bootstrap pending</Tone>}
                     </div>
                   </div>
-                  <div className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{meta.desc}</div>
+                  <div className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{desc}</div>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {meta.tags.map(([c, t]) => (
+                    {tags.map(([c, t]) => (
                       <Tone key={t} c={c}>{t}</Tone>
                     ))}
                   </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Library, Network } from 'lucide-react'
+import { Library, Network, TriangleAlert } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
@@ -11,34 +11,48 @@ import { apiJson } from '@/api'
 // Quentin) : le catalogue de concepts (GET /semantic/concepts) + l'ontologie
 // causale revue (GET /semantic/relations, subsystem B1).
 
+// Renvoie { data, error } pour distinguer « 0 ligne en base » d'un échec réseau /
+// 401 / 500 — sinon une erreur ressemble à un état vide et masque la vraie cause.
 function useEndpoint(path) {
   const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
         const d = await apiJson(path)
         if (alive) setData(Array.isArray(d) ? d : [])
-      } catch {
-        if (alive) setData([])
+      } catch (e) {
+        if (alive) setError(String(e?.message || e))
       }
     })()
     return () => {
       alive = false
     }
   }, [path])
-  return data
+  return { data, error }
+}
+
+function ErrorState({ path, error }) {
+  return (
+    <EmptyState
+      icon={TriangleAlert}
+      title="Couldn't load from the backend"
+      subtitle={`GET ${path} failed — ${error}`}
+    />
+  )
 }
 
 function Concepts() {
-  const concepts = useEndpoint('/semantic/concepts')
+  const { data: concepts, error } = useEndpoint('/semantic/concepts')
+  if (error) return <ErrorState path="/semantic/concepts" error={error} />
   if (concepts == null) return <Loading />
   if (concepts.length === 0) {
     return (
       <EmptyState
         icon={Library}
-        title="No taxonomy concepts yet"
-        subtitle="The semantic taxonomy will appear here once the bundle is seeded into the live DB."
+        title="No taxonomy concepts in the live DB"
+        subtitle="The endpoint responded with 0 rows. Apply the taxonomy seed (apps/api/supabase/seed.sql) to the live public schema behind Modal."
       />
     )
   }
@@ -90,15 +104,17 @@ function polarityBadge(polarity) {
 }
 
 function Relations() {
-  const relations = useEndpoint('/semantic/relations')
-  const concepts = useEndpoint('/semantic/concepts')
+  const { data: relations, error: relError } = useEndpoint('/semantic/relations')
+  const { data: concepts, error: cptError } = useEndpoint('/semantic/concepts')
+  const error = relError || cptError
+  if (error) return <ErrorState path="/semantic/relations" error={error} />
   if (relations == null || concepts == null) return <Loading />
   if (relations.length === 0) {
     return (
       <EmptyState
         icon={Network}
-        title="No causal relations yet"
-        subtitle="The reviewed causal ontology (B1) will appear here once the bundle is applied to the live DB."
+        title="No causal relations in the live DB"
+        subtitle="The endpoint responded with 0 rows. Apply the B1 ontology seed (schema + seed + policies) to the live public schema behind Modal."
       />
     )
   }

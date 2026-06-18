@@ -12,7 +12,7 @@ import InlineChatbot from "../components/InlineChatbot";
 // ─────────────────────────────────────────────────────────────────────────────
 // VIEW 7: CAUSAL MODEL
 // Implements Causal Roadmap steps D1–D3:
-//   D1 — Causal question + population (HIGH vs REST engagement)
+//   D1 — Causal question + population (exposure vs comparison group)
 //   D2 — Estimand (ATT — Average Treatment effect on the Treated)
 //   D3 — Minimal sufficient adjustment set (confounders)
 // ─────────────────────────────────────────────────────────────────────────────

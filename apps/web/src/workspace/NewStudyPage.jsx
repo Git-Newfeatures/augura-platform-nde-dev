@@ -93,7 +93,7 @@ export function NewStudyPage() {
         <Field label="Study name" hint="required">
           <input
             className={fieldCls}
-            placeholder="e.g. Lucis — preventive biomarkers"
+            placeholder="e.g. preventive cardiometabolic biomarkers"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') create() }}

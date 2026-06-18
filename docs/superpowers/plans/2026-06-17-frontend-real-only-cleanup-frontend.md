@@ -28,6 +28,13 @@ All commands run from `apps/web/` unless noted. `vite build` fails on unresolved
 | `views/ProfilingAssistant.jsx` | `STUDY_DESIGN_FALLBACK`, `DOC_TYPE_FALLBACK`, inline `RANGES` | `ID_COLS` (see note) |
 | `views/DatasetVerification.jsx` | `PII_PATTERNS`, `GROUPS`, `GROUP_REMAP`, `ROLES`, `ROLE_LABEL` | `ROLE_TAG` |
 | `data/projectDefaults.ts` | `FALLBACK_PROJECT_ID` | `BLANK_DEFAULTS` |
+| `SimulationEngine.jsx` *(gap, found by completeness critic)* | `OUTCOME_LABELS` | — |
+| `views/CausalModel.jsx` *(gap)* | `D1_OUTCOME_MAP`, `OUTCOME_LABEL_MAP`, inline outcome label maps, Lucis demo strings (`D1_COMPARATOR`, intervention/population fallbacks) | — |
+| `views/DataAvailability.jsx` *(gap)* | `PRIMARY_OUTCOME_ROW`, `DYNAMIC_SECONDARIES` (hardcoded outcome labels + clinical caveats) | live cohort pct/N access |
+
+> **Backend gap:** `CeslSourceOut` must also expose `default_evidence_type`
+> (column/seed exist but the response schema omitted it, so F5's
+> `SOURCE_ET_DEFAULTS` reads a field the API never returns).
 
 > **Note on `ID_COLS`** (ProfilingAssistant.jsx:72): a short list of conventional
 > id column names (`member_id`, `user_id`, …) used purely for local duplicate

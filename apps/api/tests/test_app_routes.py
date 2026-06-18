@@ -40,6 +40,7 @@ def test_openapi_exposes_routes() -> None:
         "/semantic/concepts",
         "/semantic/relations",
         "/datasets/{dataset_id}/map",
+        "/causal/dag",
     ):
         assert path in paths, path
 
@@ -93,4 +94,9 @@ async def test_protected_routes_require_auth() -> None:
             r = await client.post(path)
             assert r.status_code == 401, path
             assert r.headers["content-type"] == "application/problem+json"
+            assert r.json()["code"] == "unauthorized"
+        # POST routes with a body : corps valide vide ⇒ l'auth (401) précède le métier.
+        for path in ("/causal/dag",):
+            r = await client.post(path, json={})
+            assert r.status_code == 401, path
             assert r.json()["code"] == "unauthorized"

@@ -8,6 +8,7 @@ from augura_api.modules.semantic.models import (
     DqConstraint,
     OntologyRelation,
     OntologyRelationEvidence,
+    OntologyRelationQualifier,
     TableArchetype,
     TaxonomyConcept,
     TaxonomyDqValidValue,
@@ -83,6 +84,10 @@ class SemanticRepo:
 
     async def list_relation_evidence(self) -> list[OntologyRelationEvidence]:
         stmt = select(OntologyRelationEvidence)
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def list_relation_qualifiers(self) -> list[OntologyRelationQualifier]:
+        stmt = select(OntologyRelationQualifier)
         return list((await self.session.execute(stmt)).scalars().all())
 
     async def list_causal_predicates(self) -> list[CausalPredicate]:

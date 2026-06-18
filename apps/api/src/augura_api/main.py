@@ -6,6 +6,7 @@ from augura_api.core.errors import register_error_handlers
 from augura_api.core.logging import RequestIdMiddleware, configure_logging
 from augura_api.modules.agents import router as agents_router
 from augura_api.modules.analytics import router as analytics_router
+from augura_api.modules.causal import router as causal_router
 from augura_api.modules.corpus import router as corpus_router
 from augura_api.modules.datasets import router as datasets_router
 from augura_api.modules.documents import router as documents_router
@@ -50,5 +51,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(analytics_router)
     app.include_router(reference_router)
     app.include_router(semantic_router)
+    app.include_router(causal_router)
 
     return app

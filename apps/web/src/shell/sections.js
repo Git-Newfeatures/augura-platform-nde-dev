@@ -3,6 +3,7 @@ import {
   Database,
   Library,
   Variable,
+  Layers,
   Settings2,
   FileText,
 } from 'lucide-react'
@@ -15,6 +16,7 @@ export const WORKSPACE_SECTIONS = [
   { id: 'intake',    label: 'Intake',             path: '/intake',    icon: FileText },
   { id: 'corpus',    label: 'Literature',         path: '/corpus',    icon: Library },
   { id: 'variables', label: 'Variables & Models', path: '/variables', icon: Variable },
+  { id: 'semantic',  label: 'Semantic layer',     path: '/semantic',  icon: Layers },
   { id: 'runs',      label: 'Audit',              path: '/runs',      icon: Settings2, subtle: true },
   { id: 'dossiers',  label: 'Dossiers',           path: '/dossiers',  icon: FileText },
 ]

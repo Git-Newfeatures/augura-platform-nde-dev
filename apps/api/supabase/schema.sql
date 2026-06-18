@@ -604,6 +604,99 @@ create index if not exists taxonomy_synonyms_synonym_idx on taxonomy_synonyms (l
 create index if not exists taxonomy_measurement_units_concept_idx on taxonomy_measurement_units (concept_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Module : semantic (B1) — ontologie/causal globale (lecture seule). DDL porté
+-- de l'MVP semantic schema → public, FKs vers taxonomy_concepts conservées.
+-- Substrat consommé par B2 (dag-llm) et B4 (enrich). Ordre : parents FK d'abord
+-- (codes/areas/relationships → concepts ; causal_predicates → ontology_relations
+-- → evidence/qualifiers).
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table if not exists taxonomy_standard_codes (
+  local_concept_id      text not null references taxonomy_concepts(local_concept_id),
+  vocabulary_id         text not null,
+  concept_code          text not null,
+  standard_concept_id   text,
+  standard_concept_name text,
+  standard_concept_flag text,
+  concept_class_id      text,
+  primary key (local_concept_id, vocabulary_id, concept_code)
+);
+
+create table if not exists taxonomy_therapeutic_areas (
+  local_concept_id text not null references taxonomy_concepts(local_concept_id),
+  therapeutic_area text not null,
+  primary key (local_concept_id, therapeutic_area)
+);
+
+create table if not exists taxonomy_relationships (
+  relationship_id   text primary key,
+  from_concept_id   text not null references taxonomy_concepts(local_concept_id),
+  to_concept_id     text not null references taxonomy_concepts(local_concept_id),
+  relationship_type text not null,
+  provenance        text not null,
+  notes             text
+);
+
+create table if not exists causal_predicates (
+  predicate_id   text primary key,
+  label          text not null,
+  description    text not null,
+  direction_type text not null,
+  review_status  text not null,
+  version        text not null
+);
+
+create table if not exists dq_predicates (
+  predicate_id   text primary key,
+  label          text not null,
+  description    text not null,
+  direction_type text not null,
+  review_status  text not null,
+  version        text not null
+);
+
+create table if not exists ontology_relations (
+  relation_id          text primary key,
+  subject_concept_id   text not null references taxonomy_concepts(local_concept_id),
+  predicate            text not null references causal_predicates(predicate_id),
+  object_concept_id    text not null references taxonomy_concepts(local_concept_id),
+  polarity             text not null,
+  default_strength     text not null,
+  default_temporal_lag text not null,
+  mechanism_summary    text not null,
+  review_status        text not null,
+  version              text not null,
+  active               boolean not null
+);
+
+create table if not exists ontology_relation_evidence (
+  evidence_id       text primary key,
+  relation_id       text not null references ontology_relations(relation_id),
+  source_type       text not null,
+  citation_or_url   text not null,
+  evidence_summary  text not null,
+  population_notes  text not null,
+  evidence_strength text not null,
+  review_status     text not null
+);
+
+create table if not exists ontology_relation_qualifiers (
+  qualifier_id         text primary key,
+  relation_id          text not null references ontology_relations(relation_id),
+  qualifier_type       text not null,
+  qualifier_concept_id text references taxonomy_concepts(local_concept_id),
+  qualifier_value      text not null,
+  qualifier_effect     text not null,
+  is_hard_constraint   boolean not null,
+  notes                text not null
+);
+
+create index if not exists ontology_relations_subject_idx on ontology_relations (subject_concept_id);
+create index if not exists ontology_relations_object_idx on ontology_relations (object_concept_id);
+create index if not exists ontology_relation_evidence_relation_idx
+  on ontology_relation_evidence (relation_id);
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- Module : corpus — recherche live (retrieve-and-freeze)
 -- Miroir de la migration alembic 0002_literature_live_search. Verbe distinct de
 -- l'ingestion : récupère + gèle un jeu de preuves (content_hash), sans toucher au

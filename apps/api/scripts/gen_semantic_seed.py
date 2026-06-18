@@ -17,13 +17,16 @@ BOOL_COLS: dict[str, set[str]] = {
     "table_archetypes": {"is_surrogate", "active"},
     "taxonomy_measurement_units": {"is_preferred"},
     "unit_conversions": {"bidirectional"},
+    "ontology_relations": {"active"},
+    "ontology_relation_qualifiers": {"is_hard_constraint"},
 }
 NUM_COLS: dict[str, set[str]] = {
     "taxonomy_concepts": {"layer", "value_min", "value_max"},
     "table_archetypes": {"semantic_score"},
     "unit_conversions": {"scale_factor", "offset", "precision"},
 }
-# Ordre d'insertion (FK : concepts d'abord).
+# Ordre d'insertion (FK : concepts d'abord, puis causal_predicates avant
+# ontology_relations, puis evidence/qualifiers).
 TABLES = [
     "taxonomy_concepts",
     "taxonomy_synonyms",
@@ -32,6 +35,15 @@ TABLES = [
     "unit_conversions",
     "table_archetypes",
     "dq_constraints",
+    # Ontologie/causal (B1)
+    "taxonomy_standard_codes",
+    "taxonomy_therapeutic_areas",
+    "taxonomy_relationships",
+    "causal_predicates",
+    "dq_predicates",
+    "ontology_relations",
+    "ontology_relation_evidence",
+    "ontology_relation_qualifiers",
 ]
 
 
@@ -60,7 +72,7 @@ def rows_to_sql(table: str, csv_path: Path) -> str:
 
 def main() -> None:
     csv_dir = Path(sys.argv[1])
-    header = "-- ===== semantic taxonomy seed (A1) — généré par gen_semantic_seed.py ====="
+    header = "-- ===== semantic taxonomy + ontology seed (A1+B1) — gen_semantic_seed.py ====="
     out: list[str] = [header]
     for table in TABLES:
         csv_path = csv_dir / f"{table}.csv"

@@ -275,6 +275,26 @@ alter table dq_constraints force row level security;
 create policy backend_read on dq_constraints
   for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
 
+-- ── Ontologie/causal (B1) : globale, lecture seule (FOR SELECT) ───────────
+-- Mêmes catalogues de référence que la taxonomie A1 : RLS activée + gate
+-- « session backend » en lecture. Aucune policy d'écriture ⇒ le seed entre par
+-- le rôle privilégié.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'taxonomy_standard_codes','taxonomy_therapeutic_areas','taxonomy_relationships',
+    'causal_predicates','dq_predicates','ontology_relations',
+    'ontology_relation_evidence','ontology_relation_qualifiers'
+  ] loop
+    execute format('alter table %I enable row level security;', t);
+    execute format('alter table %I force row level security;', t);
+    execute format('drop policy if exists backend_read on %I;', t);
+    execute format($f$create policy backend_read on %I for select
+        using (nullif(current_setting('app.tenant_id', true), '') is not null);$f$, t);
+  end loop;
+end $$;
+
 -- ── dq_bundles (A3a) : tenant-scopé via org_id ───────────────────────────
 alter table dq_bundles enable row level security;
 alter table dq_bundles force row level security;

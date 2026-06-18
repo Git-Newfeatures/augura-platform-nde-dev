@@ -1,14 +1,18 @@
 """Accès base du module semantic — catalogues globaux (lecture seule)."""
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.modules.semantic.models import (
+    CausalPredicate,
     DqConstraint,
+    OntologyRelation,
+    OntologyRelationEvidence,
     TableArchetype,
     TaxonomyConcept,
     TaxonomyDqValidValue,
     TaxonomyMeasurementUnit,
+    TaxonomyRelationship,
     TaxonomySynonym,
     UnitConversion,
 )
@@ -52,3 +56,37 @@ class SemanticRepo:
         if status:
             stmt = stmt.where(DqConstraint.status == status)
         return list((await self.session.execute(stmt)).scalars().all())
+
+    # ── Ontologie/causal (B1) ──────────────────────────────────────────────
+
+    async def list_relations(self, *, active: bool = True) -> list[OntologyRelation]:
+        stmt = select(OntologyRelation)
+        if active:
+            stmt = stmt.where(OntologyRelation.active.is_(True))
+        stmt = stmt.order_by(OntologyRelation.relation_id)
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def relations_for_concepts(self, concept_ids: list[str]) -> list[OntologyRelation]:
+        """Sous-graphe : relations actives dont le sujet OU l'objet ∈ concept_ids (B2)."""
+        stmt = (
+            select(OntologyRelation)
+            .where(
+                OntologyRelation.active.is_(True),
+                or_(
+                    OntologyRelation.subject_concept_id.in_(concept_ids),
+                    OntologyRelation.object_concept_id.in_(concept_ids),
+                ),
+            )
+            .order_by(OntologyRelation.relation_id)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def list_relation_evidence(self) -> list[OntologyRelationEvidence]:
+        stmt = select(OntologyRelationEvidence)
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def list_causal_predicates(self) -> list[CausalPredicate]:
+        return list((await self.session.execute(select(CausalPredicate))).scalars().all())
+
+    async def list_relationships(self) -> list[TaxonomyRelationship]:
+        return list((await self.session.execute(select(TaxonomyRelationship))).scalars().all())

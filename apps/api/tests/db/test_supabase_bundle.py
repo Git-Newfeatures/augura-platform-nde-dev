@@ -39,6 +39,15 @@ EXPECTED_TABLES = {
     "unit_conversions",
     "table_archetypes",
     "dq_constraints",
+    # Ontologie/causal (B1) — globaux, lecture seule.
+    "taxonomy_standard_codes",
+    "taxonomy_therapeutic_areas",
+    "taxonomy_relationships",
+    "causal_predicates",
+    "dq_predicates",
+    "ontology_relations",
+    "ontology_relation_evidence",
+    "ontology_relation_qualifiers",
     "dq_bundles",
     "literature_snapshots",
     "search_sessions",
@@ -199,4 +208,34 @@ def test_seed_includes_semantic_taxonomy() -> None:
         "table_archetypes",
         "taxonomy_measurement_units",
     ):
+        assert f"insert into {t} " in seed
+
+
+# ── Ontologie/causal (B1) : 8 tables globales, lecture seule, seedées. ──────
+ONTOLOGY_TABLES = (
+    "taxonomy_standard_codes",
+    "taxonomy_therapeutic_areas",
+    "taxonomy_relationships",
+    "causal_predicates",
+    "dq_predicates",
+    "ontology_relations",
+    "ontology_relation_evidence",
+    "ontology_relation_qualifiers",
+)
+
+
+def test_ontology_tables_have_select_only_rls() -> None:
+    # RLS posée via boucle format() : on vérifie l'appartenance au tableau bouclé
+    # + que la policy émise est bien FOR SELECT (lecture seule, pas d'écriture tenant).
+    policies = _read("policies.sql")
+    array_blocks = re.findall(r"array\[(.*?)\]", policies, re.DOTALL)
+    looped = {name for block in array_blocks for name in re.findall(r"'(\w+)'", block)}
+    missing = set(ONTOLOGY_TABLES) - looped
+    assert not missing, f"RLS backend_read manquante sur ontologie : {missing}"
+    assert "create policy backend_read on %i for select" in policies.lower()
+
+
+def test_seed_includes_ontology() -> None:
+    seed = _read("seed.sql").lower()
+    for t in ("ontology_relations", "causal_predicates", "taxonomy_standard_codes"):
         assert f"insert into {t} " in seed

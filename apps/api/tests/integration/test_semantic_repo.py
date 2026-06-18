@@ -69,3 +69,35 @@ async def test_taxonomy_is_read_only_for_tenant(
                     "values (:i, 1, 'x', 'd', 'r', 'v', true)"
                 ).bindparams(i="rogue-" + uuid4().hex[:6])
             )
+
+
+async def test_ontology_relations_readable_and_seeded(
+    sm: async_sessionmaker[AsyncSession],
+) -> None:
+    tenant = TenantId(uuid4())
+    async with sm() as session, session.begin():
+        await _scope(session, tenant, USER)
+        repo = SemanticRepo(session)
+        relations = await repo.list_relations()
+        predicates = await repo.list_causal_predicates()
+    assert len(relations) > 50  # ~75 seedées
+    assert all(r.active for r in relations)
+    assert [r.relation_id for r in relations] == sorted(r.relation_id for r in relations)
+    assert len(predicates) >= 1
+    # Intégrité FK : sujet et objet pointent sur des concepts (ids non vides).
+    assert all(r.subject_concept_id and r.object_concept_id for r in relations)
+
+
+async def test_relations_for_concepts_returns_subgraph(
+    sm: async_sessionmaker[AsyncSession],
+) -> None:
+    tenant = TenantId(uuid4())
+    async with sm() as session, session.begin():
+        await _scope(session, tenant, USER)
+        repo = SemanticRepo(session)
+        anchor = (await repo.list_relations())[0].subject_concept_id
+        subgraph = await repo.relations_for_concepts([anchor])
+    assert subgraph, "sous-graphe vide pour un concept présent dans l'ontologie"
+    assert all(
+        anchor in (r.subject_concept_id, r.object_concept_id) for r in subgraph
+    )

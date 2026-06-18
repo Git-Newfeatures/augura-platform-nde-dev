@@ -101,3 +101,92 @@ class DqConstraint(Base):
     evidence_source: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text)
     version: Mapped[str] = mapped_column(Text)
+
+
+# ── Ontologie/causal (B1) — lecture seule (B2/B4 consomment) ────────────────
+
+
+class TaxonomyStandardCode(Base):
+    __tablename__ = "taxonomy_standard_codes"
+    local_concept_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    vocabulary_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    concept_code: Mapped[str] = mapped_column(Text, primary_key=True)
+    standard_concept_id: Mapped[str | None] = mapped_column(Text)
+    standard_concept_name: Mapped[str | None] = mapped_column(Text)
+    standard_concept_flag: Mapped[str | None] = mapped_column(Text)
+    concept_class_id: Mapped[str | None] = mapped_column(Text)
+
+
+class TaxonomyTherapeuticArea(Base):
+    __tablename__ = "taxonomy_therapeutic_areas"
+    local_concept_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    therapeutic_area: Mapped[str] = mapped_column(Text, primary_key=True)
+
+
+class TaxonomyRelationship(Base):
+    __tablename__ = "taxonomy_relationships"
+    relationship_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    from_concept_id: Mapped[str] = mapped_column(Text)
+    to_concept_id: Mapped[str] = mapped_column(Text)
+    relationship_type: Mapped[str] = mapped_column(Text)
+    provenance: Mapped[str] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+class CausalPredicate(Base):
+    __tablename__ = "causal_predicates"
+    predicate_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    label: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    direction_type: Mapped[str] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+    version: Mapped[str] = mapped_column(Text)
+
+
+class DqPredicate(Base):
+    __tablename__ = "dq_predicates"
+    predicate_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    label: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    direction_type: Mapped[str] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+    version: Mapped[str] = mapped_column(Text)
+
+
+class OntologyRelation(Base):
+    __tablename__ = "ontology_relations"
+    relation_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    subject_concept_id: Mapped[str] = mapped_column(Text)
+    predicate: Mapped[str] = mapped_column(Text)
+    object_concept_id: Mapped[str] = mapped_column(Text)
+    polarity: Mapped[str] = mapped_column(Text)
+    default_strength: Mapped[str] = mapped_column(Text)
+    default_temporal_lag: Mapped[str] = mapped_column(Text)
+    mechanism_summary: Mapped[str] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+    version: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean)
+
+
+class OntologyRelationEvidence(Base):
+    __tablename__ = "ontology_relation_evidence"
+    evidence_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    relation_id: Mapped[str] = mapped_column(Text)
+    source_type: Mapped[str] = mapped_column(Text)
+    citation_or_url: Mapped[str] = mapped_column(Text)
+    evidence_summary: Mapped[str] = mapped_column(Text)
+    population_notes: Mapped[str] = mapped_column(Text)
+    evidence_strength: Mapped[str] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+
+
+class OntologyRelationQualifier(Base):
+    __tablename__ = "ontology_relation_qualifiers"
+    qualifier_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    relation_id: Mapped[str] = mapped_column(Text)
+    qualifier_type: Mapped[str] = mapped_column(Text)
+    qualifier_concept_id: Mapped[str | None] = mapped_column(Text)
+    qualifier_value: Mapped[str] = mapped_column(Text)
+    qualifier_effect: Mapped[str] = mapped_column(Text)
+    is_hard_constraint: Mapped[bool] = mapped_column(Boolean)
+    notes: Mapped[str] = mapped_column(Text)

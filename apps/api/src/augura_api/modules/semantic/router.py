@@ -18,3 +18,13 @@ async def concepts(
     active: bool = True,
 ) -> list[schemas.ConceptOut]:
     return await SemanticService(SemanticRepo(session)).concepts(domain=domain, active=active)
+
+
+@router.get("/relations", response_model=list[schemas.RelationOut])
+async def relations(
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    concept_id: str | None = None,
+) -> list[schemas.RelationOut]:
+    """Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id)."""
+    return await SemanticService(SemanticRepo(session)).relations(concept_id=concept_id)

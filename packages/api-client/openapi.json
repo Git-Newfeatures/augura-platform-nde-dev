@@ -253,6 +253,124 @@
         "title": "Body_upload_dataset_datasets_upload_post",
         "type": "object"
       },
+      "CausalDagRequest": {
+        "properties": {
+          "clinical_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Question"
+          },
+          "mapped_concepts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MappedConcept"
+            },
+            "title": "Mapped Concepts",
+            "type": "array"
+          },
+          "picot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Picot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "CausalDagRequest",
+        "type": "object"
+      },
+      "CausalDagResponse": {
+        "properties": {
+          "clinical_question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Question"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/augura_api__modules__causal__schemas__DagEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "format": {
+            "default": "augura.intake.dag/1",
+            "title": "Format",
+            "type": "string"
+          },
+          "generation_mode": {
+            "default": "ontology_llm",
+            "title": "Generation Mode",
+            "type": "string"
+          },
+          "graph": {
+            "$ref": "#/components/schemas/Graph"
+          },
+          "llm_context": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Llm Context",
+            "type": "object"
+          },
+          "missing_variables": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/augura_api__modules__causal__schemas__MissingVariable"
+            },
+            "title": "Missing Variables",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/augura_api__modules__causal__schemas__DagNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "proposed_relations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProposedRelation"
+            },
+            "title": "Proposed Relations",
+            "type": "array"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "graph",
+          "nodes",
+          "edges",
+          "quality"
+        ],
+        "title": "CausalDagResponse",
+        "type": "object"
+      },
       "CeslSourceOut": {
         "properties": {
           "base_url": {
@@ -1590,63 +1708,6 @@
         "title": "CoverageResponse",
         "type": "object"
       },
-      "DagEdge": {
-        "properties": {
-          "from": {
-            "title": "From",
-            "type": "string"
-          },
-          "to": {
-            "title": "To",
-            "type": "string"
-          }
-        },
-        "required": [
-          "from",
-          "to"
-        ],
-        "title": "DagEdge",
-        "type": "object"
-      },
-      "DagNode": {
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "measured": {
-            "title": "Measured",
-            "type": "boolean"
-          },
-          "rationale": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rationale"
-          },
-          "role": {
-            "title": "Role",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "role",
-          "measured"
-        ],
-        "title": "DagNode",
-        "type": "object"
-      },
       "DagRequest": {
         "properties": {
           "candidate_outcomes": {
@@ -1757,14 +1818,14 @@
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/DagEdge"
+              "$ref": "#/components/schemas/augura_api__modules__agents__schemas__DagEdge"
             },
             "title": "Edges",
             "type": "array"
           },
           "nodes": {
             "items": {
-              "$ref": "#/components/schemas/DagNode"
+              "$ref": "#/components/schemas/augura_api__modules__agents__schemas__DagNode"
             },
             "title": "Nodes",
             "type": "array"
@@ -2558,7 +2619,7 @@
         "properties": {
           "missing_variables": {
             "items": {
-              "$ref": "#/components/schemas/MissingVariable"
+              "$ref": "#/components/schemas/augura_api__modules__agents__schemas__MissingVariable"
             },
             "title": "Missing Variables",
             "type": "array"
@@ -2686,6 +2747,50 @@
           "created_at"
         ],
         "title": "GeneratedDocumentOut",
+        "type": "object"
+      },
+      "Graph": {
+        "properties": {
+          "adjusted_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Adjusted Ids",
+            "type": "array"
+          },
+          "exposure_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Exposure Ids",
+            "type": "array"
+          },
+          "latent_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Latent Ids",
+            "type": "array"
+          },
+          "outcome_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Outcome Ids",
+            "type": "array"
+          },
+          "type": {
+            "const": "dag",
+            "default": "dag",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "Graph",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -3022,6 +3127,46 @@
         "title": "MapResult",
         "type": "object"
       },
+      "MappedConcept": {
+        "description": "Un concept issu du mapping (POST /datasets/{id}/map) présent dans la donnée.",
+        "properties": {
+          "concept_domain": {
+            "default": "unknown",
+            "title": "Concept Domain",
+            "type": "string"
+          },
+          "concept_id": {
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "concept_label": {
+            "default": "",
+            "title": "Concept Label",
+            "type": "string"
+          },
+          "concept_layer": {
+            "default": 0,
+            "title": "Concept Layer",
+            "type": "integer"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          }
+        },
+        "required": [
+          "concept_id"
+        ],
+        "title": "MappedConcept",
+        "type": "object"
+      },
       "MeasuredVariable": {
         "properties": {
           "column": {
@@ -3044,50 +3189,6 @@
           "column"
         ],
         "title": "MeasuredVariable",
-        "type": "object"
-      },
-      "MissingVariable": {
-        "properties": {
-          "category": {
-            "title": "Category",
-            "type": "string"
-          },
-          "column_hint": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Column Hint"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "rationale": {
-            "title": "Rationale",
-            "type": "string"
-          },
-          "role": {
-            "title": "Role",
-            "type": "string"
-          },
-          "severity": {
-            "title": "Severity",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "role",
-          "category",
-          "rationale",
-          "severity"
-        ],
-        "title": "MissingVariable",
         "type": "object"
       },
       "OutcomeOut": {
@@ -3171,6 +3272,114 @@
           "sort_order"
         ],
         "title": "OutcomeOut",
+        "type": "object"
+      },
+      "Picot": {
+        "properties": {
+          "comparator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparator"
+          },
+          "intervention": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention"
+          },
+          "intervention_concept_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Concept Id"
+          },
+          "outcomes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PicotOutcome"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "population": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population"
+          },
+          "therapeutic_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Therapeutic Area"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          }
+        },
+        "title": "Picot",
+        "type": "object"
+      },
+      "PicotOutcome": {
+        "properties": {
+          "concept_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "title": "PicotOutcome",
         "type": "object"
       },
       "PiiPatternOut": {
@@ -3340,6 +3549,110 @@
           "messages"
         ],
         "title": "ProfilingRequest",
+        "type": "object"
+      },
+      "ProposedRelation": {
+        "properties": {
+          "default_strength": {
+            "default": "moderate",
+            "title": "Default Strength",
+            "type": "string"
+          },
+          "mechanism_summary": {
+            "default": "",
+            "title": "Mechanism Summary",
+            "type": "string"
+          },
+          "object_concept_id": {
+            "title": "Object Concept Id",
+            "type": "string"
+          },
+          "polarity": {
+            "default": "unknown",
+            "title": "Polarity",
+            "type": "string"
+          },
+          "predicate": {
+            "default": "causally_influences",
+            "title": "Predicate",
+            "type": "string"
+          },
+          "subject_concept_id": {
+            "title": "Subject Concept Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_concept_id",
+          "object_concept_id"
+        ],
+        "title": "ProposedRelation",
+        "type": "object"
+      },
+      "Quality": {
+        "properties": {
+          "data_backed_edges": {
+            "title": "Data Backed Edges",
+            "type": "integer"
+          },
+          "data_backing_rate": {
+            "title": "Data Backing Rate",
+            "type": "number"
+          },
+          "has_confounder": {
+            "title": "Has Confounder",
+            "type": "boolean"
+          },
+          "has_exposure": {
+            "title": "Has Exposure",
+            "type": "boolean"
+          },
+          "has_outcome": {
+            "title": "Has Outcome",
+            "type": "boolean"
+          },
+          "issues": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "label": {
+            "enum": [
+              "High",
+              "Medium",
+              "Low"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "node_data_coverage": {
+            "title": "Node Data Coverage",
+            "type": "number"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "total_edges": {
+            "title": "Total Edges",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "score",
+          "label",
+          "has_exposure",
+          "has_outcome",
+          "has_confounder",
+          "data_backing_rate",
+          "node_data_coverage",
+          "data_backed_edges",
+          "total_edges"
+        ],
+        "title": "Quality",
         "type": "object"
       },
       "RecentEvent": {
@@ -4684,6 +4997,320 @@
         ],
         "title": "VariableRolesOut",
         "type": "object"
+      },
+      "augura_api__modules__agents__schemas__DagEdge": {
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "DagEdge",
+        "type": "object"
+      },
+      "augura_api__modules__agents__schemas__DagNode": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "measured": {
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "role",
+          "measured"
+        ],
+        "title": "DagNode",
+        "type": "object"
+      },
+      "augura_api__modules__agents__schemas__MissingVariable": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "column_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Hint"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "category",
+          "rationale",
+          "severity"
+        ],
+        "title": "MissingVariable",
+        "type": "object"
+      },
+      "augura_api__modules__causal__schemas__DagEdge": {
+        "properties": {
+          "dag_role_from": {
+            "title": "Dag Role From",
+            "type": "string"
+          },
+          "dag_role_to": {
+            "title": "Dag Role To",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "forward",
+              "inhibitory"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "has_qualifier": {
+            "title": "Has Qualifier",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "polarity": {
+            "title": "Polarity",
+            "type": "string"
+          },
+          "predicate": {
+            "title": "Predicate",
+            "type": "string"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "qualifiers": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Qualifiers",
+            "type": "array"
+          },
+          "strength": {
+            "title": "Strength",
+            "type": "string"
+          },
+          "supported_by_data": {
+            "title": "Supported By Data",
+            "type": "boolean"
+          },
+          "temporal_lag": {
+            "title": "Temporal Lag",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "causal",
+              "associative",
+              "temporal"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "type",
+          "strength",
+          "direction",
+          "polarity",
+          "temporal_lag",
+          "predicate",
+          "dag_role_from",
+          "dag_role_to",
+          "provenance",
+          "notes",
+          "supported_by_data",
+          "has_qualifier"
+        ],
+        "title": "DagEdge",
+        "type": "object"
+      },
+      "augura_api__modules__causal__schemas__DagNode": {
+        "properties": {
+          "adjusted": {
+            "title": "Adjusted",
+            "type": "boolean"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "observed": {
+            "title": "Observed",
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "exposure",
+              "outcome",
+              "confounder",
+              "mediator",
+              "effect_modifier",
+              "collider",
+              "other"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "mapping",
+              "ontology_inferred",
+              "llm_proposed"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "standard_codes": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Standard Codes",
+            "type": "object"
+          },
+          "x": {
+            "default": 0.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "default": 0.0,
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "domain",
+          "layer",
+          "role",
+          "source",
+          "observed",
+          "adjusted"
+        ],
+        "title": "DagNode",
+        "type": "object"
+      },
+      "augura_api__modules__causal__schemas__MissingVariable": {
+        "properties": {
+          "concept_id": {
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "importance": {
+            "default": "llm_identified",
+            "title": "Importance",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept_id",
+          "label"
+        ],
+        "title": "MissingVariable",
+        "type": "object"
       }
     }
   },
@@ -5043,6 +5670,48 @@
         "summary": "Artifacts",
         "tags": [
           "analytics"
+        ]
+      }
+    },
+    "/causal/dag": {
+      "post": {
+        "description": "DAG causal ancré dans l'ontologie B1, contextualisé par LLM (port de Nico).",
+        "operationId": "dag_causal_dag_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CausalDagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CausalDagResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dag",
+        "tags": [
+          "causal"
         ]
       }
     },

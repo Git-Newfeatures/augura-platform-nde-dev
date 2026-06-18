@@ -151,6 +151,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/causal/dag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dag
+         * @description DAG causal ancré dans l'ontologie B1, contextualisé par LLM (port de Nico).
+         */
+        post: operations["dag_causal_dag_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/coverage": {
         parameters: {
             query?: never;
@@ -1121,6 +1141,60 @@ export interface components {
             /** Study Id */
             study_id?: string | null;
         };
+        /** CausalDagRequest */
+        CausalDagRequest: {
+            /** Clinical Question */
+            clinical_question?: string | null;
+            /**
+             * Mapped Concepts
+             * @default []
+             */
+            mapped_concepts: components["schemas"]["MappedConcept"][];
+            picot?: components["schemas"]["Picot"] | null;
+        };
+        /** CausalDagResponse */
+        CausalDagResponse: {
+            /** Clinical Question */
+            clinical_question?: string | null;
+            /** Edges */
+            edges: components["schemas"]["augura_api__modules__causal__schemas__DagEdge"][];
+            /**
+             * Format
+             * @default augura.intake.dag/1
+             */
+            format: string;
+            /**
+             * Generation Mode
+             * @default ontology_llm
+             */
+            generation_mode: string;
+            graph: components["schemas"]["Graph"];
+            /**
+             * Llm Context
+             * @default {}
+             */
+            llm_context: {
+                [key: string]: unknown;
+            };
+            /**
+             * Missing Variables
+             * @default []
+             */
+            missing_variables: components["schemas"]["augura_api__modules__causal__schemas__MissingVariable"][];
+            /** Nodes */
+            nodes: components["schemas"]["augura_api__modules__causal__schemas__DagNode"][];
+            /**
+             * Proposed Relations
+             * @default []
+             */
+            proposed_relations: components["schemas"]["ProposedRelation"][];
+            quality: components["schemas"]["Quality"];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
         /** CeslSourceOut */
         CeslSourceOut: {
             /** Base Url */
@@ -1477,26 +1551,6 @@ export interface components {
             matrix: components["schemas"]["CoverageCell"][];
             meta: components["schemas"]["CoverageMeta"];
         };
-        /** DagEdge */
-        DagEdge: {
-            /** From */
-            from: string;
-            /** To */
-            to: string;
-        };
-        /** DagNode */
-        DagNode: {
-            /** Id */
-            id: string;
-            /** Label */
-            label: string;
-            /** Measured */
-            measured: boolean;
-            /** Rationale */
-            rationale?: string | null;
-            /** Role */
-            role: string;
-        };
         /** DagRequest */
         DagRequest: {
             /**
@@ -1538,9 +1592,9 @@ export interface components {
              */
             collider_ids: string[];
             /** Edges */
-            edges: components["schemas"]["DagEdge"][];
+            edges: components["schemas"]["augura_api__modules__agents__schemas__DagEdge"][];
             /** Nodes */
-            nodes: components["schemas"]["DagNode"][];
+            nodes: components["schemas"]["augura_api__modules__agents__schemas__DagNode"][];
             /** Rationale */
             rationale: string;
         };
@@ -1851,7 +1905,7 @@ export interface components {
         /** GapResponse */
         GapResponse: {
             /** Missing Variables */
-            missing_variables: components["schemas"]["MissingVariable"][];
+            missing_variables: components["schemas"]["augura_api__modules__agents__schemas__MissingVariable"][];
         };
         /** GenerateRequest */
         GenerateRequest: {
@@ -1900,6 +1954,35 @@ export interface components {
             study_id?: string | null;
             /** Type */
             type: string;
+        };
+        /** Graph */
+        Graph: {
+            /**
+             * Adjusted Ids
+             * @default []
+             */
+            adjusted_ids: string[];
+            /**
+             * Exposure Ids
+             * @default []
+             */
+            exposure_ids: string[];
+            /**
+             * Latent Ids
+             * @default []
+             */
+            latent_ids: string[];
+            /**
+             * Outcome Ids
+             * @default []
+             */
+            outcome_ids: string[];
+            /**
+             * Type
+             * @default dag
+             * @constant
+             */
+            type: "dag";
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2052,27 +2135,37 @@ export interface components {
             /** Total Count */
             total_count: number;
         };
+        /**
+         * MappedConcept
+         * @description Un concept issu du mapping (POST /datasets/{id}/map) présent dans la donnée.
+         */
+        MappedConcept: {
+            /**
+             * Concept Domain
+             * @default unknown
+             */
+            concept_domain: string;
+            /** Concept Id */
+            concept_id: string;
+            /**
+             * Concept Label
+             * @default
+             */
+            concept_label: string;
+            /**
+             * Concept Layer
+             * @default 0
+             */
+            concept_layer: number;
+            /** Confidence */
+            confidence?: number | null;
+        };
         /** MeasuredVariable */
         MeasuredVariable: {
             /** Column */
             column: string;
             /** Role */
             role?: string | null;
-        };
-        /** MissingVariable */
-        MissingVariable: {
-            /** Category */
-            category: string;
-            /** Column Hint */
-            column_hint?: string | null;
-            /** Name */
-            name: string;
-            /** Rationale */
-            rationale: string;
-            /** Role */
-            role: string;
-            /** Severity */
-            severity: string;
         };
         /** OutcomeOut */
         OutcomeOut: {
@@ -2102,6 +2195,33 @@ export interface components {
             verdict?: string | null;
             /** Verdict Label */
             verdict_label?: string | null;
+        };
+        /** Picot */
+        Picot: {
+            /** Comparator */
+            comparator?: string | null;
+            /** Intervention */
+            intervention?: string | null;
+            /** Intervention Concept Id */
+            intervention_concept_id?: string | null;
+            /**
+             * Outcomes
+             * @default []
+             */
+            outcomes: components["schemas"]["PicotOutcome"][];
+            /** Population */
+            population?: string | null;
+            /** Therapeutic Area */
+            therapeutic_area?: string | null;
+            /** Timeframe */
+            timeframe?: string | null;
+        };
+        /** PicotOutcome */
+        PicotOutcome: {
+            /** Concept Id */
+            concept_id?: string | null;
+            /** Label */
+            label?: string | null;
         };
         /** PiiPatternOut */
         PiiPatternOut: {
@@ -2165,6 +2285,62 @@ export interface components {
             tools: {
                 [key: string]: unknown;
             }[];
+        };
+        /** ProposedRelation */
+        ProposedRelation: {
+            /**
+             * Default Strength
+             * @default moderate
+             */
+            default_strength: string;
+            /**
+             * Mechanism Summary
+             * @default
+             */
+            mechanism_summary: string;
+            /** Object Concept Id */
+            object_concept_id: string;
+            /**
+             * Polarity
+             * @default unknown
+             */
+            polarity: string;
+            /**
+             * Predicate
+             * @default causally_influences
+             */
+            predicate: string;
+            /** Subject Concept Id */
+            subject_concept_id: string;
+        };
+        /** Quality */
+        Quality: {
+            /** Data Backed Edges */
+            data_backed_edges: number;
+            /** Data Backing Rate */
+            data_backing_rate: number;
+            /** Has Confounder */
+            has_confounder: boolean;
+            /** Has Exposure */
+            has_exposure: boolean;
+            /** Has Outcome */
+            has_outcome: boolean;
+            /**
+             * Issues
+             * @default []
+             */
+            issues: string[];
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "High" | "Medium" | "Low";
+            /** Node Data Coverage */
+            node_data_coverage: number;
+            /** Score */
+            score: number;
+            /** Total Edges */
+            total_edges: number;
         };
         /** RecentEvent */
         RecentEvent: {
@@ -2634,6 +2810,143 @@ export interface components {
             /** Roles */
             roles: components["schemas"]["VariableRoleOut"][];
         };
+        /** DagEdge */
+        augura_api__modules__agents__schemas__DagEdge: {
+            /** From */
+            from: string;
+            /** To */
+            to: string;
+        };
+        /** DagNode */
+        augura_api__modules__agents__schemas__DagNode: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Measured */
+            measured: boolean;
+            /** Rationale */
+            rationale?: string | null;
+            /** Role */
+            role: string;
+        };
+        /** MissingVariable */
+        augura_api__modules__agents__schemas__MissingVariable: {
+            /** Category */
+            category: string;
+            /** Column Hint */
+            column_hint?: string | null;
+            /** Name */
+            name: string;
+            /** Rationale */
+            rationale: string;
+            /** Role */
+            role: string;
+            /** Severity */
+            severity: string;
+        };
+        /** DagEdge */
+        augura_api__modules__causal__schemas__DagEdge: {
+            /** Dag Role From */
+            dag_role_from: string;
+            /** Dag Role To */
+            dag_role_to: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "forward" | "inhibitory";
+            /** From */
+            from: string;
+            /** Has Qualifier */
+            has_qualifier: boolean;
+            /** Id */
+            id: string;
+            /** Notes */
+            notes: string;
+            /** Polarity */
+            polarity: string;
+            /** Predicate */
+            predicate: string;
+            /** Provenance */
+            provenance: string;
+            /**
+             * Qualifiers
+             * @default []
+             */
+            qualifiers: {
+                [key: string]: unknown;
+            }[];
+            /** Strength */
+            strength: string;
+            /** Supported By Data */
+            supported_by_data: boolean;
+            /** Temporal Lag */
+            temporal_lag: string;
+            /** To */
+            to: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "causal" | "associative" | "temporal";
+        };
+        /** DagNode */
+        augura_api__modules__causal__schemas__DagNode: {
+            /** Adjusted */
+            adjusted: boolean;
+            /** Confidence */
+            confidence?: number | null;
+            /** Domain */
+            domain: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Layer */
+            layer: number;
+            /** Observed */
+            observed: boolean;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "exposure" | "outcome" | "confounder" | "mediator" | "effect_modifier" | "collider" | "other";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "mapping" | "ontology_inferred" | "llm_proposed";
+            /**
+             * Standard Codes
+             * @default {}
+             */
+            standard_codes: {
+                [key: string]: unknown;
+            };
+            /**
+             * X
+             * @default 0
+             */
+            x: number;
+            /**
+             * Y
+             * @default 0
+             */
+            y: number;
+        };
+        /** MissingVariable */
+        augura_api__modules__causal__schemas__MissingVariable: {
+            /** Concept Id */
+            concept_id: string;
+            /**
+             * Importance
+             * @default llm_identified
+             */
+            importance: string;
+            /** Label */
+            label: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -2879,6 +3192,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dag_causal_dag_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CausalDagRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CausalDagResponse"];
                 };
             };
             /** @description Validation Error */

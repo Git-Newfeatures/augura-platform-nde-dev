@@ -12,6 +12,7 @@ import {
   GitBranch,
   Check,
   AlertTriangle,
+  Plus,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,7 +23,6 @@ import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { SubTabs } from '@/cockpit/SubTabs'
 import { CohortImport } from '@/workspace/CohortImport'
-import { DatasetUpload } from '@/workspace/DatasetUpload'
 import { apiJson } from '@/api'
 import { uploadDataset, mapDataset, runDq, getDq, listColumns } from '@/intake/intakeApi'
 
@@ -673,19 +673,44 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
   )
 }
 
+// ── Add-dataset screen (green CTA target) — the upload dropzone, wired so a
+// successful upload drops straight into the new dataset's detail view. ─────────
+function AddDatasetView({ onBack, onUploaded }) {
+  return (
+    <WorkspacePage
+      eyebrow="Library · Cohorts"
+      title="Add dataset"
+      sub="Upload a CSV or Excel file — it's parsed and profiled server-side, then registered as a new dataset."
+    >
+      <div className="flex flex-col gap-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary transition-colors hover:text-primary/80"
+        >
+          <ArrowLeft size={14} /> Back to datasets
+        </button>
+        <UploadPanel columns={null} onUploaded={onUploaded} />
+      </div>
+    </WorkspacePage>
+  )
+}
+
 export function DatasetsPage() {
   const [reloadToken, setReloadToken] = useState(0)
   const { data: datasets, loading } = useCollection('datasets', reloadToken)
   const { openStudy } = useStudyNav()
   const [selectedDataset, setSelectedDataset] = useState(null)
+  const [adding, setAdding] = useState(false)
   const refresh = () => setReloadToken((t) => t + 1)
 
-  // Upload from inside a dataset creates a NEW dataset (backend has no
-  // upload-into-existing route) — refresh the list and switch to it.
+  // Upload creates a NEW dataset (backend has no upload-into-existing route) —
+  // refresh the list, close the add screen, and switch into the new dataset.
   function handleUploaded(result) {
     const ds = result?.dataset
     if (!ds) return
     refresh()
+    setAdding(false)
     setSelectedDataset({
       id: ds.id,
       name: ds.name,
@@ -695,6 +720,16 @@ export function DatasetsPage() {
       state: ds.status ?? 'draft',
       when: 'Just now',
     })
+  }
+
+  const addButton = (
+    <Button size="sm" onClick={() => setAdding(true)} className="text-xs font-medium">
+      <Plus className="h-3.5 w-3.5" /> Add dataset
+    </Button>
+  )
+
+  if (adding) {
+    return <AddDatasetView onBack={() => setAdding(false)} onUploaded={handleUploaded} />
   }
 
   if (selectedDataset) {
@@ -721,8 +756,8 @@ export function DatasetsPage() {
       sub={loading ? 'Loading…' : `${datasets.length} dataset${datasets.length === 1 ? '' : 's'} across your studies`}
       action={
         <div className="flex items-center gap-2">
-          <DatasetUpload onUploaded={refresh} />
           <CohortImport />
+          {addButton}
         </div>
       }
     >
@@ -733,6 +768,7 @@ export function DatasetsPage() {
           icon={Database}
           title="No datasets yet"
           subtitle="Datasets registered against your studies will appear here. Upload a file to get started."
+          cta={addButton}
         />
       ) : (
         <Card className="gap-0 px-[18px] py-1">

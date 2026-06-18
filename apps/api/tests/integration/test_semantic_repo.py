@@ -98,6 +98,4 @@ async def test_relations_for_concepts_returns_subgraph(
         anchor = (await repo.list_relations())[0].subject_concept_id
         subgraph = await repo.relations_for_concepts([anchor])
     assert subgraph, "sous-graphe vide pour un concept présent dans l'ontologie"
-    assert all(
-        anchor in (r.subject_concept_id, r.object_concept_id) for r in subgraph
-    )
+    assert all(anchor in (r.subject_concept_id, r.object_concept_id) for r in subgraph)

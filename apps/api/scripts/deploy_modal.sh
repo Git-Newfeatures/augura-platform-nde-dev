@@ -33,7 +33,7 @@ OPENAI="${AUGURA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 [ -n "$OPENAI" ] && EXTRA+=("AUGURA_OPENAI_API_KEY=${OPENAI}")
 
 echo "[1/3] secret Modal 'augura-api' (env=prod, cors regex=*.vercel.app${FRONT_ORIGIN:+ + $FRONT_ORIGIN})"
-modal secret create augura-api --force \
+uv run modal secret create augura-api --force \
   AUGURA_ENV=prod \
   AUGURA_DATABASE_URL="${AUGURA_DATABASE_URL:?AUGURA_DATABASE_URL manquant dans .env}" \
   AUGURA_CORS_ORIGIN_REGEX='^https://.*\.vercel\.app$' \
@@ -42,7 +42,7 @@ modal secret create augura-api --force \
   "${EXTRA[@]}"
 
 echo "[2/3] déploiement"
-modal deploy modal_app.py
+uv run modal deploy modal_app.py
 
 echo "[3/3] terminé. Récupère l'URL imprimée ci-dessus puis vérifie :"
 echo "  curl https://<workspace>--augura-api-api.modal.run/healthz"

@@ -1,5 +1,7 @@
 """Tests unitaires du service semantic — mapping ORM→schéma sans base."""
 
+from typing import Any
+
 from augura_api.modules.semantic.models import OntologyRelation, TaxonomyConcept
 from augura_api.modules.semantic.service import SemanticService
 
@@ -41,6 +43,35 @@ class _FakeRepo:
     async def relations_for_concepts(self, concept_ids: list[str]):
         return [_relation("r-sub", concept_ids[0], "retinopathy")]
 
+    async def read_bundle(self):
+        # Les 14 clés sont toujours présentes (coalesce à [] côté SQL).
+        empty: dict[str, list[Any]] = {
+            t: []
+            for t in (
+                "taxonomy_concepts",
+                "taxonomy_synonyms",
+                "taxonomy_standard_codes",
+                "taxonomy_therapeutic_areas",
+                "taxonomy_relationships",
+                "taxonomy_dq_valid_values",
+                "taxonomy_measurement_units",
+                "unit_conversions",
+                "causal_predicates",
+                "ontology_relations",
+                "ontology_relation_evidence",
+                "ontology_relation_qualifiers",
+                "dq_constraints",
+                "table_archetypes",
+            )
+        }
+        return {**empty, "taxonomy_concepts": [{"local_concept_id": "hba1c", "layer": 1}]}
+
+    async def release_status(self):
+        return {
+            "release": {"semantic_release_version": "2.2.0", "is_current": True},
+            "counts": {"taxonomy_concepts": 1, "ontology_relations": 0},
+        }
+
 
 async def test_concepts_maps_rows() -> None:
     out = await SemanticService(_FakeRepo()).concepts()  # type: ignore[arg-type]
@@ -60,3 +91,18 @@ async def test_relations_subgraph_when_concept_id_given() -> None:
     out = await SemanticService(_FakeRepo()).relations(concept_id="hba1c")  # type: ignore[arg-type]
     assert [r.relation_id for r in out] == ["r-sub"]
     assert out[0].subject_concept_id == "hba1c"
+
+
+async def test_bundle_exposes_14_tables_with_raw_rows() -> None:
+    out = await SemanticService(_FakeRepo()).bundle()  # type: ignore[arg-type]
+    assert out.taxonomy_concepts[0]["local_concept_id"] == "hba1c"
+    # Les tables vides restent présentes (contrat à 14 clés).
+    assert out.dq_constraints == []
+    assert out.table_archetypes == []
+
+
+async def test_release_status_shape() -> None:
+    out = await SemanticService(_FakeRepo()).release()  # type: ignore[arg-type]
+    assert out.release is not None
+    assert out.release["semantic_release_version"] == "2.2.0"
+    assert out.counts["taxonomy_concepts"] == 1

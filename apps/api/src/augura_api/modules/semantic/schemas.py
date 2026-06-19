@@ -1,5 +1,7 @@
 """Schémas Pydantic — contrat public du module semantic."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -32,3 +34,34 @@ class RelationOut(BaseModel):
     default_strength: str
     mechanism_summary: str
     active: bool
+
+
+class SemanticBundle(BaseModel):
+    """Réponse de GET /semantic/bundle — la couche sémantique gouvernée en bloc.
+
+    14 tables, lignes laissées en `dict` brut : le front les indexe lui-même
+    (semantic-store → taxonomy/ontology loaders). Typer chaque table n'apporterait
+    rien au contrat de lecture. Les 14 champs sont toujours présents (coalesce à []).
+    """
+
+    taxonomy_concepts: list[dict[str, Any]]
+    taxonomy_synonyms: list[dict[str, Any]]
+    taxonomy_standard_codes: list[dict[str, Any]]
+    taxonomy_therapeutic_areas: list[dict[str, Any]]
+    taxonomy_relationships: list[dict[str, Any]]
+    taxonomy_dq_valid_values: list[dict[str, Any]]
+    taxonomy_measurement_units: list[dict[str, Any]]
+    unit_conversions: list[dict[str, Any]]
+    causal_predicates: list[dict[str, Any]]
+    ontology_relations: list[dict[str, Any]]
+    ontology_relation_evidence: list[dict[str, Any]]
+    ontology_relation_qualifiers: list[dict[str, Any]]
+    dq_constraints: list[dict[str, Any]]
+    table_archetypes: list[dict[str, Any]]
+
+
+class ReleaseStatus(BaseModel):
+    """Réponse de GET /semantic/release — release courante + compte par table."""
+
+    release: dict[str, Any] | None = None
+    counts: dict[str, int]

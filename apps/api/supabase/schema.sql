@@ -696,6 +696,20 @@ create index if not exists ontology_relations_object_idx on ontology_relations (
 create index if not exists ontology_relation_evidence_relation_idx
   on ontology_relation_evidence (relation_id);
 
+-- Historique de version de la couche sémantique gouvernée (sert GET /semantic/release).
+-- Append-only, une seule ligne is_current ; la ligne courante est seedée (cf. 0005).
+create table if not exists semantic_releases (
+  semantic_release_version text primary key,
+  taxonomy_version         text not null,
+  causal_ontology_version  text not null,
+  dq_ontology_version      text not null,
+  omop_cdm_version         text,
+  source                   text,
+  manifest                 jsonb not null,
+  imported_at              timestamptz not null default now(),
+  is_current               boolean not null default false
+);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Module : corpus — recherche live (retrieve-and-freeze)
 -- Miroir de la migration alembic 0002_literature_live_search. Verbe distinct de

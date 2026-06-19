@@ -285,7 +285,7 @@ begin
   foreach t in array array[
     'taxonomy_standard_codes','taxonomy_therapeutic_areas','taxonomy_relationships',
     'causal_predicates','dq_predicates','ontology_relations',
-    'ontology_relation_evidence','ontology_relation_qualifiers'
+    'ontology_relation_evidence','ontology_relation_qualifiers','semantic_releases'
   ] loop
     execute format('alter table %I enable row level security;', t);
     execute format('alter table %I force row level security;', t);

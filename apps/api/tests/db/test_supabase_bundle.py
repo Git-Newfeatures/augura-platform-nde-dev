@@ -48,6 +48,7 @@ EXPECTED_TABLES = {
     "ontology_relations",
     "ontology_relation_evidence",
     "ontology_relation_qualifiers",
+    "semantic_releases",
     "dq_bundles",
     "literature_snapshots",
     "search_sessions",

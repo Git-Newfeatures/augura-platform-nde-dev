@@ -24,6 +24,7 @@ import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { SubTabs } from '@/cockpit/SubTabs'
 import { CohortImport } from '@/workspace/CohortImport'
+import { LocalMappingSuggestions } from '@/workspace/LocalMappingSuggestions'
 import { apiJson } from '@/api'
 import { uploadDataset, mapDataset, runDq, getDq, listColumns } from '@/intake/intakeApi'
 
@@ -553,7 +554,10 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
           ) : mapBusy && !mapping ? (
             <Loading label="Matching columns to the taxonomy…" />
           ) : mapping ? (
-            <MappingPanel result={mapping} />
+            <>
+              <MappingPanel result={mapping} />
+              <LocalMappingSuggestions columns={mapping.columns || columns} />
+            </>
           ) : (
             <EmptyState icon={Workflow} title="No mapping yet" subtitle="Run mapping to bind columns to concepts." />
           )}

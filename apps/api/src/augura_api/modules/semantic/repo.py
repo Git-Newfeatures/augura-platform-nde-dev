@@ -1,6 +1,9 @@
 """Accès base du module semantic — catalogues globaux (lecture seule)."""
 
-from sqlalchemy import or_, select
+import json
+from typing import Any
+
+from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.modules.semantic.models import (
@@ -17,6 +20,56 @@ from augura_api.modules.semantic.models import (
     TaxonomySynonym,
     UnitConversion,
 )
+
+# Les 14 tables de la couche sémantique gouvernée exposées par GET /semantic/bundle
+# (dans l'ordre du contrat front ; dq_predicates exclu — consommé par le stack DQ).
+# Noms en dur (jamais d'entrée utilisateur) → pas de risque d'injection.
+_BUNDLE_TABLES = (
+    "taxonomy_concepts",
+    "taxonomy_synonyms",
+    "taxonomy_standard_codes",
+    "taxonomy_therapeutic_areas",
+    "taxonomy_relationships",
+    "taxonomy_dq_valid_values",
+    "taxonomy_measurement_units",
+    "unit_conversions",
+    "causal_predicates",
+    "ontology_relations",
+    "ontology_relation_evidence",
+    "ontology_relation_qualifiers",
+    "dq_constraints",
+    "table_archetypes",
+)
+
+# Bundle = un seul objet jsonb {table: [lignes brutes]} (port du RPC semantic_read_all,
+# mais inline sur le schéma public — pas de fonction stockée à maintenir).
+_BUNDLE_SQL = (
+    "select jsonb_build_object(\n"
+    + ",\n".join(
+        f"  '{t}', (select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) from {t} r)"
+        for t in _BUNDLE_TABLES
+    )
+    + "\n)"
+)
+
+# Statut de release : ligne courante de semantic_releases + compte par table.
+_RELEASE_SQL = (
+    "select jsonb_build_object("
+    "'release', (select to_jsonb(r) from semantic_releases r "
+    "where r.is_current order by r.imported_at desc limit 1), "
+    "'counts', (select jsonb_object_agg(table_name, row_count) from ("
+    + " union all ".join(
+        f"select '{t}' table_name, count(*) row_count from {t}" for t in _BUNDLE_TABLES
+    )
+    + ") c))"
+)
+
+
+def coerce_jsonb(value: Any) -> dict[str, Any]:
+    """asyncpg peut renvoyer le jsonb déjà désérialisé ou son texte ; on normalise."""
+    if isinstance(value, str):
+        return json.loads(value)
+    return value
 
 
 class SemanticRepo:
@@ -95,3 +148,15 @@ class SemanticRepo:
 
     async def list_relationships(self) -> list[TaxonomyRelationship]:
         return list((await self.session.execute(select(TaxonomyRelationship))).scalars().all())
+
+    # ── Bundle gouverné + statut de release (lecture en bloc) ───────────────
+
+    async def read_bundle(self) -> dict[str, Any]:
+        """Les 14 tables sémantiques en un objet jsonb (GET /semantic/bundle)."""
+        res = await self.session.execute(text(_BUNDLE_SQL))
+        return coerce_jsonb(res.scalar_one())
+
+    async def release_status(self) -> dict[str, Any]:
+        """Release courante + compte par table (GET /semantic/release)."""
+        res = await self.session.execute(text(_RELEASE_SQL))
+        return coerce_jsonb(res.scalar_one())

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { apiJson } from '@/api'
+import { parsePICOT } from '@/semantic/picot-parser'
 
 // Causal modeling (port de la vue /causal de Nico, recâblée sur le backend).
 // Flux : dataset mappé → POST /datasets/{id}/map (concepts) → POST /causal/dag.
@@ -267,9 +268,34 @@ export function CausalModelingPage() {
           concept_label: c.column,
           confidence: c.confidence,
         }))
+      // PICOT dérivé de la question (parser local) → enrichit le prompt B2.
+      // Défensif : tout échec retombe sur picot=null (comportement d'avant inchangé).
+      let picot = null
+      try {
+        if (question) {
+          const p = parsePICOT(question)
+          picot = {
+            intervention: p.intervention ?? null,
+            comparator: p.comparator ?? null,
+            outcomes: (p.outcomes || []).map((o) => ({
+              concept_id: o.concept_id ?? null,
+              label: o.label ?? null,
+            })),
+            timeframe:
+              Array.isArray(p.time_window) && p.time_window.length
+                ? p.time_window.join(', ')
+                : null,
+            population: p.population ?? null,
+            therapeutic_area: p.therapeutic_areas?.[0] ?? null,
+            intervention_concept_id: null,
+          }
+        }
+      } catch {
+        picot = null
+      }
       const result = await apiJson('/causal/dag', {
         method: 'POST',
-        body: JSON.stringify({ mapped_concepts, clinical_question: question || null }),
+        body: JSON.stringify({ mapped_concepts, picot, clinical_question: question || null }),
       })
       setDag(result)
     } catch (e) {

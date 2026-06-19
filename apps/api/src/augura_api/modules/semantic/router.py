@@ -28,3 +28,21 @@ async def relations(
 ) -> list[schemas.RelationOut]:
     """Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id)."""
     return await SemanticService(SemanticRepo(session)).relations(concept_id=concept_id)
+
+
+@router.get("/bundle", response_model=schemas.SemanticBundle)
+async def bundle(
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+) -> schemas.SemanticBundle:
+    """Couche sémantique gouvernée (14 tables) en un bloc — hydrate le store front."""
+    return await SemanticService(SemanticRepo(session)).bundle()
+
+
+@router.get("/release", response_model=schemas.ReleaseStatus)
+async def release(
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+) -> schemas.ReleaseStatus:
+    """Release sémantique courante + compte par table (onglet Versions)."""
+    return await SemanticService(SemanticRepo(session)).release()

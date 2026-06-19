@@ -881,6 +881,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/semantic/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bundle
+         * @description Couche sémantique gouvernée (14 tables) en un bloc — hydrate le store front.
+         */
+        get: operations["bundle_semantic_bundle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/semantic/concepts": {
         parameters: {
             query?: never;
@@ -910,6 +930,26 @@ export interface paths {
          * @description Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id).
          */
         get: operations["relations_semantic_relations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/semantic/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Release
+         * @description Release sémantique courante + compte par table (onglet Versions).
+         */
+        get: operations["release_semantic_release_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2378,6 +2418,20 @@ export interface components {
             /** Subject Concept Id */
             subject_concept_id: string;
         };
+        /**
+         * ReleaseStatus
+         * @description Réponse de GET /semantic/release — release courante + compte par table.
+         */
+        ReleaseStatus: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Release */
+            release?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** SearchHit */
         SearchHit: {
             /** Content */
@@ -2446,6 +2500,72 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * SemanticBundle
+         * @description Réponse de GET /semantic/bundle — la couche sémantique gouvernée en bloc.
+         *
+         *     14 tables, lignes laissées en `dict` brut : le front les indexe lui-même
+         *     (semantic-store → taxonomy/ontology loaders). Typer chaque table n'apporterait
+         *     rien au contrat de lecture. Les 14 champs sont toujours présents (coalesce à []).
+         */
+        SemanticBundle: {
+            /** Causal Predicates */
+            causal_predicates: {
+                [key: string]: unknown;
+            }[];
+            /** Dq Constraints */
+            dq_constraints: {
+                [key: string]: unknown;
+            }[];
+            /** Ontology Relation Evidence */
+            ontology_relation_evidence: {
+                [key: string]: unknown;
+            }[];
+            /** Ontology Relation Qualifiers */
+            ontology_relation_qualifiers: {
+                [key: string]: unknown;
+            }[];
+            /** Ontology Relations */
+            ontology_relations: {
+                [key: string]: unknown;
+            }[];
+            /** Table Archetypes */
+            table_archetypes: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Concepts */
+            taxonomy_concepts: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Dq Valid Values */
+            taxonomy_dq_valid_values: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Measurement Units */
+            taxonomy_measurement_units: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Relationships */
+            taxonomy_relationships: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Standard Codes */
+            taxonomy_standard_codes: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Synonyms */
+            taxonomy_synonyms: {
+                [key: string]: unknown;
+            }[];
+            /** Taxonomy Therapeutic Areas */
+            taxonomy_therapeutic_areas: {
+                [key: string]: unknown;
+            }[];
+            /** Unit Conversions */
+            unit_conversions: {
+                [key: string]: unknown;
+            }[];
         };
         /** SessionCreateRequest */
         SessionCreateRequest: {
@@ -4446,6 +4566,26 @@ export interface operations {
             };
         };
     };
+    bundle_semantic_bundle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SemanticBundle"];
+                };
+            };
+        };
+    };
     concepts_semantic_concepts_get: {
         parameters: {
             query?: {
@@ -4505,6 +4645,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_semantic_release_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseStatus"];
                 };
             };
         };

@@ -39,6 +39,8 @@ def test_openapi_exposes_routes() -> None:
         "/reference/study-designs",
         "/semantic/concepts",
         "/semantic/relations",
+        "/semantic/bundle",
+        "/semantic/release",
         "/datasets/{dataset_id}/map",
         "/causal/dag",
     ):
@@ -84,6 +86,8 @@ async def test_protected_routes_require_auth() -> None:
             "/reference/tenant",
             "/semantic/concepts",
             "/semantic/relations",
+            "/semantic/bundle",
+            "/semantic/release",
         ):
             r = await client.get(path)
             assert r.status_code == 401, path

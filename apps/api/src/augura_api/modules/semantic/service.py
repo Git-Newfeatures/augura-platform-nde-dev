@@ -1,6 +1,6 @@
 """Logique métier du module semantic. Le router est un adaptateur fin."""
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from augura_api.modules.semantic import schemas
 from augura_api.modules.semantic.models import OntologyRelation, TaxonomyConcept
@@ -14,6 +14,10 @@ class _SemanticReader(Protocol):
     async def list_relations(self, *, active: bool = ...) -> list[OntologyRelation]: ...
 
     async def relations_for_concepts(self, concept_ids: list[str]) -> list[OntologyRelation]: ...
+
+    async def read_bundle(self) -> dict[str, Any]: ...
+
+    async def release_status(self) -> dict[str, Any]: ...
 
 
 class SemanticService:
@@ -35,3 +39,11 @@ class SemanticService:
             else await self.repo.list_relations(active=active)
         )
         return [schemas.RelationOut.model_validate(r) for r in rows]
+
+    async def bundle(self) -> schemas.SemanticBundle:
+        """Couche sémantique gouvernée en bloc (14 tables) — GET /semantic/bundle."""
+        return schemas.SemanticBundle.model_validate(await self.repo.read_bundle())
+
+    async def release(self) -> schemas.ReleaseStatus:
+        """Release courante + compte par table — GET /semantic/release."""
+        return schemas.ReleaseStatus.model_validate(await self.repo.release_status())

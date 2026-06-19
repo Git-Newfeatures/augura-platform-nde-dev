@@ -3746,6 +3746,35 @@
         "title": "RelationOut",
         "type": "object"
       },
+      "ReleaseStatus": {
+        "description": "Réponse de GET /semantic/release — release courante + compte par table.",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          }
+        },
+        "required": [
+          "counts"
+        ],
+        "title": "ReleaseStatus",
+        "type": "object"
+      },
       "SearchHit": {
         "properties": {
           "content": {
@@ -3902,6 +3931,141 @@
           "created_by"
         ],
         "title": "SearchSession",
+        "type": "object"
+      },
+      "SemanticBundle": {
+        "description": "Réponse de GET /semantic/bundle — la couche sémantique gouvernée en bloc.\n\n14 tables, lignes laissées en `dict` brut : le front les indexe lui-même\n(semantic-store → taxonomy/ontology loaders). Typer chaque table n'apporterait\nrien au contrat de lecture. Les 14 champs sont toujours présents (coalesce à []).",
+        "properties": {
+          "causal_predicates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Causal Predicates",
+            "type": "array"
+          },
+          "dq_constraints": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Dq Constraints",
+            "type": "array"
+          },
+          "ontology_relation_evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Ontology Relation Evidence",
+            "type": "array"
+          },
+          "ontology_relation_qualifiers": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Ontology Relation Qualifiers",
+            "type": "array"
+          },
+          "ontology_relations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Ontology Relations",
+            "type": "array"
+          },
+          "table_archetypes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Table Archetypes",
+            "type": "array"
+          },
+          "taxonomy_concepts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Concepts",
+            "type": "array"
+          },
+          "taxonomy_dq_valid_values": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Dq Valid Values",
+            "type": "array"
+          },
+          "taxonomy_measurement_units": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Measurement Units",
+            "type": "array"
+          },
+          "taxonomy_relationships": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Relationships",
+            "type": "array"
+          },
+          "taxonomy_standard_codes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Standard Codes",
+            "type": "array"
+          },
+          "taxonomy_synonyms": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Synonyms",
+            "type": "array"
+          },
+          "taxonomy_therapeutic_areas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Taxonomy Therapeutic Areas",
+            "type": "array"
+          },
+          "unit_conversions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Unit Conversions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "taxonomy_concepts",
+          "taxonomy_synonyms",
+          "taxonomy_standard_codes",
+          "taxonomy_therapeutic_areas",
+          "taxonomy_relationships",
+          "taxonomy_dq_valid_values",
+          "taxonomy_measurement_units",
+          "unit_conversions",
+          "causal_predicates",
+          "ontology_relations",
+          "ontology_relation_evidence",
+          "ontology_relation_qualifiers",
+          "dq_constraints",
+          "table_archetypes"
+        ],
+        "title": "SemanticBundle",
         "type": "object"
       },
       "SessionCreateRequest": {
@@ -7359,6 +7523,28 @@
         ]
       }
     },
+    "/semantic/bundle": {
+      "get": {
+        "description": "Couche sémantique gouvernée (14 tables) en un bloc — hydrate le store front.",
+        "operationId": "bundle_semantic_bundle_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemanticBundle"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Bundle",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
     "/semantic/concepts": {
       "get": {
         "operationId": "concepts_semantic_concepts_get",
@@ -7471,6 +7657,28 @@
           }
         },
         "summary": "Relations",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/release": {
+      "get": {
+        "description": "Release sémantique courante + compte par table (onglet Versions).",
+        "operationId": "release_semantic_release_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Release",
         "tags": [
           "semantic"
         ]

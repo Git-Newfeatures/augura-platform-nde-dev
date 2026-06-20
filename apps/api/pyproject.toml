@@ -52,6 +52,11 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TID252"]
 
+[tool.ruff.lint.per-file-ignores]
+# Les prompts LLM et les schémas JSON embarqués contiennent des chaînes
+# littérales qu'on ne peut pas couper sans altérer le texte envoyé au modèle.
+"src/augura_api/modules/semantic/enrich_propose.py" = ["E501"]
+
 [tool.importlinter]
 root_package = "augura_api"
 

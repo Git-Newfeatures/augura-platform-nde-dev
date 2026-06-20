@@ -26,6 +26,7 @@ from typing import Any
 
 from augura_api.core.errors import BadRequestError
 from augura_api.modules.corpus.ctgov import CTGovClient, CTGovStudy
+from augura_api.modules.corpus.filters import SearchFilters, build_pubmed_term, ctgov_filter_params
 from augura_api.modules.corpus.known_item import (
     KNOWN_ITEM_MISS_MESSAGE,
     SOURCE_CTGOV,
@@ -118,13 +119,15 @@ class LiteratureRetriever:
         sources: set[str] | None = None,
         max_results: int = 10,
         today: date | None = None,
+        filters: SearchFilters | None = None,
     ) -> RetrievalResult:
         srcs = _normalize_sources(sources)
         day = today or datetime.now(UTC).date()
         item = classify_known_item(query)
         if item is not None:
+            # known-item = lookup exact : les filtres date/type ne s'appliquent pas.
             return await self._known_item(query, item, srcs, day)
-        return await self._topical(query, srcs, max_results, day)
+        return await self._topical(query, srcs, max_results, day, filters)
 
     async def _known_item(
         self, query: str, item: KnownItem, srcs: set[str], day: date
@@ -163,31 +166,38 @@ class LiteratureRetriever:
         return RetrievalResult(query, [item.source], True, str(item.kind), [group])
 
     async def _topical(
-        self, query: str, srcs: set[str], max_results: int, day: date
+        self, query: str, srcs: set[str], max_results: int, day: date, filters: SearchFilters | None
     ) -> RetrievalResult:
         builders: list[Coroutine[Any, Any, SourceGroup]] = []
         order: list[str] = []
         if SOURCE_PUBMED in srcs:
             order.append(SOURCE_PUBMED)
-            builders.append(self._pubmed_topical(query, max_results, day))
+            builders.append(self._pubmed_topical(query, max_results, day, filters))
         if SOURCE_CTGOV in srcs:
             order.append(SOURCE_CTGOV)
-            builders.append(self._ctgov_topical(query, max_results, day))
+            builders.append(self._ctgov_topical(query, max_results, day, filters))
         groups: list[SourceGroup] = await asyncio.gather(*builders)
         return RetrievalResult(query, order, False, None, groups)
 
-    async def _pubmed_topical(self, query: str, max_results: int, day: date) -> SourceGroup:
-        # esearch envoie `term=<query>` tel quel : le query_string EST la requête.
-        articles = await self._pubmed.search(query, max_results)
+    async def _pubmed_topical(
+        self, query: str, max_results: int, day: date, filters: SearchFilters | None
+    ) -> SourceGroup:
+        # Le terme réellement envoyé à esearch (avec filtres [pt]) EST le query_string.
+        term = build_pubmed_term(query, filters)
+        articles = await self._pubmed.search(query, max_results, filters=filters, today=day)
         items = [
-            RetrievedItem(SOURCE_PUBMED, a.pmid, a.title, query, day, _pubmed_record(a))
+            RetrievedItem(SOURCE_PUBMED, a.pmid, a.title, term, day, _pubmed_record(a))
             for a in articles
         ]
-        return SourceGroup(SOURCE_PUBMED, query, items)
+        return SourceGroup(SOURCE_PUBMED, term, items)
 
-    async def _ctgov_topical(self, query: str, max_results: int, day: date) -> SourceGroup:
-        qs = f"query.term={query}"  # chaîne API CT.gov réellement envoyée
-        studies = await self._ctgov.search(query, max_results)
+    async def _ctgov_topical(
+        self, query: str, max_results: int, day: date, filters: SearchFilters | None
+    ) -> SourceGroup:
+        extra = ctgov_filter_params(filters, day)
+        suffix = "".join(f"&{k}={v}" for k, v in sorted(extra.items()))
+        qs = f"query.term={query}{suffix}"  # chaîne API CT.gov réellement envoyée
+        studies = await self._ctgov.search(query, max_results, filters=filters, today=day)
         items = [
             RetrievedItem(SOURCE_CTGOV, s.nct_id, s.title, qs, day, _ctgov_record(s))
             for s in studies

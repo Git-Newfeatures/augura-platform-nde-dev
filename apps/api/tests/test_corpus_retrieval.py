@@ -12,6 +12,7 @@ import pytest
 
 from augura_api.core.errors import BadRequestError
 from augura_api.modules.corpus.ctgov import CTGovClient, CTGovStudy
+from augura_api.modules.corpus.filters import SearchFilters
 from augura_api.modules.corpus.known_item import (
     KNOWN_ITEM_MISS_MESSAGE,
     SOURCE_CTGOV,
@@ -53,9 +54,18 @@ class FakePubMed:
         self.search_res = search_res or []
         self.fetch_res = fetch_res or []
         self.calls: list[tuple[object, ...]] = []
+        self.last_filters: object = None
 
-    async def search(self, query: str, max_results: int) -> list[PubMedArticle]:
+    async def search(
+        self,
+        query: str,
+        max_results: int,
+        *,
+        filters: object = None,
+        today: object = None,
+    ) -> list[PubMedArticle]:
         self.calls.append(("search", query, max_results))
+        self.last_filters = filters
         return self.search_res
 
     async def fetch_by_ids(self, pmids: list[str]) -> list[PubMedArticle]:
@@ -70,9 +80,18 @@ class FakeCTGov:
         self.search_res = search_res or []
         self.fetch_res = fetch_res
         self.calls: list[tuple[object, ...]] = []
+        self.last_filters: object = None
 
-    async def search(self, query: str, max_results: int) -> list[CTGovStudy]:
+    async def search(
+        self,
+        query: str,
+        max_results: int,
+        *,
+        filters: object = None,
+        today: object = None,
+    ) -> list[CTGovStudy]:
         self.calls.append(("search", query, max_results))
+        self.last_filters = filters
         return self.search_res
 
     async def fetch_by_nct(self, nct_id: str) -> CTGovStudy | None:
@@ -183,3 +202,20 @@ async def test_invalid_source_raises() -> None:
     ct = FakeCTGov()
     with pytest.raises(BadRequestError):
         await _retriever(pm, ct).retrieve("hba1c", sources={"embase"}, today=DAY)
+
+
+async def test_topical_passes_filters_to_clients_and_captures_term() -> None:
+    pm = FakePubMed(search_res=[ART])
+    ct = FakeCTGov(search_res=[STUDY])
+    filters = SearchFilters(date_range="5y", study_types=("rct",))
+    r = await _retriever(pm, ct).retrieve(
+        "engagement and hba1c", max_results=5, today=DAY, filters=filters
+    )
+
+    # les filtres atteignent les deux clients
+    assert pm.last_filters == filters
+    assert ct.last_filters == filters
+    # le query_string capturé reflète le terme PubMed filtré (pour le gel)
+    pmg = r.groups[0]
+    assert pmg.query_string == ("(engagement and hba1c) AND (Randomized Controlled Trial[pt])")
+    assert pmg.items[0].query_string == pmg.query_string

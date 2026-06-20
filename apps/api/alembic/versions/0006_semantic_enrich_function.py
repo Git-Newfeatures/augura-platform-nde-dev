@@ -1,66 +1,23 @@
--- Augura Platform — fonctions & vues
--- À appliquer APRÈS schema.sql.
+"""upsert_semantic_release : write-path d'enrichissement de la couche sémantique (B4)
 
-begin;
+Fonction SECURITY DEFINER : le rôle applicatif (RLS FOR SELECT) écrit l'ontologie
+globale EXCLUSIVEMENT via elle. Idempotente (CREATE OR REPLACE + grant conditionnel),
+vit aussi dans le bundle canonique functions.sql exécuté par 0001_baseline.
 
--- Recherche sémantique sur le corpus (port du RPC match_chunks du front).
--- Scope tenant : chunks du corpus global (org_id NULL) + ceux du tenant courant
--- (app.tenant_id, posé par le backend via SET LOCAL). Filtre optionnel par
--- source_id / evidence_type passé en jsonb.
-create or replace function match_chunks(
-    query_embedding vector(1536),
-    match_count int default 20,
-    filter jsonb default '{}'::jsonb
-)
-returns table (
-    id          uuid,
-    document_id uuid,
-    content     text,
-    similarity  float,
-    source_id   text,
-    title       text
-)
-language sql
-stable
-set search_path = public, pg_temp
-as $$
-    select
-        c.id,
-        c.document_id,
-        c.content,
-        1 - (c.embedding <=> query_embedding) as similarity,
-        d.source_id,
-        d.title
-    from chunks c
-    join documents d on d.id = c.document_id
-    where c.embedding is not null
-      and (
-        c.org_id is null
-        or c.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
-      )
-      and (filter ->> 'source_id' is null or d.source_id = filter ->> 'source_id')
-      and (filter ->> 'evidence_type' is null or d.evidence_type = filter ->> 'evidence_type')
-    order by c.embedding <=> query_embedding
-    limit match_count;
-$$;
+Revision ID: 0006_semantic_enrich_function
+Revises: 0005_semantic_release
+"""
 
--- Matrice de couverture (jurisdiction × evidence_type → doc_count).
--- Les cellules à zéro sont complétées côté service (corpus). gap_score/severity
--- sont dérivés dans le service à partir de doc_count.
-create or replace view v_coverage_map with (security_invoker = on) as
-    select
-        coalesce(jurisdiction, 'unknown') as jurisdiction,
-        coalesce(evidence_type, 'other')  as evidence_type,
-        count(*)                          as doc_count
-    from documents
-    group by 1, 2;
+from collections.abc import Sequence
 
--- ─────────────────────────────────────────────────────────────────────────
--- upsert_semantic_release : applique un batch d'enrichissement (B4) à la couche
--- sémantique gouvernée et bascule la release courante. SECURITY DEFINER : le rôle
--- applicatif (RLS FOR SELECT seulement) écrit EXCLUSIVEMENT via cette fonction.
--- Idempotent (CREATE OR REPLACE + upserts par clé).
--- ─────────────────────────────────────────────────────────────────────────
+from alembic import op
+
+revision: str = "0006_semantic_enrich_function"
+down_revision: str | None = "0005_semantic_release"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+_FUNCTION_SQL = r"""
 create or replace function public.upsert_semantic_release(
   p_manifest jsonb,
   p_payload jsonb
@@ -187,5 +144,12 @@ do $$ begin
     execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_api';
   end if;
 end $$;
+"""
 
-commit;
+
+def upgrade() -> None:
+    op.execute(_FUNCTION_SQL)
+
+
+def downgrade() -> None:
+    op.execute("DROP FUNCTION IF EXISTS public.upsert_semantic_release(jsonb, jsonb);")

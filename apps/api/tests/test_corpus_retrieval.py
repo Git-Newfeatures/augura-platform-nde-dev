@@ -75,10 +75,15 @@ class FakePubMed:
 
 class FakeCTGov:
     def __init__(
-        self, *, search_res: list[CTGovStudy] | None = None, fetch_res: CTGovStudy | None = None
+        self,
+        *,
+        search_res: list[CTGovStudy] | None = None,
+        fetch_res: CTGovStudy | None = None,
+        search_error: Exception | None = None,
     ) -> None:
         self.search_res = search_res or []
         self.fetch_res = fetch_res
+        self.search_error = search_error
         self.calls: list[tuple[object, ...]] = []
         self.last_filters: object = None
 
@@ -92,6 +97,8 @@ class FakeCTGov:
     ) -> list[CTGovStudy]:
         self.calls.append(("search", query, max_results))
         self.last_filters = filters
+        if self.search_error is not None:
+            raise self.search_error
         return self.search_res
 
     async def fetch_by_nct(self, nct_id: str) -> CTGovStudy | None:
@@ -127,6 +134,21 @@ async def test_topical_fans_out_to_both_sources() -> None:
     # les deux ont été cherchés (topique), aucun fetch known-item
     assert pm.calls == [("search", "engagement and hba1c", 5)]
     assert ct.calls == [("search", "engagement and hba1c", 5)]
+
+
+async def test_topical_isolates_failing_source() -> None:
+    # CT.gov échoue (ex. 403 WAF depuis une IP datacenter) : PubMed doit quand même
+    # remonter et CT.gov renvoie un groupe vide annoté — JAMAIS une exception qui
+    # ferait planter tout le fan-out (et déchirerait le stream → 'network error').
+    pm = FakePubMed(search_res=[ART])
+    ct = FakeCTGov(search_error=RuntimeError("403 Forbidden"))
+    r = await _retriever(pm, ct).retrieve("hypertension telemonitoring", max_results=5, today=DAY)
+
+    assert r.sources == [SOURCE_PUBMED, SOURCE_CTGOV]  # ordre préservé
+    by_source = {g.source: g for g in r.groups}
+    assert by_source[SOURCE_PUBMED].items[0].id == "35319473"  # PubMed intact
+    assert by_source[SOURCE_CTGOV].items == []  # source en échec → vide
+    assert by_source[SOURCE_CTGOV].note  # note d'indisponibilité présente
 
 
 async def test_known_item_pmid_routes_to_pubmed_fetch_only() -> None:

@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID
 
 import httpx
+import structlog
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
@@ -35,6 +36,15 @@ from augura_api.modules.corpus.snapshot_service import (
 )
 
 router = APIRouter(prefix="/corpus", tags=["corpus"])
+
+log = structlog.get_logger(__name__)
+
+# User-Agent explicite pour les appels sortants live (PubMed/CT.gov) : identifie
+# l'app (bonne citoyenneté NLM) et évite les WAF qui filtrent l'UA httpx par défaut.
+_RETRIEVE_HEADERS = {
+    "User-Agent": "Augura/1.0 (clinical-evidence-platform; +https://augura.health)",
+    "Accept": "application/json",
+}
 
 
 def _ndjson(event_type: str, **data: Any) -> str:
@@ -193,24 +203,33 @@ async def literature_retrieve(
     sources = set(req.sources) if req.sources else None
 
     async def gen() -> AsyncIterator[str]:
-        async with httpx.AsyncClient(timeout=20.0) as http:
-            retriever = LiteratureRetriever(
-                NCBIPubMedClient(http, api_key=settings.ncbi_api_key), CTGovApiClient(http)
+        # Filet de sécurité : toute erreur (ex. known-item CT.gov 403) devient un event
+        # `error` propre au lieu d'une connexion coupée que le front lit en « network error ».
+        # Le fan-out topique isole déjà chaque source (cf. LiteratureRetriever._safe_group).
+        try:
+            async with httpx.AsyncClient(timeout=20.0, headers=_RETRIEVE_HEADERS) as http:
+                retriever = LiteratureRetriever(
+                    NCBIPubMedClient(http, api_key=settings.ncbi_api_key), CTGovApiClient(http)
+                )
+                result = await retriever.retrieve(
+                    req.query, sources=sources, max_results=req.max_results, filters=filters
+                )
+            resp = to_retrieve_response(result)
+            yield _ndjson(
+                "meta",
+                query=resp.query,
+                sources=resp.sources,
+                known_item=resp.known_item,
+                kind=resp.kind,
             )
-            result = await retriever.retrieve(
-                req.query, sources=sources, max_results=req.max_results, filters=filters
+            for group in resp.groups:
+                yield _ndjson("group", **group.model_dump(mode="json"))
+            yield _ndjson("done")
+        except Exception as exc:
+            log.exception("literature_retrieve.failed", query=req.query, error=str(exc))
+            yield _ndjson(
+                "error", message="La recherche a échoué — réessaie ou ajuste la question."
             )
-        resp = to_retrieve_response(result)
-        yield _ndjson(
-            "meta",
-            query=resp.query,
-            sources=resp.sources,
-            known_item=resp.known_item,
-            kind=resp.kind,
-        )
-        for group in resp.groups:
-            yield _ndjson("group", **group.model_dump(mode="json"))
-        yield _ndjson("done")
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 

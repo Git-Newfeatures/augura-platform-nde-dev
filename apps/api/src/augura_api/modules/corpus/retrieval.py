@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
+import structlog
+
 from augura_api.core.errors import BadRequestError
 from augura_api.modules.corpus.ctgov import CTGovClient, CTGovStudy
 from augura_api.modules.corpus.filters import SearchFilters, build_pubmed_term, ctgov_filter_params
@@ -38,6 +40,14 @@ from augura_api.modules.corpus.known_item import (
 from augura_api.modules.corpus.pubmed import PubMedArticle, PubMedClient
 
 VALID_SOURCES = (SOURCE_PUBMED, SOURCE_CTGOV)
+
+log = structlog.get_logger(__name__)
+
+# Note affichée quand une source tombe (réseau/WAF) — ex. CT.gov renvoie 403 sur
+# certaines IP datacenter (Modal). On dégrade en partiel plutôt que tout casser.
+_SOURCE_UNAVAILABLE_NOTE = (
+    "Source temporairement indisponible (erreur réseau) — résultats partiels."
+)
 
 
 @dataclass(frozen=True)
@@ -172,12 +182,31 @@ class LiteratureRetriever:
         order: list[str] = []
         if SOURCE_PUBMED in srcs:
             order.append(SOURCE_PUBMED)
-            builders.append(self._pubmed_topical(query, max_results, day, filters))
+            builders.append(
+                self._safe_group(
+                    SOURCE_PUBMED, self._pubmed_topical(query, max_results, day, filters)
+                )
+            )
         if SOURCE_CTGOV in srcs:
             order.append(SOURCE_CTGOV)
-            builders.append(self._ctgov_topical(query, max_results, day, filters))
+            builders.append(
+                self._safe_group(
+                    SOURCE_CTGOV, self._ctgov_topical(query, max_results, day, filters)
+                )
+            )
         groups: list[SourceGroup] = await asyncio.gather(*builders)
         return RetrievalResult(query, order, False, None, groups)
+
+    @staticmethod
+    async def _safe_group(source: str, coro: Coroutine[Any, Any, SourceGroup]) -> SourceGroup:
+        """Isole l'échec d'une source : renvoie un groupe vide annoté plutôt que de
+        laisser l'exception faire échouer tout le fan-out (ce qui couperait le stream
+        → « network error » côté front). La source qui fonctionne remonte normalement."""
+        try:
+            return await coro
+        except Exception as exc:
+            log.warning("retrieve.source_failed", source=source, error=str(exc))
+            return SourceGroup(source, "", [], note=_SOURCE_UNAVAILABLE_NOTE)
 
     async def _pubmed_topical(
         self, query: str, max_results: int, day: date, filters: SearchFilters | None

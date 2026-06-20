@@ -204,10 +204,12 @@ end;
 $$;
 
 revoke all on function public.upsert_semantic_release(jsonb, jsonb) from public;
--- Grant conditionnel : le rôle applicatif n'existe pas sur le Postgres de CI (db-bundle).
+-- Grant au rôle-groupe augura_app (augura_api en hérite via `grant augura_app to augura_api`,
+-- cf. policies.sql) : c'est le rôle que portent le runtime ET les tests d'intégration.
+-- Conditionnel car le rôle peut manquer sur un Postgres vierge avant policies.sql.
 do $$ begin
-  if exists (select 1 from pg_roles where rolname = 'augura_api') then
-    execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_api';
+  if exists (select 1 from pg_roles where rolname = 'augura_app') then
+    execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_app';
   end if;
 end $$;
 

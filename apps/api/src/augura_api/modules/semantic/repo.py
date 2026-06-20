@@ -177,3 +177,29 @@ class SemanticRepo:
         ).bindparams(manifest=json.dumps(manifest), payload=json.dumps(payload))
         res = await self.session.execute(stmt)
         return coerce_jsonb(res.scalar_one())
+
+    async def max_relation_seq(self, today: str) -> int:
+        """Plus grand NNN des relation_id ENRR_{today}_NNN (évite les collisions d'id)."""
+        _pat = r"'ENRR_' || :d || '_(\d{3})'"
+        stmt = text(
+            f"select coalesce(max(substring(relation_id from {_pat})::int), 0) "
+            "from ontology_relations"
+        ).bindparams(d=today)
+        return int((await self.session.execute(stmt)).scalar_one())
+
+    async def max_qualifier_seq(self, today: str) -> int:
+        """Plus grand NNN des qualifier_id ENRQ_{today}_NNN (évite les collisions d'id)."""
+        _pat = r"'ENRQ_' || :d || '_(\d{3})'"
+        stmt = text(
+            f"select coalesce(max(substring(qualifier_id from {_pat})::int), 0) "
+            "from ontology_relation_qualifiers"
+        ).bindparams(d=today)
+        return int((await self.session.execute(stmt)).scalar_one())
+
+    async def get_relation_row(self, relation_id: str) -> dict[str, Any] | None:
+        """Récupère une relation sous forme dict brut (pour deactivate)."""
+        stmt = text(
+            "select to_jsonb(r) from ontology_relations r where relation_id = :rid"
+        ).bindparams(rid=relation_id)
+        row = (await self.session.execute(stmt)).scalar_one_or_none()
+        return coerce_jsonb(row) if row is not None else None

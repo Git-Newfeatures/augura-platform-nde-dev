@@ -61,6 +61,9 @@ create or replace view v_coverage_map with (security_invoker = on) as
 -- applicatif (RLS FOR SELECT seulement) écrit EXCLUSIVEMENT via cette fonction.
 -- Idempotent (CREATE OR REPLACE + upserts par clé).
 -- ─────────────────────────────────────────────────────────────────────────
+-- NB : le propriétaire de cette fonction doit être un rôle BYPASSRLS/privilégié
+-- (service_role Supabase) pour que SECURITY DEFINER puisse écrire les catalogues
+-- gouvernés malgré leur RLS FORCE … FOR SELECT.
 create or replace function public.upsert_semantic_release(
   p_manifest jsonb,
   p_payload jsonb
@@ -85,13 +88,27 @@ begin
     on conflict (local_concept_id) do update set
       layer = excluded.layer,
       concept_name = excluded.concept_name,
+      review_section = excluded.review_section,
       augura_domain = excluded.augura_domain,
+      omop_domain_id = excluded.omop_domain_id,
+      omop_target_table = excluded.omop_target_table,
+      omop_target_concept_field = excluded.omop_target_concept_field,
+      namespace = excluded.namespace,
+      unit_source_value = excluded.unit_source_value,
+      value_min = excluded.value_min,
+      value_max = excluded.value_max,
       value_type = excluded.value_type,
-      canonical_unit = excluded.canonical_unit,
       design_rationale = excluded.design_rationale,
       review_status = excluded.review_status,
       version = excluded.version,
-      active = excluded.active;
+      active = excluded.active,
+      canonical_unit = excluded.canonical_unit,
+      temporality = excluded.temporality,
+      dq_column_role = excluded.dq_column_role,
+      fhir_crosswalk = excluded.fhir_crosswalk,
+      sdtm_crosswalk = excluded.sdtm_crosswalk,
+      unit_coverage_status = excluded.unit_coverage_status,
+      range_support_status = excluded.range_support_status;
 
   insert into public.taxonomy_synonyms
     select * from jsonb_populate_recordset(
@@ -170,7 +187,13 @@ begin
     true
   )
   on conflict (semantic_release_version) do update set
-    manifest = excluded.manifest, is_current = true;
+    taxonomy_version = excluded.taxonomy_version,
+    causal_ontology_version = excluded.causal_ontology_version,
+    dq_ontology_version = excluded.dq_ontology_version,
+    omop_cdm_version = excluded.omop_cdm_version,
+    source = excluded.source,
+    manifest = excluded.manifest,
+    is_current = true;
 
   return jsonb_build_object(
     'version', v_version,

@@ -14,9 +14,12 @@ Le 404 d'un NCT inconnu = miss known-item → None (pas de repli topique).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import Any, Protocol, cast
 
 import httpx
+
+from augura_api.modules.corpus.filters import SearchFilters, ctgov_filter_params
 
 CTGOV_BASE = "https://clinicaltrials.gov/api/v2/studies"
 
@@ -74,7 +77,14 @@ def _parse_study(protocol_section: dict[str, Any]) -> CTGovStudy | None:
 
 
 class CTGovClient(Protocol):
-    async def search(self, query: str, max_results: int) -> list[CTGovStudy]: ...
+    async def search(
+        self,
+        query: str,
+        max_results: int,
+        *,
+        filters: SearchFilters | None = None,
+        today: date | None = None,
+    ) -> list[CTGovStudy]: ...
 
     async def fetch_by_nct(self, nct_id: str) -> CTGovStudy | None: ...
 
@@ -85,12 +95,19 @@ class CTGovApiClient:
     def __init__(self, http: httpx.AsyncClient) -> None:
         self._http = http
 
-    async def search(self, query: str, max_results: int) -> list[CTGovStudy]:
+    async def search(
+        self,
+        query: str,
+        max_results: int,
+        *,
+        filters: SearchFilters | None = None,
+        today: date | None = None,
+    ) -> list[CTGovStudy]:
         n = max(1, min(50, max_results))
-        resp = await self._http.get(
-            CTGOV_BASE,
-            params={"query.term": query, "pageSize": str(n), "format": "json"},
-        )
+        day = today or datetime.now(UTC).date()
+        params: dict[str, str] = {"query.term": query, "pageSize": str(n), "format": "json"}
+        params.update(ctgov_filter_params(filters, day))
+        resp = await self._http.get(CTGOV_BASE, params=params)
         resp.raise_for_status()
         studies = _as_list(_as_dict(resp.json()).get("studies"))
         parsed = [_parse_study(_as_dict(s.get("protocolSection"))) for s in studies]

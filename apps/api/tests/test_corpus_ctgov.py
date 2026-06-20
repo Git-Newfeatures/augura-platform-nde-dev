@@ -5,9 +5,12 @@ par sonde : recherche enveloppée dans `studies[]`, fetch par NCT au niveau raci
 404 pour un NCT inconnu.
 """
 
+from datetime import date as _date
+
 import httpx
 
 from augura_api.modules.corpus.ctgov import CTGovApiClient
+from augura_api.modules.corpus.filters import SearchFilters
 
 _PROTOCOL = {
     "identificationModule": {
@@ -85,3 +88,20 @@ async def test_fetch_by_nct_empty_returns_none_without_call() -> None:
         client = CTGovApiClient(http)
         assert await client.fetch_by_nct("   ") is None
     assert record == []
+
+
+async def test_search_applies_filters_to_params() -> None:
+    record: list[httpx.Request] = []
+    async with _mock_http(record) as http:
+        client = CTGovApiClient(http)
+        await client.search(
+            "diabetes",
+            5,
+            filters=SearchFilters(date_range="1y", study_types=("observational",)),
+            today=_date(2026, 6, 19),
+        )
+
+    params = record[0].url.params
+    assert params.get("query.term") == "diabetes"
+    assert params.get("aggFilters") == "studyType:obs"
+    assert params.get("filter.advanced") == "AREA[StudyFirstPostDate]RANGE[2025-01-01,MAX]"

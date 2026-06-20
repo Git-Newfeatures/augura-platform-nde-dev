@@ -5,7 +5,7 @@ direct_relations (relations proposées par le DAG) · deactivate_relation · add
 Tous construisent un (manifest, payload) délégué à SemanticRepo.apply_release.
 """
 
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from augura_api.core.errors import BadRequestError, NotFoundError
 from augura_api.modules.semantic.enrich_schemas import (
@@ -17,7 +17,7 @@ from augura_api.modules.semantic.enrich_schemas import (
 from augura_api.modules.semantic.repo import SemanticRepo
 
 
-def bump_version(current: str | None, kind: str) -> str:
+def bump_version(current: str | None, kind: Literal["major", "minor", "patch"]) -> str:
     """Bump SemVer (port de bumpVersion). Fallback 3.0.0."""
     parts = [int(x) for x in (current or "3.0.0").split(".")]
     major, minor, patch = (parts + [0, 0, 0])[:3]
@@ -155,6 +155,8 @@ class EnrichApplyService:
     async def _add_qualifier(
         self, q: AddQualifierIn, current: str, today: str
     ) -> EnrichApplyResponse:
+        if await self.repo.get_relation_row(q.relation_id) is None:
+            raise NotFoundError("relation introuvable", relation_id=q.relation_id)
         new_version = bump_version(current, "patch")
         max_n = await self.repo.max_qualifier_seq(today)
         row: dict[str, Any] = {
@@ -194,7 +196,8 @@ class EnrichApplyService:
             raise BadRequestError("aucun concept/relation approuvé à appliquer")
         cset = {c["local_concept_id"] for c in concepts}
         rset = {r["relation_id"] for r in relations}
-        new_version = bump_version(current, "minor" if concepts else "patch")
+        kind: Literal["minor", "patch"] = "minor" if concepts else "patch"
+        new_version = bump_version(current, kind)
 
         def stamp(row: dict[str, Any]) -> dict[str, Any]:
             return {**row, "version": new_version, "active": True, "review_status": "approved"}
@@ -226,7 +229,7 @@ class EnrichApplyService:
         }
         manifest = _manifest(
             new_version,
-            f"patch: +{len(concepts)} concept(s), +{len(relations)} relation(s) via enrichment",
+            f"{kind}: +{len(concepts)} concept(s), +{len(relations)} relation(s) via enrichment",
         )
         await self.repo.apply_release(manifest, payload)
         return EnrichApplyResponse(

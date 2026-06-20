@@ -50,6 +50,44 @@
         "title": "ActivityEvent",
         "type": "object"
       },
+      "AddQualifierIn": {
+        "properties": {
+          "is_hard_constraint": {
+            "default": false,
+            "title": "Is Hard Constraint",
+            "type": "boolean"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "qualifier_effect": {
+            "title": "Qualifier Effect",
+            "type": "string"
+          },
+          "qualifier_type": {
+            "title": "Qualifier Type",
+            "type": "string"
+          },
+          "qualifier_value": {
+            "title": "Qualifier Value",
+            "type": "string"
+          },
+          "relation_id": {
+            "title": "Relation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation_id",
+          "qualifier_type",
+          "qualifier_value",
+          "qualifier_effect"
+        ],
+        "title": "AddQualifierIn",
+        "type": "object"
+      },
       "AdminStats": {
         "properties": {
           "by_type": {
@@ -2010,6 +2048,69 @@
         "title": "DatasetQuestion",
         "type": "object"
       },
+      "DeactivateRelationIn": {
+        "properties": {
+          "relation_id": {
+            "title": "Relation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation_id"
+        ],
+        "title": "DeactivateRelationIn",
+        "type": "object"
+      },
+      "DirectRelationIn": {
+        "description": "Relation légère proposée par le DAG (sans id pré-assigné).",
+        "properties": {
+          "default_strength": {
+            "default": "moderate",
+            "title": "Default Strength",
+            "type": "string"
+          },
+          "mechanism_summary": {
+            "default": "",
+            "title": "Mechanism Summary",
+            "type": "string"
+          },
+          "object_concept_id": {
+            "title": "Object Concept Id",
+            "type": "string"
+          },
+          "polarity": {
+            "default": "neutral",
+            "title": "Polarity",
+            "type": "string"
+          },
+          "predicate": {
+            "title": "Predicate",
+            "type": "string"
+          },
+          "relation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation Id"
+          },
+          "subject_concept_id": {
+            "title": "Subject Concept Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_concept_id",
+          "object_concept_id",
+          "predicate"
+        ],
+        "title": "DirectRelationIn",
+        "type": "object"
+      },
       "DqBundleOut": {
         "properties": {
           "bundle": {
@@ -2120,6 +2221,110 @@
           "status"
         ],
         "title": "DqRunResult",
+        "type": "object"
+      },
+      "EnrichApplyRequest": {
+        "description": "Corps de POST /semantic/enrich/apply — un seul chemin renseigné à la fois.",
+        "properties": {
+          "add_qualifier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddQualifierIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deactivate_relation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeactivateRelationIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "direct_relations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DirectRelationIn"
+            },
+            "title": "Direct Relations",
+            "type": "array"
+          },
+          "proposals": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposals"
+          },
+          "selected_concept_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Concept Ids",
+            "type": "array"
+          },
+          "selected_relation_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Relation Ids",
+            "type": "array"
+          }
+        },
+        "title": "EnrichApplyRequest",
+        "type": "object"
+      },
+      "EnrichApplyResponse": {
+        "properties": {
+          "concepts_added": {
+            "default": 0,
+            "title": "Concepts Added",
+            "type": "integer"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "new_version": {
+            "title": "New Version",
+            "type": "string"
+          },
+          "previous_version": {
+            "title": "Previous Version",
+            "type": "string"
+          },
+          "relation_id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Relation Id Map",
+            "type": "object"
+          },
+          "relations_added": {
+            "default": 0,
+            "title": "Relations Added",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "new_version",
+          "previous_version"
+        ],
+        "title": "EnrichApplyResponse",
         "type": "object"
       },
       "EstimandOut": {
@@ -7779,6 +7984,48 @@
           }
         },
         "summary": "Concepts",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/enrich/apply": {
+      "post": {
+        "description": "Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version.",
+        "operationId": "enrich_apply_semantic_enrich_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrichApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrichApplyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enrich Apply",
         "tags": [
           "semantic"
         ]

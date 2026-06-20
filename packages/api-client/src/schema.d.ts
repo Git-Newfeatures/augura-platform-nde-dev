@@ -943,6 +943,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/semantic/enrich/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrich Apply
+         * @description Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version.
+         */
+        post: operations["enrich_apply_semantic_enrich_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/semantic/relations": {
         parameters: {
             query?: never;
@@ -1132,6 +1152,27 @@ export interface components {
             } | null;
             /** Route */
             route?: string | null;
+        };
+        /** AddQualifierIn */
+        AddQualifierIn: {
+            /**
+             * Is Hard Constraint
+             * @default false
+             */
+            is_hard_constraint: boolean;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Qualifier Effect */
+            qualifier_effect: string;
+            /** Qualifier Type */
+            qualifier_type: string;
+            /** Qualifier Value */
+            qualifier_value: string;
+            /** Relation Id */
+            relation_id: string;
         };
         /** AdminStats */
         AdminStats: {
@@ -1723,6 +1764,40 @@ export interface components {
             /** Rationale */
             rationale?: string | null;
         };
+        /** DeactivateRelationIn */
+        DeactivateRelationIn: {
+            /** Relation Id */
+            relation_id: string;
+        };
+        /**
+         * DirectRelationIn
+         * @description Relation légère proposée par le DAG (sans id pré-assigné).
+         */
+        DirectRelationIn: {
+            /**
+             * Default Strength
+             * @default moderate
+             */
+            default_strength: string;
+            /**
+             * Mechanism Summary
+             * @default
+             */
+            mechanism_summary: string;
+            /** Object Concept Id */
+            object_concept_id: string;
+            /**
+             * Polarity
+             * @default neutral
+             */
+            polarity: string;
+            /** Predicate */
+            predicate: string;
+            /** Relation Id */
+            relation_id?: string | null;
+            /** Subject Concept Id */
+            subject_concept_id: string;
+        };
         /** DqBundleOut */
         DqBundleOut: {
             /** Bundle */
@@ -1771,6 +1846,62 @@ export interface components {
             overall_score?: number | null;
             /** Status */
             status: string;
+        };
+        /**
+         * EnrichApplyRequest
+         * @description Corps de POST /semantic/enrich/apply — un seul chemin renseigné à la fois.
+         */
+        EnrichApplyRequest: {
+            add_qualifier?: components["schemas"]["AddQualifierIn"] | null;
+            deactivate_relation?: components["schemas"]["DeactivateRelationIn"] | null;
+            /**
+             * Direct Relations
+             * @default []
+             */
+            direct_relations: components["schemas"]["DirectRelationIn"][];
+            /** Proposals */
+            proposals?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Selected Concept Ids
+             * @default []
+             */
+            selected_concept_ids: string[];
+            /**
+             * Selected Relation Ids
+             * @default []
+             */
+            selected_relation_ids: string[];
+        };
+        /** EnrichApplyResponse */
+        EnrichApplyResponse: {
+            /**
+             * Concepts Added
+             * @default 0
+             */
+            concepts_added: number;
+            /**
+             * Detail
+             * @default
+             */
+            detail: string;
+            /** New Version */
+            new_version: string;
+            /** Previous Version */
+            previous_version: string;
+            /**
+             * Relation Id Map
+             * @default {}
+             */
+            relation_id_map: {
+                [key: string]: string;
+            };
+            /**
+             * Relations Added
+             * @default 0
+             */
+            relations_added: number;
         };
         /** EstimandOut */
         EstimandOut: {
@@ -4730,6 +4861,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConceptOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enrich_apply_semantic_enrich_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrichApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrichApplyResponse"];
                 };
             };
             /** @description Validation Error */

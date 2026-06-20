@@ -227,6 +227,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/corpus/literature/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Literature Ingest
+         * @description Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.
+         *     Sert « Add to corpus » sur des résultats de retrieve gardés (PubMed only).
+         */
+        post: operations["literature_ingest_corpus_literature_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/literature/retrieve": {
         parameters: {
             query?: never;
@@ -308,7 +329,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Snapshots
+         * @description Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash).
+         */
+        get: operations["list_snapshots_corpus_literature_snapshots_get"];
         put?: never;
         /**
          * Create Snapshot
@@ -2076,8 +2101,18 @@ export interface components {
              */
             session_id: string;
         };
+        /** LiteratureIngestRequest */
+        LiteratureIngestRequest: {
+            /** Pmids */
+            pmids: string[];
+        };
         /** LiteratureRetrieveRequest */
         LiteratureRetrieveRequest: {
+            /**
+             * Date Range
+             * @default any
+             */
+            date_range: string;
             /**
              * Max Results
              * @default 10
@@ -2087,6 +2122,8 @@ export interface components {
             query: string;
             /** Sources */
             sources?: string[] | null;
+            /** Study Types */
+            study_types?: string[];
         };
         /** LiteratureSearchRequest */
         LiteratureSearchRequest: {
@@ -2679,6 +2716,30 @@ export interface components {
             summary?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * SnapshotSummary
+         * @description Vue légère pour la liste « Saved evidence » : pas de results ni de hash.
+         */
+        SnapshotSummary: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Query */
+            query: string;
+            /** Result Count */
+            result_count: number;
+            /** Sources */
+            sources: string[];
+            /** Study Id */
+            study_id?: string | null;
         };
         /** SnapshotWriteRequest */
         SnapshotWriteRequest: {
@@ -3447,6 +3508,39 @@ export interface operations {
             };
         };
     };
+    literature_ingest_corpus_literature_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiteratureIngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiteratureSearchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     literature_retrieve_corpus_literature_retrieve_post: {
         parameters: {
             query?: never;
@@ -3597,6 +3691,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiteratureEvent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_snapshots_corpus_literature_snapshots_get: {
+        parameters: {
+            query?: {
+                study_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotSummary"][];
                 };
             };
             /** @description Validation Error */

@@ -49,7 +49,7 @@ def _validate_sources(sources: list[str] | None) -> None:
         raise BadRequestError("source inconnue", value=unknown)
 
 
-def _build_filters(date_range: str, study_types: list[str]) -> SearchFilters:
+def build_filters(date_range: str, study_types: list[str]) -> SearchFilters:
     """Valide et construit les SearchFilters depuis les champs de la requête."""
     if date_range not in VALID_DATE_RANGES:
         raise BadRequestError("date_range invalide", value=date_range)
@@ -189,7 +189,7 @@ async def literature_retrieve(
     Ne touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique
     ⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel."""
     _validate_sources(req.sources)  # 400 avant le stream si source inconnue
-    filters = _build_filters(req.date_range, req.study_types)
+    filters = build_filters(req.date_range, req.study_types)
     sources = set(req.sources) if req.sources else None
 
     async def gen() -> AsyncIterator[str]:

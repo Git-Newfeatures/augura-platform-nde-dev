@@ -2900,8 +2900,31 @@
         "title": "LiteratureEvent",
         "type": "object"
       },
+      "LiteratureIngestRequest": {
+        "properties": {
+          "pmids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Pmids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pmids"
+        ],
+        "title": "LiteratureIngestRequest",
+        "type": "object"
+      },
       "LiteratureRetrieveRequest": {
         "properties": {
+          "date_range": {
+            "default": "any",
+            "title": "Date Range",
+            "type": "string"
+          },
           "max_results": {
             "default": 10,
             "maximum": 50.0,
@@ -2928,6 +2951,13 @@
               }
             ],
             "title": "Sources"
+          },
+          "study_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Study Types",
+            "type": "array"
           }
         },
         "required": [
@@ -4400,6 +4430,57 @@
           "created_at"
         ],
         "title": "SimulationRunOut",
+        "type": "object"
+      },
+      "SnapshotSummary": {
+        "description": "Vue légère pour la liste « Saved evidence » : pas de results ni de hash.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "result_count": {
+            "title": "Result Count",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "study_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Id"
+          }
+        },
+        "required": [
+          "id",
+          "query",
+          "sources",
+          "result_count",
+          "created_at"
+        ],
+        "title": "SnapshotSummary",
         "type": "object"
       },
       "SnapshotWriteRequest": {
@@ -6059,6 +6140,48 @@
         ]
       }
     },
+    "/corpus/literature/ingest": {
+      "post": {
+        "description": "Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.\nSert « Add to corpus » sur des résultats de retrieve gardés (PubMed only).",
+        "operationId": "literature_ingest_corpus_literature_ingest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiteratureIngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiteratureSearchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Literature Ingest",
+        "tags": [
+          "corpus"
+        ]
+      }
+    },
     "/corpus/literature/retrieve": {
       "post": {
         "description": "Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.\nNe touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique\n⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel.",
@@ -6288,6 +6411,59 @@
       }
     },
     "/corpus/literature/snapshots": {
+      "get": {
+        "description": "Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash).",
+        "operationId": "list_snapshots_corpus_literature_snapshots_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "study_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Study Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SnapshotSummary"
+                  },
+                  "title": "Response List Snapshots Corpus Literature Snapshots Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Snapshots",
+        "tags": [
+          "corpus"
+        ]
+      },
       "post": {
         "description": "Gèle le jeu de résultats + annotations : calcule le content_hash, épingle\nmodel/prompt version, persiste. La réponse porte le hash (auto-vérifiable).",
         "operationId": "create_snapshot_corpus_literature_snapshots_post",

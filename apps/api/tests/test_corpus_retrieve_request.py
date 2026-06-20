@@ -5,7 +5,7 @@ import pytest
 
 from augura_api.core.errors import BadRequestError
 from augura_api.modules.corpus.filters import SearchFilters
-from augura_api.modules.corpus.router import _build_filters
+from augura_api.modules.corpus.router import build_filters as _build_filters
 
 
 def test_build_filters_defaults_to_any() -> None:

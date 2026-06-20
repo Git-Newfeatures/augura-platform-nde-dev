@@ -357,7 +357,7 @@ async def _call_llm(
     model: str,
     system: str,
     user_message: str,
-    max_tokens: int = 2000,
+    max_tokens: int = 8192,
 ) -> dict[str, Any]:
     """Appelle le LLM et retourne un batch normalisé (dict à 6 clés)."""
     result = await run_structured_agent(

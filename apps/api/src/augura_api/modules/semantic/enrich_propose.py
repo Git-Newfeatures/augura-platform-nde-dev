@@ -48,7 +48,10 @@ class ProposalBatch(BaseModel):
 
 PROPOSAL_TOOL: ToolParam = {
     "name": "propose_enrichment_batch",
-    "description": "Propose taxonomy concepts, synonyms, standard codes, causal relations, evidence, and qualifiers to enrich the clinical ontology.",
+    "description": (
+        "Propose taxonomy concepts, synonyms, standard codes, causal relations, "
+        "evidence, and qualifiers to enrich the clinical ontology."
+    ),
     "input_schema": {
         "type": "object",
         "required": [
@@ -260,37 +263,51 @@ def build_system_prompt(predicate_list: str, existing_concepts_sample: str) -> s
 
     Port de ``buildSystemPrompt()`` dans enrich-propose.js.
     """
-    return f"""You are a clinical knowledge engineer building a causal ontology for MedTech real-world evidence studies.
-
-Available causal predicates (you MUST use only these predicate IDs):
-{predicate_list}
-
-Sample of existing taxonomy concepts (for reference when proposing relations):
-{existing_concepts_sample}
-
-LAYER ASSIGNMENT RULES (strictly enforced — violations cause concept rejection):
-- layer=1: ONLY if you can supply a valid standard code for that concept. You MUST include the code in taxonomy_standard_codes. A layer=1 concept without a code is REJECTED.
-- layer=2: when no standard code exists. You MUST include design_rationale explaining why (e.g. "brand-specific device model — no individual SNOMED code distinguishes this variant").
-- When unsure whether a code exists: assign layer=2. A correct L2 is always better than a rejected L1.
-
-STANDARD CODE LOOKUP ORDER (use your medical knowledge):
-1. Drug / biologic / device therapy → RxNorm (rxcui) first, then SNOMED
-2. Lab measurement / observation → LOINC (6-digit code, e.g. "4548-4" for HbA1c)
-3. Disease / condition / finding → SNOMED CT (numeric concept ID)
-4. Procedure / intervention → SNOMED CT
-5. Device category (not brand-specific) → SNOMED CT
-6. If OMOP standard concept applies → OMOP concept_id as fallback
-7. Diagnosis code → ICD10CM as last resort
-
-OTHER RULES:
-- Every relation must have at least one evidence row
-- For established physiology (undisputed mechanisms), use source_type "established_physiology" with citation_or_url "established physiology"
-- Prefer mediator chains over direct relations when the mechanism is indirect
-- CASCADE RULE (§10.3): every new concept you introduce MUST be the subject or object of at least one relation in the SAME proposal batch. Never propose a dangling concept with no path to the rest of the ontology. Where the link to an existing concept is indirect, introduce the intermediate mediator concept(s) needed to complete the chain.
-- PREFERRED SYNONYM (§10.3): every new concept MUST include at least one taxonomy_synonyms row whose synonym equals the concept's name with synonym_type "preferred". Add common abbreviations/acronyms and spelling variants as additional rows (synonym_type "abbreviation" or "acceptable") so future PICOT questions match the concept.
-- Concept IDs must use format ENRC_YYYYMMDD_NNN (e.g. ENRC_20260613_001)
-- Relation IDs: ENRR_YYYYMMDD_NNN, Evidence IDs: ENRV_YYYYMMDD_NNN, Qualifier IDs: ENRQ_YYYYMMDD_NNN
-- subject_concept_id and object_concept_id must ALWAYS be concept IDs (ENRC_ or existing L1_/L2_ prefixes) — NEVER relation IDs"""
+    return (
+        "You are a clinical knowledge engineer building a causal ontology for MedTech"
+        " real-world evidence studies.\n\n"
+        "Available causal predicates (you MUST use only these predicate IDs):\n"
+        f"{predicate_list}\n\n"
+        "Sample of existing taxonomy concepts (for reference when proposing relations):\n"
+        f"{existing_concepts_sample}\n\n"
+        "LAYER ASSIGNMENT RULES (strictly enforced — violations cause concept rejection):\n"
+        "- layer=1: ONLY if you can supply a valid standard code for that concept."
+        " You MUST include the code in taxonomy_standard_codes."
+        " A layer=1 concept without a code is REJECTED.\n"
+        "- layer=2: when no standard code exists. You MUST include design_rationale"
+        ' explaining why (e.g. "brand-specific device model —'
+        ' no individual SNOMED code distinguishes this variant").\n'
+        "- When unsure whether a code exists: assign layer=2."
+        " A correct L2 is always better than a rejected L1.\n\n"
+        "STANDARD CODE LOOKUP ORDER (use your medical knowledge):\n"
+        "1. Drug / biologic / device therapy → RxNorm (rxcui) first, then SNOMED\n"
+        '2. Lab measurement / observation → LOINC (6-digit code, e.g. "4548-4" for HbA1c)\n'
+        "3. Disease / condition / finding → SNOMED CT (numeric concept ID)\n"
+        "4. Procedure / intervention → SNOMED CT\n"
+        "5. Device category (not brand-specific) → SNOMED CT\n"
+        "6. If OMOP standard concept applies → OMOP concept_id as fallback\n"
+        "7. Diagnosis code → ICD10CM as last resort\n\n"
+        "OTHER RULES:\n"
+        "- Every relation must have at least one evidence row\n"
+        "- For established physiology (undisputed mechanisms), use source_type"
+        ' "established_physiology" with citation_or_url "established physiology"\n'
+        "- Prefer mediator chains over direct relations when the mechanism is indirect\n"
+        "- CASCADE RULE (§10.3): every new concept you introduce MUST be the subject or"
+        " object of at least one relation in the SAME proposal batch. Never propose a"
+        " dangling concept with no path to the rest of the ontology. Where the link to an"
+        " existing concept is indirect, introduce the intermediate mediator concept(s)"
+        " needed to complete the chain.\n"
+        "- PREFERRED SYNONYM (§10.3): every new concept MUST include at least one"
+        " taxonomy_synonyms row whose synonym equals the concept's name with synonym_type"
+        ' "preferred". Add common abbreviations/acronyms and spelling variants as'
+        ' additional rows (synonym_type "abbreviation" or "acceptable") so future PICOT'
+        " questions match the concept.\n"
+        "- Concept IDs must use format ENRC_YYYYMMDD_NNN (e.g. ENRC_20260613_001)\n"
+        "- Relation IDs: ENRR_YYYYMMDD_NNN, Evidence IDs: ENRV_YYYYMMDD_NNN,"
+        " Qualifier IDs: ENRQ_YYYYMMDD_NNN\n"
+        "- subject_concept_id and object_concept_id must ALWAYS be concept IDs"
+        " (ENRC_ or existing L1_/L2_ prefixes) — NEVER relation IDs"
+    )
 
 
 # ── Helpers internes ──────────────────────────────────────────────────────────
@@ -443,7 +460,8 @@ async def propose(
 
         await on_progress(
             0.5,
-            f"Proposition de relations causales pour {len(selected_concepts)} concept(s) sélectionné(s)…",
+            f"Proposition de relations causales pour {len(selected_concepts)}"
+            " concept(s) sélectionné(s)…",
         )
 
         try:
@@ -458,12 +476,16 @@ async def propose(
                     f"Intervention / exposure side:\n{iv_lines}\n\n"
                     f"Outcome side:\n{out_lines}\n\n"
                     "Requirements:\n"
-                    "1. EVERY concept listed above must appear as the subject or object of at least one relation — do not skip any.\n"
-                    "2. Propose the causal chain from each intervention concept toward each outcome concept.\n"
-                    "3. Where the pathway is indirect, you may introduce new intermediate mediator concepts in taxonomy_concepts "
-                    "(e.g. a physiological process or biomarker between intervention and outcome). "
-                    "Assign standard codes and layer per system prompt rules.\n"
-                    "4. For new mediator concepts use ENRC_{today}_{NNN} placeholder IDs — they will be reassigned automatically.\n"
+                    "1. EVERY concept listed above must appear as the subject or object of"
+                    " at least one relation — do not skip any.\n"
+                    "2. Propose the causal chain from each intervention concept toward each"
+                    " outcome concept.\n"
+                    "3. Where the pathway is indirect, you may introduce new intermediate"
+                    " mediator concepts in taxonomy_concepts "
+                    "(e.g. a physiological process or biomarker between intervention and"
+                    " outcome). Assign standard codes and layer per system prompt rules.\n"
+                    "4. For new mediator concepts use ENRC_{today}_{NNN} placeholder IDs"
+                    " — they will be reassigned automatically.\n"
                     "5. Provide at least one evidence row per relation."
                 ),
                 max_tokens=8192,
@@ -573,10 +595,13 @@ async def propose(
                     model=model,
                     system=system,
                     user_message=(
-                        "Propose taxonomy concepts for these unmatched clinical tokens from PICOT questions. "
-                        "Each line is a group of related tokens that should map to ONE concept:\n\n"
+                        "Propose taxonomy concepts for these unmatched clinical tokens"
+                        " from PICOT questions. "
+                        "Each line is a group of related tokens that should map to ONE"
+                        " concept:\n\n"
                         f"{token_lines}\n\n"
-                        "For each group, create exactly one concept. Include synonyms covering all token variants. "
+                        "For each group, create exactly one concept. Include synonyms"
+                        " covering all token variants. "
                         "If a standard code exists: assign layer=1 AND include the code. "
                         "If no standard code: assign layer=2 AND explain in design_rationale."
                     ),
@@ -661,7 +686,8 @@ async def propose(
 
             gap_lines = "\n\n".join(
                 (
-                    f"Gap for question {g['question_id']} ({g.get('therapeutic_area', 'general')}):\n"
+                    f"Gap for question {g['question_id']}"
+                    f" ({g.get('therapeutic_area', 'general')}):\n"
                     f"  Intervention: {', '.join(g['intervention_labels'])} "
                     f"[{', '.join(g['intervention_concept_ids'])}]\n"
                     f"  Outcome:      {', '.join(g['outcome_labels'])} "
@@ -794,7 +820,8 @@ async def propose(
 
             await on_progress(
                 0.80,
-                f"Proposition de relations bootstrap pour {len(all_proposals['taxonomy_concepts'])} nouveau(x) concept(s)…",
+                f"Proposition de relations bootstrap pour"
+                f" {len(all_proposals['taxonomy_concepts'])} nouveau(x) concept(s)…",
             )
 
             try:
@@ -803,13 +830,17 @@ async def propose(
                     model=model,
                     system=system,
                     user_message=(
-                        "The following concepts were just added to the ontology and have no causal relations yet "
-                        "(marked [NEW]). Propose the causal relation chain from each intervention concept to each "
-                        "outcome concept. Include mediator concepts where the mechanism is indirect.\n\n"
+                        "The following concepts were just added to the ontology and have"
+                        " no causal relations yet "
+                        "(marked [NEW]). Propose the causal relation chain from each"
+                        " intervention concept to each "
+                        "outcome concept. Include mediator concepts where the mechanism"
+                        " is indirect.\n\n"
                         f"Intervention / exposure concepts:\n{iv_lines}\n\n"
                         f"Outcome concepts:\n{out_lines}\n\n"
                         "For each [NEW] concept, propose at least one relation. "
-                        "Use exact concept IDs as subject/object. Provide at least one evidence row per relation."
+                        "Use exact concept IDs as subject/object."
+                        " Provide at least one evidence row per relation."
                     ),
                     max_tokens=8192,
                 )

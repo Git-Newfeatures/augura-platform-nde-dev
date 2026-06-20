@@ -89,28 +89,6 @@ const normSources = (resp) =>
     icon: SOURCE_META[s.source_id]?.icon ?? 'page',
   }))
 
-// Coverage bars "by category": one bar per evidence type, share of the indexed
-// corpus, greener as coverage rises. Derived from the backend coverage matrix.
-const COVERAGE_PALETTE = ['#047857', '#3172B0', '#7C3AED', '#B45309', '#0E7490']
-const normCoverage = (resp) => {
-  const cells = resp?.matrix ?? []
-  const byType = new Map()
-  let total = 0
-  for (const c of cells) {
-    const n = c.doc_count ?? 0
-    total += n
-    byType.set(c.evidence_type, (byType.get(c.evidence_type) ?? 0) + n)
-  }
-  if (!total) return []
-  return [...byType.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([type, n], i) => ({
-      label: humanize(type),
-      pct: Math.round((100 * n) / total),
-      color: COVERAGE_PALETTE[i % COVERAGE_PALETTE.length],
-    }))
-}
-
 // Variables registry → flattens profiled dataset columns into the shape VariablesPage
 // renders. A column is "ok" when it has a role and low missingness.
 const normVariables = (datasetsWithCols, studyNameById = new Map()) => {
@@ -145,7 +123,6 @@ const FETCHERS = {
   },
   dossiers:        async () => normDossiers(await apiJson('/documents')),
   corpus_sources:  async () => normSources(await apiJson('/corpus/sources')),
-  corpus_coverage: async () => normCoverage(await apiJson('/corpus/coverage')),
   runs:            async () => {
     const [rows, studies] = await Promise.all([
       apiJson('/simulations/runs'),

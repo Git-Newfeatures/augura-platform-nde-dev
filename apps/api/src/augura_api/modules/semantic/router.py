@@ -1,13 +1,20 @@
 """Adaptateur HTTP du module semantic."""
 
-from fastapi import APIRouter
+from datetime import UTC, datetime
+from typing import Annotated
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep
-from augura_api.modules.semantic import schemas
+from fastapi import APIRouter, Depends
+
+from augura_api.core.deps import CurrentTenantDep, SessionDep, require_role
+from augura_api.core.tenancy import CurrentTenant
+from augura_api.modules.semantic import enrich_schemas, schemas
+from augura_api.modules.semantic.enrich_apply import EnrichApplyService
 from augura_api.modules.semantic.repo import SemanticRepo
 from augura_api.modules.semantic.service import SemanticService
 
 router = APIRouter(prefix="/semantic", tags=["semantic"])
+
+OwnerTenantDep = Annotated[CurrentTenant, Depends(require_role("owner"))]
 
 
 @router.get("/concepts", response_model=list[schemas.ConceptOut])
@@ -46,3 +53,14 @@ async def release(
 ) -> schemas.ReleaseStatus:
     """Release sémantique courante + compte par table (onglet Versions)."""
     return await SemanticService(SemanticRepo(session)).release()
+
+
+@router.post("/enrich/apply", response_model=enrich_schemas.EnrichApplyResponse)
+async def enrich_apply(
+    req: enrich_schemas.EnrichApplyRequest,
+    tenant: OwnerTenantDep,
+    session: SessionDep,
+) -> enrich_schemas.EnrichApplyResponse:
+    """Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version."""
+    today = datetime.now(UTC).strftime("%Y%m%d")
+    return await EnrichApplyService(SemanticRepo(session)).apply(req, today=today)

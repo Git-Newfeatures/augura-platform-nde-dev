@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Network, Sparkles, TriangleAlert } from 'lucide-react'
+import { Network, Sparkles, TriangleAlert, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,8 @@ import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { apiJson } from '@/api'
 import { parsePICOT } from '@/semantic/picot-parser'
+import { enrichApply } from '@/workspace/dataClient'
+import { resetSemanticStore, initSemanticStore } from '@/lib/semantic-store'
 
 // Causal modeling (port de la vue /causal de Nico, recâblée sur le backend).
 // Flux : dataset mappé → POST /datasets/{id}/map (concepts) → POST /causal/dag.
@@ -164,7 +166,113 @@ function QualityBadge({ q }) {
   )
 }
 
-function Result({ dag }) {
+// ─── Acceptation des arêtes proposées ──────────────────────────────────────
+
+/** Mappe l'erreur backend vers un message lisible. */
+function mapAcceptError(err) {
+  const msg = String(err?.message || err || '')
+  if (msg.includes('403') || err?.status === 403) return 'Réservé aux propriétaires (owner).'
+  if (msg.includes('unknown_concept_ids') || msg.includes('400'))
+    return "Concepts non encore créés (proposés) — à enrichir d'abord."
+  return msg || 'Une erreur inattendue est survenue.'
+}
+
+/**
+ * Section listant les arêtes proposées par le LLM, chacune avec un bouton
+ * « Accepter » qui appelle enrichApply puis recharge le DAG.
+ */
+function ProposedEdges({ edges, nodes, onAccepted }) {
+  const proposed = edges.filter(isProposed)
+  if (proposed.length === 0) return null
+
+  // Index des labels de nœuds pour l'affichage.
+  const labelById = Object.fromEntries(nodes.map((n) => [n.id, n.label]))
+
+  // État par arête : null | 'accepting' | 'done' | string (erreur)
+  const [states, setStates] = useState({})
+
+  async function accept(e) {
+    setStates((s) => ({ ...s, [e.id]: 'accepting' }))
+    try {
+      await enrichApply({
+        direct_relations: [
+          {
+            subject_concept_id: e.from,
+            object_concept_id: e.to,
+            predicate: e.predicate ?? null,
+            polarity: e.polarity ?? null,
+            default_strength: e.strength ?? null,
+            mechanism_summary: e.notes || '',
+            relation_id: e.id,
+          },
+        ],
+      })
+      setStates((s) => ({ ...s, [e.id]: 'done' }))
+      // Rechargement du store sémantique puis regénération du DAG.
+      resetSemanticStore()
+      await initSemanticStore()
+      onAccepted()
+    } catch (err) {
+      setStates((s) => ({ ...s, [e.id]: mapAcceptError(err) }))
+    }
+  }
+
+  return (
+    <Card className="border-amber-300/60 p-4">
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-amber-700">
+        Relations proposées ({proposed.length})
+      </div>
+      <ul className="flex flex-col gap-2">
+        {proposed.map((e) => {
+          const state = states[e.id] ?? null
+          const isDone = state === 'done'
+          const isAccepting = state === 'accepting'
+          const isError = state !== null && !isDone && !isAccepting
+
+          return (
+            <li key={e.id} className="flex flex-wrap items-center gap-2 text-[12.5px]">
+              <span className="font-medium text-foreground">
+                {labelById[e.from] ?? e.from}
+              </span>
+              <span className="text-muted-foreground">→</span>
+              <span className="font-medium text-foreground">
+                {labelById[e.to] ?? e.to}
+              </span>
+              {e.predicate && (
+                <Badge variant="outline" className="text-[10.5px] text-muted-foreground">
+                  {e.predicate}
+                </Badge>
+              )}
+              <span className="ml-auto flex items-center gap-2">
+                {isDone ? (
+                  <span className="flex items-center gap-1 text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Acceptée
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11.5px] text-amber-700 border-amber-300 hover:bg-amber-50"
+                    disabled={isAccepting}
+                    onClick={() => accept(e)}
+                  >
+                    {isAccepting ? 'Enregistrement…' : 'Accepter'}
+                  </Button>
+                )}
+              </span>
+              {isError && (
+                <span className="w-full text-[11.5px] text-red-700">{state}</span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
+function Result({ dag, onAccepted }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -227,6 +335,9 @@ function Result({ dag }) {
           </ul>
         </Card>
       )}
+
+      {/* Section des arêtes proposées — uniquement si le DAG en contient. */}
+      <ProposedEdges edges={dag.edges} nodes={dag.nodes} onAccepted={onAccepted} />
     </div>
   )
 }
@@ -347,7 +458,7 @@ export function CausalModelingPage() {
       </Card>
 
       {busy && <Loading label="Querying the causal ontology and contextualizing…" />}
-      {!busy && dag && <Result dag={dag} />}
+      {!busy && dag && <Result dag={dag} onAccepted={generate} />}
       {!busy && !dag && !error && (
         <EmptyState
           icon={Network}

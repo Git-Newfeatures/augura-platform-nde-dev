@@ -8,6 +8,7 @@ from anthropic.types import ToolParam
 
 from augura_api.modules.causal.schemas import MappedConcept, Picot
 from augura_api.modules.causal.subgraph import ConceptMeta, Relation
+from augura_api.modules.semantic import vocab
 
 _ROLE_ENUM = [
     "exposure",
@@ -138,7 +139,7 @@ DAG_FILTER_TOOL: ToolParam = {
                         },
                         "polarity": {
                             "type": "string",
-                            "enum": ["increases", "decreases", "mixed", "unknown"],
+                            "enum": vocab.POLARITY,
                         },
                         "default_strength": {
                             "type": "string",

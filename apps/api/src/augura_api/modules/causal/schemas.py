@@ -80,7 +80,7 @@ class ProposedRelation(BaseModel):
     subject_concept_id: str
     object_concept_id: str
     predicate: str = "causally_influences"
-    polarity: str = "unknown"
+    polarity: str = "neutral"
     default_strength: str = "moderate"
     mechanism_summary: str = ""
 

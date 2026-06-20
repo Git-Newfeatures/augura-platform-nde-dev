@@ -8,6 +8,7 @@ analytics/provenance. Chaque handler persiste son résultat, émet un event de p
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -146,9 +147,52 @@ async def handle_document(ctx: JobContext) -> str | None:
     return ref
 
 
+async def handle_enrich_propose(ctx: JobContext) -> str | None:
+    """Pipeline de proposition d'enrichissement (B4) : lit le bundle, exécute les
+    batchs LLM, persiste le batch de propositions en artifact JSON. La progression
+    passe par set_progress (float) ; le log textuel détaillé vit dans l'artifact."""
+    from augura_api.core.llm.runtime import get_anthropic_client
+    from augura_api.modules import jobs as jobs_iface
+    from augura_api.modules.semantic.enrich_propose import propose
+    from augura_api.modules.semantic.repo import SemanticRepo
+
+    payload = dict(ctx.job.payload or {})
+    bundle = await SemanticRepo(ctx.session).read_bundle()
+    client = get_anthropic_client(ctx.settings)
+
+    async def on_progress(frac: float, _message: str) -> None:
+        await jobs_iface.set_progress(ctx.session, ctx.tenant_id, ctx.job.id, frac)
+
+    result = await propose(
+        client=client,
+        model=ctx.settings.agent_model_dag,
+        bundle=bundle,
+        questions=payload.get("questions"),
+        selected_concepts=payload.get("selected_concepts"),
+        on_progress=on_progress,
+    )
+    result["generated_at"] = datetime.now(UTC).isoformat()
+    ref = storage.save_bytes(
+        ctx.settings,
+        org_id=str(ctx.tenant_id),
+        name=f"enrich-proposals-{ctx.job.id}.json",
+        data=json.dumps(result).encode("utf-8"),
+    )
+    await analytics.log_usage(
+        ctx.session,
+        tenant_id=ctx.tenant_id,
+        user_id=ctx.user_id,
+        event_type="semantic.enrich.proposed",
+        route="/semantic/enrich/propose",
+        metadata={"job_id": str(ctx.job.id), **result.get("summary", {})},
+    )
+    return ref
+
+
 def build_handlers() -> dict[str, JobHandler]:
     return {
         "bootstrap": handle_bootstrap,
         "generate_protocol": handle_document,
         "generate_report": handle_document,
+        "enrich_propose": handle_enrich_propose,
     }

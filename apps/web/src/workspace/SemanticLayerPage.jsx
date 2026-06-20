@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { BookOpen, GitMerge, History, Search, X } from 'lucide-react'
+import { BookOpen, GitMerge, History, Search, Sparkles, X } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { SubTabs } from '@/cockpit/SubTabs'
@@ -7,10 +7,11 @@ import { apiJson } from '@/api'
 import { getTaxonomyIndex, getConceptById } from '@/semantic/taxonomy-loader'
 import { getCausalOntology } from '@/causal/ontology-loader'
 import { getStoredSynonyms, getStoredStandardCodes, initSemanticStore, isSemanticStoreReady } from '@/lib/semantic-store'
+import { EnrichmentPanel } from '@/workspace/EnrichmentPanel'
 
-// Read-only browser over the Semantic Layer (taxonomy + causal ontology + release).
-// Ported from data-intake-nde; the LLM enrichment surfaces (CausalEnrichPanel,
-// EnrichmentSection) are intentionally omitted until the backend LLM routes land.
+// Navigateur de la couche sémantique (taxonomie + ontologie causale + version).
+// Porté depuis data-intake-nde. L'onglet Enrichissement expose le pipeline B4
+// (enrichPropose → review → enrichApply) via EnrichmentPanel.
 
 // ── Shared modal shell ────────────────────────────────────────────────────────
 
@@ -628,16 +629,18 @@ export function SemanticLayerPage() {
       <>
         <SubTabs
           tabs={[
-            { id: 'taxonomy', label: 'Taxonomy',        icon: <BookOpen size={13} /> },
-            { id: 'causal',   label: 'Causal ontology', icon: <GitMerge size={13} /> },
-            { id: 'versions', label: 'Versions',        icon: <History  size={13} /> },
+            { id: 'taxonomy',    label: 'Taxonomy',        icon: <BookOpen  size={13} /> },
+            { id: 'causal',      label: 'Causal ontology', icon: <GitMerge  size={13} /> },
+            { id: 'enrichment',  label: 'Enrichissement',  icon: <Sparkles  size={13} /> },
+            { id: 'versions',    label: 'Versions',        icon: <History   size={13} /> },
           ]}
           active={sub}
           onChange={setSub}
         />
-        {sub === 'taxonomy' && <TaxonomyTab />}
-        {sub === 'causal'   && <CausalOntologyTab />}
-        {sub === 'versions' && <VersionAdminTab />}
+        {sub === 'taxonomy'   && <TaxonomyTab />}
+        {sub === 'causal'     && <CausalOntologyTab />}
+        {sub === 'enrichment' && <EnrichmentPanel />}
+        {sub === 'versions'   && <VersionAdminTab />}
       </>
     )
   }

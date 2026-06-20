@@ -10,10 +10,16 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 import httpx
+
+from augura_api.modules.corpus.filters import (
+    SearchFilters,
+    build_pubmed_term,
+    pubmed_date_params,
+)
 
 EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
@@ -126,7 +132,14 @@ def _parse_article(article_el: ET.Element) -> PubMedArticle | None:
 
 
 class PubMedClient(Protocol):
-    async def search(self, query: str, max_results: int) -> list[PubMedArticle]: ...
+    async def search(
+        self,
+        query: str,
+        max_results: int,
+        *,
+        filters: SearchFilters | None = None,
+        today: date | None = None,
+    ) -> list[PubMedArticle]: ...
 
     async def fetch_by_ids(self, pmids: list[str]) -> list[PubMedArticle]: ...
 
@@ -144,10 +157,14 @@ class NCBIPubMedClient:
             params["api_key"] = self._api_key
         return params
 
-    async def _esearch(self, term: str, retmax: int) -> list[str]:
+    async def _esearch(
+        self, term: str, retmax: int, *, extra: dict[str, str] | None = None
+    ) -> list[str]:
         esearch = await self._http.get(
             f"{EUTILS_BASE}/esearch.fcgi",
-            params=self._params(term=term, retmax=str(retmax), retmode="json", sort="relevance"),
+            params=self._params(
+                term=term, retmax=str(retmax), retmode="json", sort="relevance", **(extra or {})
+            ),
         )
         esearch.raise_for_status()
         idlist: list[str] = esearch.json().get("esearchresult", {}).get("idlist", [])
@@ -170,9 +187,18 @@ class NCBIPubMedClient:
         articles = [_parse_article(a) for a in root.findall(".//PubmedArticle")]
         return [a for a in articles if a is not None]
 
-    async def search(self, query: str, max_results: int) -> list[PubMedArticle]:
+    async def search(
+        self,
+        query: str,
+        max_results: int,
+        *,
+        filters: SearchFilters | None = None,
+        today: date | None = None,
+    ) -> list[PubMedArticle]:
         n = max(1, min(50, max_results))
-        pmids = await self._esearch(query, n)
+        day = today or datetime.now(UTC).date()
+        term = build_pubmed_term(query, filters)
+        pmids = await self._esearch(term, n, extra=pubmed_date_params(filters, day))
         if not pmids:
             return []
         return await self.fetch_by_ids(pmids)

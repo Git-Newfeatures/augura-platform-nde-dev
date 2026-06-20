@@ -1,9 +1,11 @@
 """NCBIPubMedClient : esearch + efetch + parsing XML, sans réseau (httpx MockTransport)."""
 
 from datetime import date
+from datetime import date as _date
 
 import httpx
 
+from augura_api.modules.corpus.filters import SearchFilters
 from augura_api.modules.corpus.pubmed import NCBIPubMedClient
 
 _ESEARCH = {"esearchresult": {"idlist": ["111", "222"]}}
@@ -88,3 +90,29 @@ async def test_search_empty_when_no_pmids() -> None:
     )
     async with httpx.AsyncClient(transport=transport) as http:
         assert await NCBIPubMedClient(http).search("nonsense xyzzy", 5) == []
+
+
+async def test_search_applies_filters_to_term_and_params() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "esearch" in request.url.path:
+            captured.update(dict(request.url.params))
+            return httpx.Response(200, json=_ESEARCH)
+        if "efetch" in request.url.path:
+            return httpx.Response(200, text=_EFETCH_XML)
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        await NCBIPubMedClient(http).search(
+            "digital engagement",
+            5,
+            filters=SearchFilters(date_range="5y", study_types=("rct",)),
+            today=_date(2026, 6, 19),
+        )
+
+    assert captured["term"] == "(digital engagement) AND (Randomized Controlled Trial[pt])"
+    assert captured["datetype"] == "pdat"
+    assert captured["mindate"] == "2021"
+    assert captured["maxdate"] == "2026"

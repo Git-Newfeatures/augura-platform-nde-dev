@@ -182,14 +182,14 @@ function mapAcceptError(err) {
  * « Accepter » qui appelle enrichApply puis recharge le DAG.
  */
 function ProposedEdges({ edges, nodes, onAccepted }) {
+  // État par arête : null | 'accepting' | 'done' | string (erreur)
+  const [states, setStates] = useState({})
+
   const proposed = edges.filter(isProposed)
   if (proposed.length === 0) return null
 
   // Index des labels de nœuds pour l'affichage.
   const labelById = Object.fromEntries(nodes.map((n) => [n.id, n.label]))
-
-  // État par arête : null | 'accepting' | 'done' | string (erreur)
-  const [states, setStates] = useState({})
 
   async function accept(e) {
     setStates((s) => ({ ...s, [e.id]: 'accepting' }))
@@ -199,9 +199,9 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
           {
             subject_concept_id: e.from,
             object_concept_id: e.to,
-            predicate: e.predicate ?? null,
-            polarity: e.polarity ?? null,
-            default_strength: e.strength ?? null,
+            predicate: e.predicate || 'causally_influences',
+            polarity: e.polarity || 'neutral',
+            default_strength: e.strength || 'moderate',
             mechanism_summary: e.notes || '',
             relation_id: e.id,
           },

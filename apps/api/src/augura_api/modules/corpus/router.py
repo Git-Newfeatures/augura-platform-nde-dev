@@ -156,6 +156,26 @@ async def literature(
         )
 
 
+@router.post("/literature/ingest", response_model=schemas.LiteratureSearchResult)
+async def literature_ingest(
+    req: schemas.LiteratureIngestRequest,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> schemas.LiteratureSearchResult:
+    """Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.
+    Sert « Add to corpus » sur des résultats de retrieve gardés (PubMed only)."""
+    embedder: Embedder | None = None
+    try:
+        embedder = get_embedder(settings)
+    except AgentUpstreamError:
+        embedder = None
+    async with httpx.AsyncClient(timeout=20.0) as http:
+        pubmed = NCBIPubMedClient(http, api_key=settings.ncbi_api_key)
+        service = LiteratureService(CorpusRepo(session), pubmed, embedder=embedder)
+        return await service.ingest_by_ids(tenant, pmids=req.pmids)
+
+
 # ── Recherche live (retrieve-and-freeze) — verbe distinct de l'ingestion ──────
 
 

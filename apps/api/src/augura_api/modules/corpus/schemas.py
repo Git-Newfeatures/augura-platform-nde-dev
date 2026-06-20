@@ -119,6 +119,10 @@ class LiteratureSearchResult(BaseModel):
     documents: list[FeedDocument]
 
 
+class LiteratureIngestRequest(BaseModel):
+    pmids: list[str] = Field(min_length=1, max_length=50)
+
+
 # ── Recherche live (retrieve-and-freeze) — distinct de l'ingestion ci-dessus ──
 # Nouveau verbe : récupère + gèle un jeu de preuves (hash de contenu), SANS
 # ingérer dans le corpus, SANS embedding, SANS DATA_CHANGED_EVENT.

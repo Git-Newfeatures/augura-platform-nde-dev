@@ -37,8 +37,11 @@ class FakePubMed:
     def __init__(self, articles: list[PubMedArticle]) -> None:
         self._articles = articles
 
-    async def search(self, query: str, max_results: int) -> list[PubMedArticle]:
+    async def search(self, query: str, max_results: int, **_kw: object) -> list[PubMedArticle]:
         return self._articles[:max_results]
+
+    async def fetch_by_ids(self, pmids: list[str]) -> list[PubMedArticle]:
+        return [a for a in self._articles if a.pmid in pmids]
 
 
 class FakeEmbedder:
@@ -97,3 +100,13 @@ async def test_embeds_chunks_when_embedder_present() -> None:
     assert res.embedded is True
     assert len(repo.chunks) == 2
     assert all(emb is not None for _doc, emb in repo.chunks)
+
+
+async def test_ingest_by_ids_fetches_and_ingests() -> None:
+    repo = FakeRepo()
+    res = await _service(repo).ingest_by_ids(TENANT, pmids=["1"])
+    assert (res.found, res.ingested) == (1, 1)
+    assert {d.url for d in res.documents} == {"https://doi.org/10.1/a"}
+    # idempotent : même PMID déjà ingéré ⇒ 0 nouvelle ingestion
+    res2 = await _service(repo).ingest_by_ids(TENANT, pmids=["1"])
+    assert (res2.found, res2.ingested) == (1, 0)

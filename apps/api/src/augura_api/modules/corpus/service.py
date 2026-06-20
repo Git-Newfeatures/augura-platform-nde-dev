@@ -20,7 +20,7 @@ from augura_api.core.llm.runtime import (
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.corpus import schemas
 from augura_api.modules.corpus.models import Document
-from augura_api.modules.corpus.pubmed import PubMedClient
+from augura_api.modules.corpus.pubmed import PubMedArticle, PubMedClient
 from augura_api.modules.corpus.repo import CorpusFilters, CorpusRepo
 
 VALID_JURISDICTIONS = {
@@ -272,6 +272,26 @@ class LiteratureService:
     ) -> schemas.LiteratureSearchResult:
         eq = (effective_query or query).strip()
         articles = await self.pubmed.search(eq, max_results)
+        return await self._ingest_articles(tenant, articles, query=query, effective_query=eq)
+
+    async def ingest_by_ids(
+        self, tenant: CurrentTenant, *, pmids: list[str]
+    ) -> schemas.LiteratureSearchResult:
+        """Ingère des enregistrements PubMed précis (efetch par PMID), sans recherche.
+        Sert « Add to corpus » sur des résultats de retrieve déjà sélectionnés."""
+        articles = await self.pubmed.fetch_by_ids(pmids)
+        return await self._ingest_articles(
+            tenant, articles, query=",".join(pmids), effective_query=",".join(pmids)
+        )
+
+    async def _ingest_articles(
+        self,
+        tenant: CurrentTenant,
+        articles: list[PubMedArticle],
+        *,
+        query: str,
+        effective_query: str,
+    ) -> schemas.LiteratureSearchResult:
         today = datetime.now(UTC).date()
         ingested: list[Document] = []
         embedded_any = False
@@ -318,7 +338,7 @@ class LiteratureService:
         ]
         return schemas.LiteratureSearchResult(
             query=query,
-            effective_query=eq,
+            effective_query=effective_query,
             found=len(articles),
             ingested=len(ingested),
             embedded=embedded_any,

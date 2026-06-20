@@ -131,6 +131,9 @@ class LiteratureRetrieveRequest(BaseModel):
     # Défaut : les deux sources. Validé côté service (source inconnue → 400).
     sources: list[str] | None = None
     max_results: int = Field(default=10, ge=1, le=50)
+    # Filtres v0 : fenêtre de date + types d'étude. Validés côté routeur (_build_filters).
+    date_range: str = "any"
+    study_types: list[str] = Field(default_factory=list)
 
 
 class RetrievedItemOut(BaseModel):

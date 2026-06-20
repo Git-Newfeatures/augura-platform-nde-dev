@@ -15,6 +15,11 @@ from augura_api.core.llm.embeddings import Embedder, get_embedder
 from augura_api.core.llm.runtime import AgentUpstreamError, get_anthropic_client
 from augura_api.modules.corpus import schemas
 from augura_api.modules.corpus.ctgov import CTGovApiClient
+from augura_api.modules.corpus.filters import (
+    VALID_DATE_RANGES,
+    VALID_STUDY_TYPES,
+    SearchFilters,
+)
 from augura_api.modules.corpus.live_repo import LiveRepo
 from augura_api.modules.corpus.pubmed import NCBIPubMedClient
 from augura_api.modules.corpus.repo import CorpusRepo
@@ -42,6 +47,16 @@ def _validate_sources(sources: list[str] | None) -> None:
     unknown = [s for s in sources if s not in schemas.VALID_RETRIEVE_SOURCES]
     if unknown:
         raise BadRequestError("source inconnue", value=unknown)
+
+
+def _build_filters(date_range: str, study_types: list[str]) -> SearchFilters:
+    """Valide et construit les SearchFilters depuis les champs de la requête."""
+    if date_range not in VALID_DATE_RANGES:
+        raise BadRequestError("date_range invalide", value=date_range)
+    unknown = [t for t in study_types if t not in VALID_STUDY_TYPES]
+    if unknown:
+        raise BadRequestError("study_type inconnu", value=unknown)
+    return SearchFilters(date_range=date_range, study_types=tuple(study_types))
 
 
 def _live_service(session: SessionDep) -> LiteratureSnapshotService:
@@ -154,6 +169,7 @@ async def literature_retrieve(
     Ne touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique
     ⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel."""
     _validate_sources(req.sources)  # 400 avant le stream si source inconnue
+    filters = _build_filters(req.date_range, req.study_types)
     sources = set(req.sources) if req.sources else None
 
     async def gen() -> AsyncIterator[str]:
@@ -162,7 +178,7 @@ async def literature_retrieve(
                 NCBIPubMedClient(http, api_key=settings.ncbi_api_key), CTGovApiClient(http)
             )
             result = await retriever.retrieve(
-                req.query, sources=sources, max_results=req.max_results
+                req.query, sources=sources, max_results=req.max_results, filters=filters
             )
         resp = to_retrieve_response(result)
         yield _ndjson(

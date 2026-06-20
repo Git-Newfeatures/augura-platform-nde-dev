@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from augura_api.modules.semantic import enrichment as enr
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -13,7 +15,7 @@ def _concept(
     domain: str = "condition",
     layer: int = 2,
     active: bool = True,
-) -> dict:
+) -> dict[str, Any]:
     return {
         "local_concept_id": cid,
         "concept_name": label,
@@ -24,11 +26,11 @@ def _concept(
 
 
 def _raw(
-    concepts: list | None = None,
-    synonyms: list | None = None,
-    relations: list | None = None,
-    predicates: list | None = None,
-) -> dict:
+    concepts: list[dict[str, Any]] | None = None,
+    synonyms: list[dict[str, Any]] | None = None,
+    relations: list[dict[str, Any]] | None = None,
+    predicates: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     return {
         "taxonomy_concepts": concepts or [],
         "taxonomy_synonyms": synonyms or [],
@@ -37,7 +39,9 @@ def _raw(
     }
 
 
-def _rel(rid: str, subj: str, obj: str, pred: str = "precedes", pol: str = "increases") -> dict:
+def _rel(
+    rid: str, subj: str, obj: str, pred: str = "precedes", pol: str = "increases"
+) -> dict[str, Any]:
     return {
         "relation_id": rid,
         "subject_concept_id": subj,
@@ -48,9 +52,9 @@ def _rel(rid: str, subj: str, obj: str, pred: str = "precedes", pol: str = "incr
     }
 
 
-def _batch(**kwargs) -> dict:
+def _batch(**kwargs: Any) -> dict[str, Any]:
     """Crée un batch minimal avec toutes les clés requises."""
-    base: dict = {
+    base: dict[str, Any] = {
         "taxonomy_concepts": [],
         "taxonomy_synonyms": [],
         "taxonomy_standard_codes": [],
@@ -171,7 +175,7 @@ def test_match_tokens_label_substring_match() -> None:
     concepts = [_concept("C1", "blood pressure")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
     # phrase courte (2 mots) → couverture OK
-    matched, unmatched = enr.match_tokens(
+    matched, _unmatched = enr.match_tokens(
         ["systolic blood pressure"], idx.syn_lookup, idx.concept_index
     )
     assert "C1" in matched.get("systolic blood pressure", [])
@@ -182,7 +186,7 @@ def test_match_tokens_word_coverage_rejects_short_label_in_long_phrase() -> None
     concepts = [_concept("C1", "blood pressure")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
     # "blood pressure" = 2 mots / 7 mots de la phrase = 28.6% < 50%
-    matched, unmatched = enr.match_tokens(
+    matched, _unmatched = enr.match_tokens(
         ["reduction of systolic blood pressure after treatment"],
         idx.syn_lookup,
         idx.concept_index,
@@ -195,7 +199,7 @@ def test_match_tokens_short_phrase_accepts_short_label() -> None:
     """Phrase ≤ 3 mots : toujours acceptée quelle que soit la couverture."""
     concepts = [_concept("C1", "glucose")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
-    matched, unmatched = enr.match_tokens(["blood glucose"], idx.syn_lookup, idx.concept_index)
+    matched, _unmatched = enr.match_tokens(["blood glucose"], idx.syn_lookup, idx.concept_index)
     # "glucose" (1 mot) dans "blood glucose" (2 mots) → phrase ≤ 3 mots → OK
     assert "C1" in matched.get("blood glucose", [])
 
@@ -215,7 +219,7 @@ def test_match_tokens_empty_phrase_skipped() -> None:
 def test_match_tokens_unmatched_added_to_set() -> None:
     concepts = [_concept("C1", "hypertension")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
-    matched, unmatched = enr.match_tokens(
+    _matched, unmatched = enr.match_tokens(
         ["completely unknown phrase xyzabc"], idx.syn_lookup, idx.concept_index
     )
     assert "completely unknown phrase xyzabc" in unmatched
@@ -240,7 +244,7 @@ def test_match_tokens_label_present_failing_coverage_does_not_fall_through_to_sy
             "causal_predicates": [],
         }
     )
-    matched, unmatched = enr.match_tokens(
+    matched, _unmatched = enr.match_tokens(
         ["lowering systolic blood pressure outcomes"],
         idx.syn_lookup,
         idx.concept_index,
@@ -639,7 +643,7 @@ def test_reassign_ids_counter_increments() -> None:
 
 def test_group_missing_concepts_similar_tokens_grouped() -> None:
     """Deux tokens partageant > 40% des mots (Jaccard) doivent être groupés."""
-    missing = [
+    missing: list[dict[str, Any]] = [
         {
             "token": "systolic blood pressure",
             "appeared_in": [],
@@ -663,7 +667,7 @@ def test_group_missing_concepts_similar_tokens_grouped() -> None:
 
 def test_group_missing_concepts_distinct_tokens_separated() -> None:
     """Deux tokens sans mots communs doivent être dans des groupes séparés."""
-    missing = [
+    missing: list[dict[str, Any]] = [
         {
             "token": "insulin glargine",
             "appeared_in": [],

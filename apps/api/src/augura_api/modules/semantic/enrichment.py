@@ -389,23 +389,28 @@ def match_tokens(
         for c in concept_index:
             norm_label: str = c["_norm_label"]
 
-            # Vérification via le label normalisé (port exact du JS) :
-            # le label doit être contenu dans la phrase ET faire ≥ 4 chars.
-            if norm_label and len(norm_label) >= 4 and norm_label in norm_phrase:
+            # Port exact du if/else JS (enrich-propose.js ~lignes 233-253) :
+            #   if (!normPhrase.includes(c._normLabel) || c._normLabel.length < 4)
+            #     → essayer les synonymes
+            #   else
+            #     → le label est présent ET ≥ 4 chars : UNIQUEMENT vérification
+            #       de couverture du label, les synonymes ne sont JAMAIS tentés.
+            if norm_phrase and (norm_label not in norm_phrase or len(norm_label) < 4):
+                # Label absent ou trop court → on tente les synonymes normalisés
+                for syn in c["_norm_synonyms"]:
+                    if not syn or len(syn) < 4 or syn not in norm_phrase:
+                        continue
+                    syn_words = len([w for w in syn.split() if w])
+                    # Accepté si phrase courte (≤3 mots) ou synonyme couvre ≥50% des mots
+                    if phrase_words <= 3 or syn_words / phrase_words >= 0.5:
+                        found.append(c["id"])
+                        break
+            else:
+                # Label présent ET ≥ 4 chars → vérification de couverture uniquement
+                # (les synonymes ne sont JAMAIS essayés dans cette branche)
                 label_words = len([w for w in norm_label.split() if w])
                 if phrase_words <= 3 or label_words / phrase_words >= 0.5:
                     found.append(c["id"])
-                    continue  # label match → on passe au concept suivant
-
-            # Sinon, vérification via les synonymes normalisés
-            for syn in c["_norm_synonyms"]:
-                if not syn or len(syn) < 4 or syn not in norm_phrase:
-                    continue
-                syn_words = len([w for w in syn.split() if w])
-                # Accepté si phrase courte (≤3 mots) ou synonyme couvre ≥50% des mots
-                if phrase_words <= 3 or syn_words / phrase_words >= 0.5:
-                    found.append(c["id"])
-                    break
 
         if found:
             # Déduplication (comme JS : [...new Set(found)])
@@ -433,7 +438,11 @@ def directed_bfs(
     le concept le plus proche des cibles vu depuis la frontière visitée.
     """
     to_set: set[str] = set(to_ids)
-    visited: set[str] = set(from_ids)
+    # visited est un dict[str, None] ordonné par insertion pour reproduire le
+    # comportement du JS qui utilise un Set ES6 (insertion-ordered).
+    # list(visited) reflète ainsi l'ordre d'insertion, comme [...visited] en JS,
+    # ce qui rend hops_from_intervention déterministe.
+    visited: dict[str, None] = {nid: None for nid in from_ids}
     frontier: set[str] = set(from_ids)
 
     for _hop in range(1, max_hops + 1):
@@ -445,7 +454,7 @@ def directed_bfs(
                     return BfsResult(found=True, nearest_forward_hop=None)
                 if target not in visited:
                     next_frontier.add(target)
-                    visited.add(target)
+                    visited[target] = None
         if not next_frontier:
             break
         frontier = next_frontier

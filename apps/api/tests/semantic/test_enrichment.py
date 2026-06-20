@@ -221,6 +221,38 @@ def test_match_tokens_unmatched_added_to_set() -> None:
     assert "completely unknown phrase xyzabc" in unmatched
 
 
+def test_match_tokens_label_present_failing_coverage_does_not_fall_through_to_synonym() -> None:
+    # Régression : fidélité au if/else JS (enrich-propose.js ~lignes 233-253).
+    # La phrase normalisée "lowering systolic blood pressure outcomes" a 5 mots.
+    # Label "blood pressure" (2 mots) : PRÉSENT dans la phrase ET ≥ 4 chars.
+    #   → branche else du JS → on vérifie UNIQUEMENT la couverture du label.
+    #   → couverture = 2/5 = 0.40 < 0.50 → AUCUN match.
+    # Le synonyme "systolic blood pressure" (3 mots, 3/5 = 0.60 ≥ 0.50) NE DOIT PAS
+    # être tenté (branche else = interdiction totale des synonymes).
+    # Ce test doit ÉCHOUER avant le correctif et PASSER après.
+    concepts = [_concept("C1", "blood pressure")]
+    syns = [{"local_concept_id": "C1", "synonym": "systolic blood pressure"}]
+    idx = enr.build_semantic_data(
+        {
+            "taxonomy_concepts": concepts,
+            "taxonomy_synonyms": syns,
+            "ontology_relations": [],
+            "causal_predicates": [],
+        }
+    )
+    matched, unmatched = enr.match_tokens(
+        ["lowering systolic blood pressure outcomes"],
+        idx.syn_lookup,
+        idx.concept_index,
+    )
+    # C1 ne doit PAS apparaître : la branche label est seule autorisée et elle échoue.
+    all_matched_ids = {cid for ids in matched.values() for cid in ids}
+    assert "C1" not in all_matched_ids, (
+        "C1 a été matché via le synonyme alors que le label est présent "
+        "(violation du if/else JS : la branche else interdit les synonymes)"
+    )
+
+
 def test_match_tokens_label_min_length_4() -> None:
     """Un label de moins de 4 caractères ne doit pas matcher via label-path."""
     concepts = [_concept("C1", "bp")]  # 2 chars normalisé → "bp"

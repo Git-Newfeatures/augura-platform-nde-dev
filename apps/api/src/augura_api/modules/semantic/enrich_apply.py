@@ -7,6 +7,7 @@ Tous construisent un (manifest, payload) délégué à SemanticRepo.apply_releas
 
 from typing import Any, cast
 
+from augura_api.core.errors import BadRequestError, NotFoundError
 from augura_api.modules.semantic.enrich_schemas import (
     AddQualifierIn,
     DirectRelationIn,
@@ -99,12 +100,24 @@ class EnrichApplyService:
             return await self._direct_relations(req.direct_relations, current, today)
         if req.proposals:
             return await self._proposals(req, current)
-        raise ValueError("aucun chemin d'apply renseigné")
+        raise BadRequestError("aucun chemin d'apply renseigné")
 
     async def _direct_relations(
         self, relations: list[DirectRelationIn], current: str, today: str
     ) -> EnrichApplyResponse:
         new_version = bump_version(current, "patch")
+        all_ids = {cid for r in relations for cid in (r.subject_concept_id, r.object_concept_id)}
+        known = await self.repo.existing_concept_ids(list(all_ids))
+        valid = [
+            r for r in relations if r.subject_concept_id in known and r.object_concept_id in known
+        ]
+        if not valid:
+            unknown = sorted(all_ids - known)
+            raise BadRequestError(
+                "aucune relation ne référence des concepts existants",
+                unknown_concept_ids=unknown,
+            )
+        relations = valid
         max_n = await self.repo.max_relation_seq(today)
         payload, id_map = build_direct_relations_payload(
             relations, version=new_version, existing_max_rel_n=max_n, today=today
@@ -123,7 +136,7 @@ class EnrichApplyService:
     async def _deactivate(self, relation_id: str, current: str) -> EnrichApplyResponse:
         existing = await self.repo.get_relation_row(relation_id)
         if existing is None:
-            raise ValueError(f"relation {relation_id} introuvable")
+            raise NotFoundError("relation introuvable", relation_id=relation_id)
         new_version = bump_version(current, "patch")
         row: dict[str, Any] = {
             **existing,
@@ -178,7 +191,7 @@ class EnrichApplyService:
         concepts = [c for c in all_concepts if c.get("local_concept_id") in csel]
         relations = [r for r in all_relations if r.get("relation_id") in rsel]
         if not concepts and not relations:
-            raise ValueError("aucun concept/relation approuvé à appliquer")
+            raise BadRequestError("aucun concept/relation approuvé à appliquer")
         cset = {c["local_concept_id"] for c in concepts}
         rset = {r["relation_id"] for r in relations}
         new_version = bump_version(current, "minor" if concepts else "patch")
@@ -192,20 +205,22 @@ class EnrichApplyService:
         payload: dict[str, Any] = {
             "taxonomy_concepts": [stamp(c) for c in concepts],
             "taxonomy_synonyms": [
-                stamp_sub(s) for s in _dicts("taxonomy_synonyms")
+                stamp_sub(s)
+                for s in _dicts("taxonomy_synonyms")
                 if s.get("local_concept_id") in cset
             ],
             "taxonomy_standard_codes": [
-                s for s in _dicts("taxonomy_standard_codes")
-                if s.get("local_concept_id") in cset
+                s for s in _dicts("taxonomy_standard_codes") if s.get("local_concept_id") in cset
             ],
             "ontology_relations": [stamp(r) for r in relations],
             "ontology_relation_evidence": [
-                stamp_sub(e) for e in _dicts("ontology_relation_evidence")
+                stamp_sub(e)
+                for e in _dicts("ontology_relation_evidence")
                 if e.get("relation_id") in rset
             ],
             "ontology_relation_qualifiers": [
-                stamp_sub(qf) for qf in _dicts("ontology_relation_qualifiers")
+                stamp_sub(qf)
+                for qf in _dicts("ontology_relation_qualifiers")
                 if qf.get("relation_id") in rset
             ],
         }

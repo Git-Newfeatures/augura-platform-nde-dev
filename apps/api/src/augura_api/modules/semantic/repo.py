@@ -196,6 +196,15 @@ class SemanticRepo:
         ).bindparams(d=today)
         return int((await self.session.execute(stmt)).scalar_one())
 
+    async def existing_concept_ids(self, ids: list[str]) -> set[str]:
+        """Sous-ensemble des ids fournis qui existent dans la taxonomie (validation FK)."""
+        if not ids:
+            return set()
+        stmt = select(TaxonomyConcept.local_concept_id).where(
+            TaxonomyConcept.local_concept_id.in_(ids)
+        )
+        return set((await self.session.execute(stmt)).scalars().all())
+
     async def get_relation_row(self, relation_id: str) -> dict[str, Any] | None:
         """Récupère une relation sous forme dict brut (pour deactivate)."""
         stmt = text(

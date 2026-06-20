@@ -44,6 +44,8 @@ def test_openapi_exposes_routes() -> None:
         "/datasets/{dataset_id}/map",
         "/causal/dag",
         "/semantic/enrich/apply",
+        "/semantic/enrich/propose",
+        "/semantic/enrich/proposals/{job_id}",
     ):
         assert path in paths, path
 
@@ -101,7 +103,12 @@ async def test_protected_routes_require_auth() -> None:
             assert r.headers["content-type"] == "application/problem+json"
             assert r.json()["code"] == "unauthorized"
         # POST routes with a body : corps valide vide ⇒ l'auth (401) précède le métier.
-        for path in ("/causal/dag", "/semantic/enrich/apply"):
+        for path in ("/causal/dag", "/semantic/enrich/apply", "/semantic/enrich/propose"):
             r = await client.post(path, json={})
+            assert r.status_code == 401, path
+            assert r.json()["code"] == "unauthorized"
+        # GET routes avec paramètre de chemin : l'auth (401) précède la résolution.
+        for path in ("/semantic/enrich/proposals/00000000-0000-0000-0000-000000000000",):
+            r = await client.get(path)
             assert r.status_code == 401, path
             assert r.json()["code"] == "unauthorized"

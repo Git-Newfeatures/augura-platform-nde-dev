@@ -46,3 +46,18 @@ class EnrichApplyResponse(BaseModel):
     relations_added: int = 0
     relation_id_map: dict[str, str] = {}
     detail: str = ""
+
+
+class PicotQuestionIn(BaseModel):
+    id: str
+    therapeutic_area: str | None = None
+    picot: dict[str, object] = {}  # {intervention?, comparator?, outcome?: list[str]}
+
+
+class EnrichProposeRequest(BaseModel):
+    questions: list[PicotQuestionIn] = []
+    selected_concepts: list[dict[str, object]] = []
+
+
+class EnrichProposeAccepted(BaseModel):
+    job_id: str

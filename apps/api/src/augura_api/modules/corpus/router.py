@@ -204,6 +204,14 @@ async def create_snapshot(
     return await _live_service(session).freeze(tenant, req)
 
 
+@router.get("/literature/snapshots", response_model=list[schemas.SnapshotSummary])
+async def list_snapshots(
+    tenant: CurrentTenantDep, session: SessionDep, study_id: UUID | None = None
+) -> list[schemas.SnapshotSummary]:
+    """Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash)."""
+    return await _live_service(session).list_snapshots(tenant, study_id=study_id)
+
+
 @router.get("/literature/snapshots/{snapshot_id}", response_model=schemas.LiteratureSnapshot)
 async def read_snapshot(
     snapshot_id: UUID, tenant: CurrentTenantDep, session: SessionDep

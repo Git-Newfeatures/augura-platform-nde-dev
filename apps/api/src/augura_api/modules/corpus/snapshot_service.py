@@ -113,6 +113,22 @@ class LiteratureSnapshotService:
         verify_content_hash({**row.payload, "content_hash": row.content_hash})
         return self._to_snapshot(row)
 
+    async def list_snapshots(
+        self, tenant: CurrentTenant, *, study_id: UUID | None = None
+    ) -> list[schemas.SnapshotSummary]:
+        rows = await self.repo.list_snapshots(tenant.tenant_id, study_id=study_id)
+        return [
+            schemas.SnapshotSummary(
+                id=r.id,
+                study_id=r.study_id,
+                query=r.payload["query"],
+                sources=r.payload["sources"],
+                result_count=len(r.payload.get("results", [])),
+                created_at=r.created_at,
+            )
+            for r in rows
+        ]
+
     def _to_snapshot(self, row: LiteratureSnapshot) -> schemas.LiteratureSnapshot:
         p = row.payload
         return schemas.LiteratureSnapshot(

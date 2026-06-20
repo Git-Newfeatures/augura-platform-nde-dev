@@ -61,6 +61,15 @@ class LiveRepo:
         )
         return res.scalar_one_or_none()
 
+    async def list_snapshots(
+        self, tenant_id: TenantId, *, study_id: UUID | None = None
+    ) -> list[LiteratureSnapshot]:
+        stmt = select(LiteratureSnapshot).where(LiteratureSnapshot.org_id == tenant_id)
+        if study_id is not None:
+            stmt = stmt.where(LiteratureSnapshot.study_id == study_id)
+        res = await self.session.execute(stmt.order_by(LiteratureSnapshot.created_at.desc()))
+        return list(res.scalars().all())
+
     # ── Sessions ─────────────────────────────────────────────────────────────
     async def create_session(
         self,

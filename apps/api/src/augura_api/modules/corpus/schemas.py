@@ -203,6 +203,17 @@ class LiteratureSnapshot(BaseModel):
     verified: bool = True
 
 
+class SnapshotSummary(BaseModel):
+    """Vue légère pour la liste « Saved evidence » : pas de results ni de hash."""
+
+    id: UUID
+    study_id: UUID | None = None
+    query: str
+    sources: list[str]
+    result_count: int
+    created_at: datetime
+
+
 class SessionCreateRequest(BaseModel):
     query: str | None = Field(default=None, max_length=400)
     study_id: UUID | None = None

@@ -160,3 +160,20 @@ class SemanticRepo:
         """Release courante + compte par table (GET /semantic/release)."""
         res = await self.session.execute(text(_RELEASE_SQL))
         return coerce_jsonb(res.scalar_one())
+
+    # ── Écriture (B4 enrich) : exclusivement via la fonction SECURITY DEFINER ──
+
+    async def apply_release(
+        self, manifest: dict[str, Any], payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Applique un batch d'enrichissement + bascule la release courante.
+
+        Le rôle applicatif n'a pas le write direct (RLS FOR SELECT) ; tout passe par
+        public.upsert_semantic_release (SECURITY DEFINER). Renvoie {version, concepts,
+        relations}."""
+        stmt = text(
+            "select public.upsert_semantic_release("
+            "cast(:manifest as jsonb), cast(:payload as jsonb))"
+        ).bindparams(manifest=json.dumps(manifest), payload=json.dumps(payload))
+        res = await self.session.execute(stmt)
+        return coerce_jsonb(res.scalar_one())

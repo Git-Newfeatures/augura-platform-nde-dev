@@ -2327,6 +2327,42 @@
         "title": "EnrichApplyResponse",
         "type": "object"
       },
+      "EnrichProposeAccepted": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "EnrichProposeAccepted",
+        "type": "object"
+      },
+      "EnrichProposeRequest": {
+        "properties": {
+          "questions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PicotQuestionIn"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "selected_concepts": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Selected Concepts",
+            "type": "array"
+          }
+        },
+        "title": "EnrichProposeRequest",
+        "type": "object"
+      },
       "EstimandOut": {
         "properties": {
           "description": {
@@ -3617,6 +3653,36 @@
         "title": "PicotOutcome",
         "type": "object"
       },
+      "PicotQuestionIn": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "picot": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Picot",
+            "type": "object"
+          },
+          "therapeutic_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Therapeutic Area"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "PicotQuestionIn",
+        "type": "object"
+      },
       "PiiPatternOut": {
         "properties": {
           "key": {
@@ -3803,7 +3869,7 @@
             "type": "string"
           },
           "polarity": {
-            "default": "unknown",
+            "default": "neutral",
             "title": "Polarity",
             "type": "string"
           },
@@ -8026,6 +8092,90 @@
           }
         },
         "summary": "Enrich Apply",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/enrich/proposals/{job_id}": {
+      "get": {
+        "description": "Sert l'artifact JSON des propositions d'un job réussi (scopé tenant).",
+        "operationId": "enrich_proposals_semantic_enrich_proposals__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enrich Proposals",
+        "tags": [
+          "semantic"
+        ]
+      }
+    },
+    "/semantic/enrich/propose": {
+      "post": {
+        "description": "Lance l'analyse de couverture + proposition LLM en job background (suivi par polling).",
+        "operationId": "enrich_propose_semantic_enrich_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrichProposeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrichProposeAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enrich Propose",
         "tags": [
           "semantic"
         ]

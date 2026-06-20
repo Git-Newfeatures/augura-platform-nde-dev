@@ -963,6 +963,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/semantic/enrich/proposals/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enrich Proposals
+         * @description Sert l'artifact JSON des propositions d'un job réussi (scopé tenant).
+         */
+        get: operations["enrich_proposals_semantic_enrich_proposals__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/semantic/enrich/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrich Propose
+         * @description Lance l'analyse de couverture + proposition LLM en job background (suivi par polling).
+         */
+        post: operations["enrich_propose_semantic_enrich_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/semantic/relations": {
         parameters: {
             query?: never;
@@ -1903,6 +1943,26 @@ export interface components {
              */
             relations_added: number;
         };
+        /** EnrichProposeAccepted */
+        EnrichProposeAccepted: {
+            /** Job Id */
+            job_id: string;
+        };
+        /** EnrichProposeRequest */
+        EnrichProposeRequest: {
+            /**
+             * Questions
+             * @default []
+             */
+            questions: components["schemas"]["PicotQuestionIn"][];
+            /**
+             * Selected Concepts
+             * @default []
+             */
+            selected_concepts: {
+                [key: string]: unknown;
+            }[];
+        };
         /** EstimandOut */
         EstimandOut: {
             /** Description */
@@ -2431,6 +2491,20 @@ export interface components {
             /** Label */
             label?: string | null;
         };
+        /** PicotQuestionIn */
+        PicotQuestionIn: {
+            /** Id */
+            id: string;
+            /**
+             * Picot
+             * @default {}
+             */
+            picot: {
+                [key: string]: unknown;
+            };
+            /** Therapeutic Area */
+            therapeutic_area?: string | null;
+        };
         /** PiiPatternOut */
         PiiPatternOut: {
             /** Key */
@@ -2510,7 +2584,7 @@ export interface components {
             object_concept_id: string;
             /**
              * Polarity
-             * @default unknown
+             * @default neutral
              */
             polarity: string;
             /**
@@ -4894,6 +4968,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnrichApplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enrich_proposals_semantic_enrich_proposals__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enrich_propose_semantic_enrich_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrichProposeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrichProposeAccepted"];
                 };
             };
             /** @description Validation Error */

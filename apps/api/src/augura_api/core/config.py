@@ -59,11 +59,17 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("AUGURA_NCBI_API_KEY", "NCBI_API_KEY"),
     )
+    # Proxy sortant optionnel pour les appels ClinicalTrials.gov : le WAF de CT.gov
+    # renvoie 403 depuis les IP datacenter (Modal). Si défini, les appels CT.gov passent
+    # par ce proxy (IP non-datacenter) ; absent ⇒ appel direct (dégradation gracieuse).
+    ctgov_proxy_url: str | None = None
     agent_model_dag: str = "claude-sonnet-4-6"
     agent_model_fast: str = "claude-haiku-4-5"
     agent_model_deep: str = "claude-opus-4-8"
 
-    @field_validator("anthropic_api_key", "openai_api_key", "ncbi_api_key", mode="after")
+    @field_validator(
+        "anthropic_api_key", "openai_api_key", "ncbi_api_key", "ctgov_proxy_url", mode="after"
+    )
     @classmethod
     def _blank_key_is_none(cls, v: str | None) -> str | None:
         # Une clé vide/whitespace dans .env (`ANTHROPIC_API_KEY=`) doit valoir « absente »

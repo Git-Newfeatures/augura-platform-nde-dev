@@ -207,9 +207,17 @@ async def literature_retrieve(
         # `error` propre au lieu d'une connexion coupée que le front lit en « network error ».
         # Le fan-out topique isole déjà chaque source (cf. LiteratureRetriever._safe_group).
         try:
-            async with httpx.AsyncClient(timeout=20.0, headers=_RETRIEVE_HEADERS) as http:
+            # PubMed en direct ; CT.gov via proxy si AUGURA_CTGOV_PROXY_URL est défini
+            # (contourne le 403 WAF sur les IP datacenter). proxy=None ⇒ appel direct.
+            async with (
+                httpx.AsyncClient(timeout=20.0, headers=_RETRIEVE_HEADERS) as http,
+                httpx.AsyncClient(
+                    timeout=20.0, headers=_RETRIEVE_HEADERS, proxy=settings.ctgov_proxy_url
+                ) as ctgov_http,
+            ):
                 retriever = LiteratureRetriever(
-                    NCBIPubMedClient(http, api_key=settings.ncbi_api_key), CTGovApiClient(http)
+                    NCBIPubMedClient(http, api_key=settings.ncbi_api_key),
+                    CTGovApiClient(ctgov_http),
                 )
                 result = await retriever.retrieve(
                     req.query, sources=sources, max_results=req.max_results, filters=filters

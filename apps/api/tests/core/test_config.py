@@ -55,3 +55,17 @@ def test_blank_llm_key_normalised_to_none(monkeypatch: pytest.MonkeyPatch) -> No
     s = Settings()  # pyright: ignore[reportCallIssue]
     assert s.anthropic_api_key is None
     assert s.openai_api_key is None
+
+
+def test_ctgov_proxy_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AUGURA_CTGOV_PROXY_URL : absent ⇒ None (appel direct) ; posé ⇒ chargé ;
+    vide ⇒ None (le validateur blank→None couvre aussi ce champ)."""
+    monkeypatch.setenv("AUGURA_ENV", "dev")
+    monkeypatch.delenv("AUGURA_CTGOV_PROXY_URL", raising=False)
+    assert Settings().ctgov_proxy_url is None  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("AUGURA_CTGOV_PROXY_URL", "http://user:pass@proxy.example:8080")
+    assert Settings().ctgov_proxy_url == "http://user:pass@proxy.example:8080"  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("AUGURA_CTGOV_PROXY_URL", "  ")
+    assert Settings().ctgov_proxy_url is None  # pyright: ignore[reportCallIssue]

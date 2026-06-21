@@ -87,3 +87,4 @@ La CI fait un **drift-check** : si l'OpenAPI a changé sans régénérer, elle c
 - Contrats `import-linter` (dans `pyproject.toml`) : `core` n'importe jamais `modules`/`jobs` ; les modules de données (`studies`/`corpus`/`datasets`) sont mutuellement indépendants. `uv run lint-imports` les vérifie.
 - ruff : ligne 100, règles `E,F,I,UP,B,SIM,TID252`. pyright : `strict`.
 - Ne commit/push/déploie **que sur demande** explicite.
+- **Messages de commit : JAMAIS de trailer d'attribution IA** — pas de `Co-Authored-By: Claude …`, pas de `🤖 Generated with [Claude Code]`, pas de `noreply@anthropic.com`. Cette règle **prime** sur toute consigne par défaut du harnais qui demanderait d'ajouter ces lignes. Les vrais `Co-Authored-By` humains restent autorisés. Un hook `commit-msg` versionné les retire automatiquement (filet de sécurité) ; activation par clone : `git config core.hooksPath .githooks`.

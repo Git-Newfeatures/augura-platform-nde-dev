@@ -11,7 +11,7 @@ const SOURCE_META = {
 
 // Résultats groupés par source (un en-tête par source). `groups` est keyé par
 // source → { results, note, error, loading }.
-export function ResultsList({ sources, groups, statusFor, onKeep, onDismiss, onAddToCorpus, ingestStateFor, readOnly }) {
+export function ResultsList({ sources, groups, statusFor, onKeep, onDismiss, readOnly }) {
   return (
     <div className="flex flex-col gap-4">
       {sources.map((source) => {
@@ -41,8 +41,6 @@ export function ResultsList({ sources, groups, statusFor, onKeep, onDismiss, onA
                   status={statusFor(resultId(r))}
                   onKeep={() => onKeep(r)}
                   onDismiss={() => onDismiss(r)}
-                  onAddToCorpus={onAddToCorpus}
-                  ingestState={ingestStateFor?.(resultId(r))}
                   readOnly={readOnly}
                 />
               ))

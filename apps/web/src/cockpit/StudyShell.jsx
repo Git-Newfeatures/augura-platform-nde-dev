@@ -22,7 +22,7 @@ function ShellInner({ study, go, onExit, ctx, children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const goAndClose = (id) => { setDrawerOpen(false); go(id); };
   const padX = bp.md ? 24 : 16;
-  const studyTab = ["history", "lineage", "settings"].includes(ctx?.currentView) ? ctx.currentView : "workflow";
+  const studyTab = ["history", "lineage", "settings", "literature"].includes(ctx?.currentView) ? ctx.currentView : "workflow";
   const inWorkflow = studyTab === "workflow";
 
   // "Next" target — advance one view; from the Overview, open the active step.
@@ -77,10 +77,11 @@ function ShellInner({ study, go, onExit, ctx, children }) {
         {/* Row 2 — study-level tabs */}
         <SubTabs
           tabs={[
-            { id: "workflow", label: "Workflow" },
-            { id: "history",  label: "History" },
-            { id: "lineage",  label: "Lineage" },
-            { id: "settings", label: "Settings" },
+            { id: "workflow",   label: "Workflow" },
+            { id: "literature", label: "Evidence" },
+            { id: "history",    label: "History" },
+            { id: "lineage",    label: "Lineage" },
+            { id: "settings",   label: "Settings" },
           ]}
           active={studyTab}
           onChange={(id) => go(id === "workflow" ? "cockpit" : id)}

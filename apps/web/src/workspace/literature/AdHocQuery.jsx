@@ -10,7 +10,7 @@ import { SessionActions } from './SessionActions'
 import { StudyPicker } from './StudyPicker'
 import {
   streamRetrieve, createSession, listSessions, logEvent,
-  saveSnapshot, listSnapshots, getSnapshot, ingestPmids, flattenItem, resultId,
+  saveSnapshot, listSnapshots, getSnapshot, flattenItem, resultId,
 } from './literatureClient'
 
 const DATE_RANGES = [
@@ -88,7 +88,7 @@ export function AdHocQuery() {
   const [history, setHistory] = useState([])
   const [saved, setSavedList] = useState([])
   const [picking, setPicking] = useState(false)
-  const [ingest, setIngest] = useState({}) // resultId -> 'busy'|'done'|'error'
+  const [notice, setNotice] = useState(null)   // avertissement transitoire (rien de sélectionné)
   const abortRef = useRef(null)
 
   const refreshHistory = useCallback(async () => {
@@ -114,6 +114,7 @@ export function AdHocQuery() {
 
   const run = async () => {
     if (!state.question.trim() || busy) return
+    setNotice(null)
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
@@ -140,26 +141,39 @@ export function AdHocQuery() {
     const id = resultId(result)
     const next = state.marks[id] === value ? null : value
     dispatch({ type: 'mark', id, value: next })
+    if (next === 'kept') setNotice(null)   // garder un résultat lève l'avertissement « rien de sélectionné »
     if (next && state.sessionId) {
       logEvent(state.sessionId, value === 'kept' ? 'result_kept' : 'result_dismissed', { id, source: result.source })
     }
   }
 
-  const addToCorpus = async (result) => {
-    if (result.source !== 'pubmed' || !result.pmid) return
-    const id = resultId(result)
-    setIngest((m) => ({ ...m, [id]: 'busy' }))
-    try { await ingestPmids([result.pmid]); setIngest((m) => ({ ...m, [id]: 'done' })) }
-    catch { setIngest((m) => ({ ...m, [id]: 'error' })) }
-  }
+  // On ne gèle QUE les résultats explicitement gardés (« Keep ») — pas les rejetés
+  // ni les non marqués. Chaque item porte annotation: 'kept'.
+  const keptItems = () => Object.values(state.groups).flatMap((g) =>
+    (g.results || []).filter((r) => state.marks[resultId(r)] === 'kept').map((r) => ({ ...r, annotation: 'kept' })))
 
-  const allItems = () => Object.values(state.groups).flatMap((g) => (g.results || []).map((r) => ({ ...r, annotation: state.marks[resultId(r)] ?? null })))
+  // « Save to study » : exige au moins un Keep avant d'ouvrir le sélecteur d'étude.
+  const requestSaveToStudy = () => {
+    if (!keptItems().length) { setNotice('Keep at least one result before saving to a study.'); return }
+    setNotice(null); setPicking(true)
+  }
+  const requestSaveStandalone = () => {
+    if (!keptItems().length) { setNotice('Keep at least one result before saving.'); return }
+    setNotice(null); doSave('standalone')
+  }
 
   const doSave = async (scope, study) => {
     setPicking(false)
+    const items = keptItems()
+    if (!items.length) { setNotice('Keep at least one result before saving.'); return }
+    const n = items.length
+    const plural = n > 1 ? 's' : ''
     try {
-      await saveSnapshot({ query: state.question, sources: state.sources, studyId: scope === 'study' ? study?.id ?? null : null, items: allItems() })
-      dispatch({ type: 'saved', saved: scope === 'study' ? { label: `Saved to ${study.name}.`, href: `/studies/${study.id}` } : { label: 'Saved to Literature (standalone).' } })
+      await saveSnapshot({ query: state.question, sources: state.sources, studyId: scope === 'study' ? study?.id ?? null : null, items })
+      setNotice(null)
+      dispatch({ type: 'saved', saved: scope === 'study'
+        ? { label: `Saved ${n} result${plural} to ${study.name}.`, href: `/studies/${study.id}/literature` }
+        : { label: `Saved ${n} result${plural} to Literature (standalone).` } })
       refreshSaved()
     } catch (e) {
       dispatch({ type: 'saved', saved: { label: `Could not save (${String(e?.message || 'error').slice(0, 80)}).` } })
@@ -171,7 +185,7 @@ export function AdHocQuery() {
     abortRef.current?.abort()
     try { const snap = await getSnapshot(id); dispatch({ type: 'restore_frozen', snapshot: snap }) } catch { /* ignore */ }
   }
-  const startNew = () => { abortRef.current?.abort(); setIngest({}); dispatch({ type: 'reset' }) }
+  const startNew = () => { abortRef.current?.abort(); setNotice(null); dispatch({ type: 'reset' }) }
 
   const toggleSource = (id) => {
     const set = new Set(state.sources)
@@ -260,15 +274,14 @@ export function AdHocQuery() {
             statusFor={(id) => state.marks[id]}
             onKeep={(r) => mark(r, 'kept')}
             onDismiss={(r) => mark(r, 'dismissed')}
-            onAddToCorpus={addToCorpus}
-            ingestStateFor={(id) => ingest[id]}
             readOnly={frozen}
           />
           {!frozen && (
             <SessionActions
               saved={state.saved}
-              onSaveToStudy={() => setPicking(true)}
-              onSaveStandalone={() => doSave('standalone')}
+              notice={notice}
+              onSaveToStudy={requestSaveToStudy}
+              onSaveStandalone={requestSaveStandalone}
               onNewQuery={startNew}
               onDiscard={startNew}
             />

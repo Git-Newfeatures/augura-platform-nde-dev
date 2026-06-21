@@ -39,6 +39,7 @@ import MonitoringView         from "./views/MonitoringView";
 import { StudyShell }         from "./cockpit/StudyShell";
 import { Rail }               from "./cockpit/Rail";
 import { StudyHistory, StudyLineage, StudySettings } from "./cockpit/StudyTabs";
+import { StudyLiterature }    from "./workspace/literature/StudyLiterature";
 import { buildCockpitStudy } from "./cockpit/cockpitData";
 import { VIEW_ORDER } from "./lib/nav";
 
@@ -79,7 +80,7 @@ export default function LucisApp() {
     if (!splat) return "cockpit";
     const m = splat.match(/^workflow\/(.+)$/);
     if (m && VIEW_ORDER.includes(m[1])) return m[1];
-    if (["history", "lineage", "settings"].includes(splat)) return splat;
+    if (["history", "lineage", "settings", "literature"].includes(splat)) return splat;
     return "cockpit";
   })();
 
@@ -488,7 +489,7 @@ SOURCE COUNTS:
     // Reset agent to input state when navigating back to Data Input
     if (id === "assistant" && agentStep === "running") setAgentStep("input");
     if (id === "cockpit") navigate(`/studies/${projectId}`);
-    else if (["history", "lineage", "settings"].includes(id)) navigate(`/studies/${projectId}/${id}`);
+    else if (["history", "lineage", "settings", "literature"].includes(id)) navigate(`/studies/${projectId}/${id}`);
     else navigate(`/studies/${projectId}/workflow/${id}`);
     window.scrollTo(0, 0);
   }
@@ -605,6 +606,7 @@ SOURCE COUNTS:
           {view==="monitoring"  && <MonitoringView   simResults={simResults} onBack={()=>go("report")} partnerLabel={defaults.partnerLabel} chatProps={chatProps} />}
           {view==="history"     && <StudyHistory  study={cockpitStudy} />}
           {view==="lineage"     && <StudyLineage  study={cockpitStudy} />}
+          {view==="literature"  && <StudyLiterature studyId={projectId} />}
           {view==="settings"    && <StudySettings study={cockpitStudy} projectId={projectId} />}
         </>}
         </div>

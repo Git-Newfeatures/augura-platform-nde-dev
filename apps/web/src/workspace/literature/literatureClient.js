@@ -113,7 +113,10 @@ export function saveSnapshot({ query, sources, studyId = null, items }) {
   })
 }
 
-export const listSnapshots = () => apiJson('/corpus/literature/snapshots')
+// studyId optionnel : filtre les snapshots gelés rattachés à une étude (vue
+// « Saved evidence » scopée étude). Sans argument → tous les snapshots du tenant.
+export const listSnapshots = (studyId = null) =>
+  apiJson('/corpus/literature/snapshots' + (studyId ? `?study_id=${encodeURIComponent(studyId)}` : ''))
 export const getSnapshot = (id) => apiJson(`/corpus/literature/snapshots/${id}`)
 
 // ── Add to corpus (PubMed only) ───────────────────────────────────────────────

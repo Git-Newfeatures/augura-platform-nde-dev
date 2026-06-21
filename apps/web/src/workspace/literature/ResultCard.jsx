@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { Check, X, ChevronDown, ChevronRight, ExternalLink, Undo2, BookPlus } from 'lucide-react'
+import { Check, X, ChevronDown, ChevronRight, ExternalLink, Undo2 } from 'lucide-react'
 import { resultId } from './literatureClient'
 
 const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
@@ -11,8 +11,8 @@ const doiUrl = (doi) => `https://doi.org/${doi}`
 const ctgovUrl = (nct) => `https://clinicaltrials.gov/study/${nct}`
 
 // Dismissed → ligne repliée (conservé pour l'audit). Kept → carte pleine.
-// readOnly (snapshot gelé) masque les actions. `ingestState` ∈ undefined|'busy'|'done'|'error'.
-export function ResultCard({ result, position, status, onKeep, onDismiss, onAddToCorpus, ingestState, readOnly }) {
+// readOnly (snapshot gelé) masque les actions.
+export function ResultCard({ result, position, status, onKeep, onDismiss, readOnly }) {
   const [showAbstract, setShowAbstract] = useState(false)
   const isCtgov = result.source === 'ctgov'
   const kept = status === 'kept'
@@ -72,19 +72,6 @@ export function ResultCard({ result, position, status, onKeep, onDismiss, onAddT
             <Button variant="ghost" size="sm" className="h-7 px-2.5 text-[12px] text-muted-foreground" onClick={onDismiss} title="Dismiss">
               <X size={13} /> Dismiss
             </Button>
-            {!isCtgov && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2.5 text-[12px] text-muted-foreground"
-                disabled={ingestState === 'busy' || ingestState === 'done'}
-                onClick={() => onAddToCorpus?.(result)}
-                title={ingestState === 'done' ? 'Added to corpus' : 'Index this article into your corpus'}
-              >
-                <BookPlus size={13} />{' '}
-                {ingestState === 'done' ? 'Added' : ingestState === 'busy' ? 'Adding…' : 'Add to corpus'}
-              </Button>
-            )}
           </div>
         )}
         {readOnly && kept && <Badge variant="secondary" className="flex-shrink-0 text-[10.5px] text-primary">Kept</Badge>}

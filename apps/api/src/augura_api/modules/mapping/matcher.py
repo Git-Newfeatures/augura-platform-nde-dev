@@ -15,6 +15,8 @@ class Candidate:
     dq_column_role: str | None
     score: float
     method: str
+    layer: int | None = None
+    domain: str | None = None
 
 
 def match_column(norm_name: str, index: ConceptIndex, top_n: int = 5) -> list[Candidate]:
@@ -28,7 +30,17 @@ def match_column(norm_name: str, index: ConceptIndex, top_n: int = 5) -> list[Ca
             if cid in seen:
                 continue
             seen.add(cid)
-            out.append(Candidate(cid, index.label[cid], index.role[cid], 0.95, "exact_synonym"))
+            out.append(
+                Candidate(
+                    cid,
+                    index.label[cid],
+                    index.role[cid],
+                    0.95,
+                    "exact_synonym",
+                    layer=index.layer.get(cid),
+                    domain=index.domain.get(cid),
+                )
+            )
         return out[:top_n]
 
     cands: list[Candidate] = []
@@ -36,7 +48,15 @@ def match_column(norm_name: str, index: ConceptIndex, top_n: int = 5) -> list[Ca
         label_sim = string_similarity(norm_name, index.norm_label[cid])
         if label_sim > 0.85:
             cands.append(
-                Candidate(cid, index.label[cid], index.role[cid], label_sim * 0.92, "fuzzy_label")
+                Candidate(
+                    cid,
+                    index.label[cid],
+                    index.role[cid],
+                    label_sim * 0.92,
+                    "fuzzy_label",
+                    layer=index.layer.get(cid),
+                    domain=index.domain.get(cid),
+                )
             )
             continue
         best_syn = max(
@@ -44,7 +64,15 @@ def match_column(norm_name: str, index: ConceptIndex, top_n: int = 5) -> list[Ca
         )
         if best_syn > 0.75:
             cands.append(
-                Candidate(cid, index.label[cid], index.role[cid], best_syn * 0.88, "fuzzy_synonym")
+                Candidate(
+                    cid,
+                    index.label[cid],
+                    index.role[cid],
+                    best_syn * 0.88,
+                    "fuzzy_synonym",
+                    layer=index.layer.get(cid),
+                    domain=index.domain.get(cid),
+                )
             )
     cands = [c for c in cands if c.score > 0.20]
     cands.sort(key=lambda c: c.score, reverse=True)

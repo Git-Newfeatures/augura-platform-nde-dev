@@ -26,7 +26,7 @@ import { SubTabs } from '@/cockpit/SubTabs'
 import { CohortImport } from '@/workspace/CohortImport'
 import { LocalMappingSuggestions } from '@/workspace/LocalMappingSuggestions'
 import { apiJson } from '@/api'
-import { uploadDataset, mapDataset, runDq, getDq, listColumns } from '@/intake/intakeApi'
+import { uploadDataset, uploadDatasets, mapDataset, runDq, getDq, listColumns } from '@/intake/intakeApi'
 
 // Data workspace — port de la vue /datasets de Nico, recâblée sur le backend
 // Quentin. Le flux intake (upload → mapping → data quality) vit ICI, par dataset,
@@ -281,17 +281,21 @@ function ConfBadge({ score, label }) {
 }
 
 function MappingPanel({ result }) {
+  const columns = result.columns || []
+  const total = result.total_count ?? 0
+  const mapped = result.mapped_count ?? 0
+  const tally = (label) => columns.filter((c) => c.confidence_label === label).length
+  const cards = [
+    ['Mapping rate', total ? `${Math.round((mapped / total) * 100)}%` : '—'],
+    ['High conf.', tally('High')],
+    ['Medium conf.', tally('Medium')],
+    ['Low conf.', tally('Low')],
+    ['Unmapped', total - mapped],
+  ]
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-3 gap-2.5">
-        {[
-          ['Mapped', `${result.mapped_count ?? 0} / ${result.total_count ?? 0}`],
-          [
-            'Avg confidence',
-            result.avg_confidence != null ? `${Math.round(result.avg_confidence * 100)}%` : '—',
-          ],
-          ['Unmapped', (result.total_count ?? 0) - (result.mapped_count ?? 0)],
-        ].map(([label, value]) => (
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+        {cards.map(([label, value]) => (
           <Card key={label} className="gap-0 rounded-xl border p-3 text-center">
             <div className="font-mono text-[20px] font-bold text-foreground">{value}</div>
             <div className="text-[10px] text-muted-foreground">{label}</div>
@@ -305,15 +309,35 @@ function MappingPanel({ result }) {
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
               <th className="px-4 py-2.5 font-medium">Source column</th>
               <th className="px-4 py-2.5 font-medium">Proposed concept</th>
+              <th className="px-4 py-2.5 font-medium text-center">Layer</th>
+              <th className="px-4 py-2.5 font-medium">Domain</th>
               <th className="px-4 py-2.5 font-medium text-right">Confidence</th>
             </tr>
           </thead>
           <tbody>
-            {(result.columns || []).map((c) => (
+            {columns.map((c) => (
               <tr key={c.column} className="border-b border-border/60 last:border-0">
                 <td className="px-4 py-2 font-mono text-foreground">{c.column}</td>
                 <td className="px-4 py-2 font-mono text-[11.5px] text-muted-foreground">
                   {c.proposed_canonical_id ?? <em className="text-muted-foreground/50">Unmapped</em>}
+                </td>
+                <td className="px-4 py-2 text-center">
+                  {c.layer != null ? (
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      L{c.layer}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground/40">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-2">
+                  {c.domain ? (
+                    <Badge variant="secondary" className="text-[10px] font-normal">
+                      {c.domain}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground/40">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-2 text-right">
                   <ConfBadge score={c.confidence} label={c.confidence_label} />
@@ -680,40 +704,83 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
 
 // ── Add-dataset modal (green CTA target) — registers a dataset like Nico's
 // legacy form (name + study), but with the file: one POST /datasets/upload
-// creates + profiles it, then we land in the new dataset's full detail view. ──
+// creates + profiles it. One file → land in its detail view. Plusieurs fichiers →
+// un dataset par fichier (nom = nom du fichier), puis on reste sur la liste. ──
 const MODAL_INPUT_CLS =
   'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground ' +
   'placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15'
 
-function AddDatasetModal({ studies, onClose, onUploaded }) {
+function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
   const [name, setName] = useState('')
   const [studyId, setStudyId] = useState('')
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState(null) // { done, total, name }
   const [error, setError] = useState(null)
+  const [failed, setFailed] = useState([]) // [{ name, message }]
   const fileRef = useRef(null)
+  const multi = files.length > 1
 
-  function pickFile(f) {
-    if (!f) return
-    setFile(f)
-    if (!name.trim()) setName(f.name.replace(/\.(csv|xlsx|xls)$/i, ''))
+  function pickFiles(fileList) {
+    const picked = Array.from(fileList || [])
+    if (!picked.length) return
+    setFiles(picked)
+    setFailed([])
+    setError(null)
+    // Préremplit le nom depuis le fichier unique (flux mono-fichier seulement).
+    if (picked.length === 1 && !name.trim()) {
+      setName(picked[0].name.replace(/\.(csv|xlsx|xls)$/i, ''))
+    }
+  }
+
+  function removeFile(idx) {
+    setFiles((prev) => prev.filter((_, i) => i !== idx))
   }
 
   async function submit() {
-    if (!file || busy) return
+    if (!files.length || busy) return
     setBusy(true)
     setError(null)
-    try {
-      const result = await uploadDataset(file, {
-        name: name.trim() || undefined,
-        studyId: studyId || undefined,
-      })
-      onUploaded(result)
-    } catch (e) {
-      setError(String(e?.message || e))
-      setBusy(false)
+    setFailed([])
+    // Mono-fichier → flux historique : nom éditable + saut dans le détail du dataset.
+    if (files.length === 1) {
+      try {
+        const result = await uploadDataset(files[0], {
+          name: name.trim() || undefined,
+          studyId: studyId || undefined,
+        })
+        onUploaded(result)
+      } catch (e) {
+        setError(String(e?.message || e))
+        setBusy(false)
+      }
+      return
     }
+    // Multi → un dataset par fichier (nom du fichier côté serveur), séquentiel.
+    const { ok, failed: fail } = await uploadDatasets(files, {
+      studyId: studyId || undefined,
+      onProgress: (done, total, current) => setProgress({ done, total, name: current }),
+    })
+    if (ok.length) onRefresh()
+    if (!fail.length) {
+      onClose()
+      return
+    }
+    // Échec partiel/total : on garde la modale ouverte avec le détail des erreurs
+    // (les datasets réussis sont déjà rafraîchis dans la liste en arrière-plan).
+    setFailed(fail)
+    setError(`${fail.length} of ${files.length} files failed — successes were added`)
+    setProgress(null)
+    setBusy(false)
   }
+
+  const ctaLabel = busy
+    ? progress
+      ? `Uploading ${progress.done} / ${progress.total}…`
+      : 'Uploading…'
+    : multi
+      ? `Add ${files.length} datasets`
+      : 'Add dataset'
 
   return (
     <div
@@ -725,7 +792,8 @@ function AddDatasetModal({ studies, onClose, onUploaded }) {
           <div>
             <h2 className="text-[16px] font-semibold text-foreground">Add dataset</h2>
             <p className="mt-1 text-[13px] text-muted-foreground">
-              Register a cohort dataset — the file is parsed and profiled server-side.
+              Register cohort datasets — files are parsed and profiled server-side. Select multiple
+              files to create one dataset per file.
             </p>
           </div>
           <button
@@ -738,15 +806,17 @@ function AddDatasetModal({ studies, onClose, onUploaded }) {
         </div>
 
         <div className="flex flex-col gap-4 p-5">
-          <label className="block">
-            <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Dataset name</div>
-            <input
-              className={MODAL_INPUT_CLS}
-              placeholder="e.g. cohort_2026"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
+          {!multi && (
+            <label className="block">
+              <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Dataset name</div>
+              <input
+                className={MODAL_INPUT_CLS}
+                placeholder="e.g. cohort_2026"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+          )}
           <label className="block">
             <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Study</div>
             <select className={MODAL_INPUT_CLS} value={studyId} onChange={(e) => setStudyId(e.target.value)}>
@@ -758,16 +828,17 @@ function AddDatasetModal({ studies, onClose, onUploaded }) {
               ))}
             </select>
           </label>
-          <label className="block">
+          <div className="block">
             <div className="mb-1.5 text-[12.5px] font-medium text-foreground">
-              File <span className="text-[#C0392B]">*</span>
+              File{multi ? 's' : ''} <span className="text-[#C0392B]">*</span>
             </div>
             <input
               ref={fileRef}
               type="file"
               accept=".csv,.xlsx,.xls"
+              multiple
               className="hidden"
-              onChange={(e) => pickFile(e.target.files?.[0])}
+              onChange={(e) => pickFiles(e.target.files)}
             />
             <button
               type="button"
@@ -775,23 +846,60 @@ function AddDatasetModal({ studies, onClose, onUploaded }) {
               className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border bg-secondary/40 px-3 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/80"
             >
               <Upload size={15} className="flex-shrink-0" />
-              {file ? (
-                <span className="truncate font-mono text-foreground">{file.name}</span>
-              ) : (
-                'Choose CSV or Excel file'
-              )}
+              {files.length === 0
+                ? 'Choose CSV or Excel files'
+                : files.length === 1
+                  ? <span className="truncate font-mono text-foreground">{files[0].name}</span>
+                  : `${files.length} files selected`}
             </button>
             <p className="mt-1.5 text-[11px] text-muted-foreground">.csv · .xlsx · .xls</p>
-          </label>
+            {multi && (
+              <ul className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto">
+                {files.map((f, i) => (
+                  <li
+                    key={f.name + i}
+                    className="flex items-center gap-2 rounded-md border border-border bg-secondary/30 px-2.5 py-1.5"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-foreground">{f.name}</span>
+                    {!busy && (
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        aria-label={`Remove ${f.name}`}
+                        className="flex-shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {busy && multi && progress && (
+            <div className="truncate text-[11.5px] text-muted-foreground">
+              Uploading {progress.done} / {progress.total}
+              {progress.name ? ` — ${progress.name}` : ''}…
+            </div>
+          )}
           {error && <div className="text-[12px] text-destructive">{error}</div>}
+          {failed.length > 0 && (
+            <ul className="flex flex-col gap-0.5 text-[11px] text-destructive">
+              {failed.map((f) => (
+                <li key={f.name} className="truncate">
+                  <span className="font-mono">{f.name}</span> — {f.message}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border p-5">
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button disabled={!file || busy} onClick={submit}>
-            {busy ? 'Uploading…' : 'Add dataset'}
+          <Button disabled={!files.length || busy} onClick={submit}>
+            {ctaLabel}
           </Button>
         </div>
       </Card>
@@ -903,6 +1011,7 @@ export function DatasetsPage() {
           studies={studies}
           onClose={() => setAdding(false)}
           onUploaded={handleUploaded}
+          onRefresh={refresh}
         />
       )}
     </WorkspacePage>

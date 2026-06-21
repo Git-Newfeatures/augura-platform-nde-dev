@@ -80,6 +80,10 @@ async def test_upload_then_map_persists_proposals(
     assert result.mapped_count >= 0
     assert len(result.columns) == 3
     assert all(c.confidence_label for c in result.columns)
+    # Les colonnes appariées portent leur couche + domaine taxonomiques (colonnes du front).
+    for c in result.columns:
+        if c.proposed_canonical_id is not None:
+            assert c.layer is not None and c.domain
 
     # Proposals (if any matched) are persisted on dataset_columns.
     async with sm() as session, session.begin():

@@ -1611,6 +1611,10 @@ export interface components {
             confidence?: number | null;
             /** Confidence Label */
             confidence_label: string;
+            /** Domain */
+            domain?: string | null;
+            /** Layer */
+            layer?: number | null;
             /** Proposed Canonical Id */
             proposed_canonical_id?: string | null;
             /** Proposed Role */

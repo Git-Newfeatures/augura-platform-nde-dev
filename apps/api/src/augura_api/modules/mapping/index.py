@@ -14,6 +14,8 @@ class _ConceptRow(Protocol):
     local_concept_id: str
     concept_name: str
     dq_column_role: str | None
+    layer: int
+    augura_domain: str
 
 
 class _SynonymRow(Protocol):
@@ -26,6 +28,8 @@ class ConceptIndex:
     concept_ids: list[str] = field(default_factory=list[str])
     label: dict[str, str] = field(default_factory=dict[str, str])
     role: dict[str, str | None] = field(default_factory=dict[str, str | None])
+    layer: dict[str, int] = field(default_factory=dict[str, int])
+    domain: dict[str, str] = field(default_factory=dict[str, str])
     norm_label: dict[str, str] = field(default_factory=dict[str, str])
     norm_synonyms: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     synonym_lookup: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
@@ -42,6 +46,8 @@ def build_index(concepts: Sequence[_ConceptRow], synonyms: Sequence[_SynonymRow]
         idx.concept_ids.append(cid)
         idx.label[cid] = c.concept_name
         idx.role[cid] = c.dq_column_role
+        idx.layer[cid] = c.layer
+        idx.domain[cid] = c.augura_domain
         nl = normalize(c.concept_name)
         idx.norm_label[cid] = nl
         if nl:

@@ -51,6 +51,8 @@ class MappingService:
                     column=col.name,
                     proposed_canonical_id=best.concept_id if best else None,
                     proposed_role=best.dq_column_role if best else None,
+                    layer=best.layer if best else None,
+                    domain=best.domain if best else None,
                     confidence=score if best else None,
                     confidence_label=str(conf["label"]),
                 )

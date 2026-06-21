@@ -1409,6 +1409,28 @@
             "title": "Confidence Label",
             "type": "string"
           },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "layer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layer"
+          },
           "proposed_canonical_id": {
             "anyOf": [
               {

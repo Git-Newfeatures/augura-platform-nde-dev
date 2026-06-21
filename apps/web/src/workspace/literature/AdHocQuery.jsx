@@ -45,6 +45,8 @@ const initialState = {
   error: null,
   saved: null,     // { label, href } après sauvegarde
   frozenAt: null,
+  modelVersion: null,
+  promptVersion: null,
 }
 
 const blankGroups = (sources) => Object.fromEntries(sources.map((s) => [s, { results: [], loading: true }]))
@@ -58,7 +60,7 @@ function reducer(state, action) {
     case 'submit':
       return { ...state, status: 'querying', sessionId: action.sessionId, groups: blankGroups(state.sources), knownItem: false, knownItemMiss: false, marks: {}, error: null, saved: null, frozenAt: null }
     case 'ev_meta':
-      return { ...state, sources: action.sources || state.sources, knownItem: !!action.known_item, groups: blankGroups(action.sources || state.sources) }
+      return { ...state, sources: action.sources || state.sources, knownItem: !!action.known_item, modelVersion: action.model_version ?? null, promptVersion: action.prompt_version ?? null, groups: blankGroups(action.sources || state.sources) }
     case 'ev_group': {
       const items = (action.items || []).map(flattenItem)
       return { ...state, groups: { ...state.groups, [action.source]: { results: items, note: action.note, loading: false } } }
@@ -129,7 +131,7 @@ export function AdHocQuery() {
       studyTypes: state.studyTypes,
       signal: ctrl.signal,
       onEvent: (ev) => {
-        if (ev.type === 'meta') dispatch({ type: 'ev_meta', sources: ev.sources, known_item: ev.known_item })
+        if (ev.type === 'meta') dispatch({ type: 'ev_meta', sources: ev.sources, known_item: ev.known_item, model_version: ev.model_version, prompt_version: ev.prompt_version })
         else if (ev.type === 'group') dispatch({ type: 'ev_group', source: ev.source, items: ev.items, note: ev.note })
         else if (ev.type === 'done') dispatch({ type: 'ev_done' })
         else if (ev.type === 'error') dispatch({ type: 'ev_error', text: ev.text })
@@ -169,7 +171,7 @@ export function AdHocQuery() {
     const n = items.length
     const plural = n > 1 ? 's' : ''
     try {
-      await saveSnapshot({ query: state.question, sources: state.sources, studyId: scope === 'study' ? study?.id ?? null : null, items })
+      await saveSnapshot({ query: state.question, sources: state.sources, studyId: scope === 'study' ? study?.id ?? null : null, items, modelVersion: state.modelVersion ?? undefined, promptVersion: state.promptVersion ?? undefined })
       setNotice(null)
       dispatch({ type: 'saved', saved: scope === 'study'
         ? { label: `Saved ${n} result${plural} to ${study.name}.`, href: `/studies/${study.id}/literature` }

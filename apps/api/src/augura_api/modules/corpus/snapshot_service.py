@@ -46,6 +46,7 @@ def to_retrieve_response(result: RetrievalResult) -> schemas.LiteratureRetrieveR
                         retrieval_date=i.retrieval_date,
                         record=i.record,
                         annotation=i.annotation,
+                        rationale=i.rationale,
                     )
                     for i in g.items
                 ],
@@ -76,6 +77,7 @@ def _build_payload(
                 "retrieval_date": r.retrieval_date.isoformat(),
                 "record": r.record,
                 "annotation": r.annotation,
+                "rationale": r.rationale,
             }
             for r in req.results
         ],

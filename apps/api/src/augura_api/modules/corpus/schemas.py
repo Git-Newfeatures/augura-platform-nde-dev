@@ -148,6 +148,7 @@ class RetrievedItemOut(BaseModel):
     retrieval_date: date
     record: dict[str, Any]
     annotation: str | None = None
+    rationale: str | None = None  # justification de curation (None si non curé)
 
 
 class SourceGroupOut(BaseModel):
@@ -179,6 +180,7 @@ class FrozenResult(BaseModel):
     retrieval_date: date
     record: dict[str, Any]
     annotation: str | None = None  # kept / dismissed / null
+    rationale: str | None = None  # justification de curation gelée (provenance)
 
 
 class SnapshotWriteRequest(BaseModel):

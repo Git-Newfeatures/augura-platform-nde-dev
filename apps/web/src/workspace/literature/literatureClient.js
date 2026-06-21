@@ -24,6 +24,7 @@ export function flattenItem(item) {
     retrieval_date: item.retrieval_date,
     record: rec,
     annotation: item.annotation ?? null,
+    rationale: item.rationale ?? null,
     ...rec,
     publication_date: rec.published_at ?? null,
   }
@@ -90,7 +91,7 @@ export const logEvent = (sessionId, eventType, payload = {}) =>
 const MODEL_VERSION = 'retrieve'
 const PROMPT_VERSION = 'v1'
 
-export function saveSnapshot({ query, sources, studyId = null, items }) {
+export function saveSnapshot({ query, sources, studyId = null, items, modelVersion = MODEL_VERSION, promptVersion = PROMPT_VERSION }) {
   const results = items.map((r) => ({
     source: r.source,
     id: r.id,
@@ -99,14 +100,15 @@ export function saveSnapshot({ query, sources, studyId = null, items }) {
     retrieval_date: r.retrieval_date,
     record: r.record,
     annotation: r.annotation ?? null,
+    rationale: r.rationale ?? null,
   }))
   return apiJson('/corpus/literature/snapshots', {
     method: 'POST',
     body: JSON.stringify({
       query,
       sources,
-      model_version: MODEL_VERSION,
-      prompt_version: PROMPT_VERSION,
+      model_version: modelVersion,
+      prompt_version: promptVersion,
       study_id: studyId,
       results,
     }),

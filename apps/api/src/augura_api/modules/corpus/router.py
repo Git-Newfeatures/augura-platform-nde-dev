@@ -16,6 +16,7 @@ from augura_api.core.llm.embeddings import Embedder, get_embedder
 from augura_api.core.llm.runtime import AgentUpstreamError, get_anthropic_client
 from augura_api.modules.corpus import schemas
 from augura_api.modules.corpus.ctgov import CTGovApiClient
+from augura_api.modules.corpus.curation import CURATION_PROMPT_VERSION, Curator, LLMCurator
 from augura_api.modules.corpus.filters import (
     VALID_DATE_RANGES,
     VALID_STUDY_TYPES,
@@ -202,6 +203,14 @@ async def literature_retrieve(
     filters = build_filters(req.date_range, req.study_types)
     sources = set(req.sources) if req.sources else None
 
+    # Curator construit une fois par requête (réutilise le client Anthropic). Pas de clé
+    # ⇒ curator=None ⇒ retrieve se comporte comme avant (zéro régression).
+    curator: Curator | None = None
+    try:
+        curator = LLMCurator(get_anthropic_client(settings), settings.agent_model_fast)
+    except AgentUpstreamError:
+        curator = None
+
     async def gen() -> AsyncIterator[str]:
         # Filet de sécurité : toute erreur (ex. known-item CT.gov 403) devient un event
         # `error` propre au lieu d'une connexion coupée que le front lit en « network error ».
@@ -218,6 +227,7 @@ async def literature_retrieve(
                 retriever = LiteratureRetriever(
                     NCBIPubMedClient(http, api_key=settings.ncbi_api_key),
                     CTGovApiClient(ctgov_http, base_url=settings.ctgov_relay_url),
+                    curator=curator,
                 )
                 result = await retriever.retrieve(
                     req.query, sources=sources, max_results=req.max_results, filters=filters
@@ -229,6 +239,9 @@ async def literature_retrieve(
                 sources=resp.sources,
                 known_item=resp.known_item,
                 kind=resp.kind,
+                curated=curator is not None and not resp.known_item,
+                model_version=settings.agent_model_fast if curator else None,
+                prompt_version=CURATION_PROMPT_VERSION if curator else None,
             )
             for group in resp.groups:
                 yield _ndjson("group", **group.model_dump(mode="json"))

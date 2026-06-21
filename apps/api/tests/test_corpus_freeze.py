@@ -4,6 +4,8 @@ Pur, sans base : mêmes données → même hash (indépendant de l'ordre des cl�
 toute altération d'un octet stocké lève une erreur dure à la vérification.
 """
 
+from datetime import date
+
 import pytest
 
 from augura_api.modules.corpus.freeze import (
@@ -12,6 +14,12 @@ from augura_api.modules.corpus.freeze import (
     content_hash,
     verify_content_hash,
 )
+from augura_api.modules.corpus.retrieval import (
+    RetrievalResult,
+    RetrievedItem,
+    SourceGroup,
+)
+from augura_api.modules.corpus.snapshot_service import to_retrieve_response
 
 
 def _artifact() -> dict[str, object]:
@@ -80,3 +88,12 @@ def test_verify_tamper_one_byte_raises() -> None:
     results[0]["title"] = "Paperr"
     with pytest.raises(ContentIntegrityError):
         verify_content_hash(art)
+
+
+def test_to_retrieve_response_carries_rationale() -> None:
+    item = RetrievedItem(
+        "pubmed", "1", "T", "term", date(2026, 6, 21), {"pmid": "1"}, rationale="le plus pertinent"
+    )
+    res = RetrievalResult("q", ["pubmed"], False, None, [SourceGroup("pubmed", "term", [item])])
+    out = to_retrieve_response(res)
+    assert out.groups[0].items[0].rationale == "le plus pertinent"

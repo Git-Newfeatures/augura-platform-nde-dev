@@ -27,7 +27,13 @@ from typing import Any
 import structlog
 
 from augura_api.core.errors import BadRequestError
+from augura_api.core.llm.runtime import AgentInvalidOutput, AgentUpstreamError
 from augura_api.modules.corpus.ctgov import CTGovClient, CTGovStudy
+from augura_api.modules.corpus.curation import (
+    CurationCandidate,
+    Curator,
+    apply_curation,
+)
 from augura_api.modules.corpus.filters import SearchFilters, build_pubmed_term, ctgov_filter_params
 from augura_api.modules.corpus.known_item import (
     KNOWN_ITEM_MISS_MESSAGE,
@@ -61,6 +67,7 @@ class RetrievedItem:
     retrieval_date: date
     record: dict[str, Any]  # enregistrement structuré, JSON-sérialisable (gel)
     annotation: str | None = None  # kept/dismissed/null — posé plus tard par l'UI
+    rationale: str | None = None  # justification de curation (None si non curé)
 
 
 @dataclass(frozen=True)
@@ -118,9 +125,12 @@ def _normalize_sources(sources: set[str] | None) -> set[str]:
 class LiteratureRetriever:
     """Orchestration retrieve-only : known-item routing + fan-out topique parallèle."""
 
-    def __init__(self, pubmed: PubMedClient, ctgov: CTGovClient) -> None:
+    def __init__(
+        self, pubmed: PubMedClient, ctgov: CTGovClient, *, curator: Curator | None = None
+    ) -> None:
         self._pubmed = pubmed
         self._ctgov = ctgov
+        self._curator = curator
 
     async def retrieve(
         self,
@@ -208,15 +218,65 @@ class LiteratureRetriever:
             log.warning("retrieve.source_failed", source=source, error=str(exc))
             return SourceGroup(source, "", [], note=_SOURCE_UNAVAILABLE_NOTE)
 
+    def _pool(self, max_results: int) -> int:
+        """Taille du pool sur-récupéré : pas de curation ⇒ exactement max_results
+        (comportement historique inchangé) ; sinon min(50, max(25, max_results*2))."""
+        if self._curator is None:
+            return max_results
+        return min(50, max(25, max_results * 2))
+
+    async def _curate_pubmed(
+        self, query: str, articles: list[PubMedArticle], max_results: int
+    ) -> list[tuple[PubMedArticle, str | None]]:
+        if self._curator is None:
+            return [(a, None) for a in articles[:max_results]]
+        cands = [CurationCandidate(a.pmid, a.title, a.abstract) for a in articles]
+        try:
+            refs = await self._curator.curate(query, SOURCE_PUBMED, cands, max_results=max_results)
+        except (AgentUpstreamError, AgentInvalidOutput) as exc:
+            log.warning("curate.failed", source=SOURCE_PUBMED, error=str(exc))
+            return [(a, None) for a in articles[:max_results]]
+        applied = apply_curation(refs, {a.pmid: a for a in articles}, max_results=max_results)
+        if not applied:
+            return [(a, None) for a in articles[:max_results]]
+        return [(a, rat or None) for a, rat in applied]
+
+    async def _curate_ctgov(
+        self, query: str, studies: list[CTGovStudy], max_results: int
+    ) -> list[tuple[CTGovStudy, str | None]]:
+        if self._curator is None:
+            return [(s, None) for s in studies[:max_results]]
+        cands = [
+            CurationCandidate(
+                s.nct_id,
+                s.title,
+                f"Conditions: {', '.join(s.conditions)}. Interventions: "
+                f"{', '.join(s.interventions)}. Phase {s.phase}. Statut {s.status}.",
+            )
+            for s in studies
+        ]
+        try:
+            refs = await self._curator.curate(query, SOURCE_CTGOV, cands, max_results=max_results)
+        except (AgentUpstreamError, AgentInvalidOutput) as exc:
+            log.warning("curate.failed", source=SOURCE_CTGOV, error=str(exc))
+            return [(s, None) for s in studies[:max_results]]
+        applied = apply_curation(refs, {s.nct_id: s for s in studies}, max_results=max_results)
+        if not applied:
+            return [(s, None) for s in studies[:max_results]]
+        return [(s, rat or None) for s, rat in applied]
+
     async def _pubmed_topical(
         self, query: str, max_results: int, day: date, filters: SearchFilters | None
     ) -> SourceGroup:
         # Le terme réellement envoyé à esearch (avec filtres [pt]) EST le query_string.
         term = build_pubmed_term(query, filters)
-        articles = await self._pubmed.search(query, max_results, filters=filters, today=day)
+        articles = await self._pubmed.search(
+            query, self._pool(max_results), filters=filters, today=day
+        )
+        curated = await self._curate_pubmed(query, articles, max_results)
         items = [
-            RetrievedItem(SOURCE_PUBMED, a.pmid, a.title, term, day, _pubmed_record(a))
-            for a in articles
+            RetrievedItem(SOURCE_PUBMED, a.pmid, a.title, term, day, _pubmed_record(a), rationale=r)
+            for a, r in curated
         ]
         return SourceGroup(SOURCE_PUBMED, term, items)
 
@@ -226,9 +286,12 @@ class LiteratureRetriever:
         extra = ctgov_filter_params(filters, day)
         suffix = "".join(f"&{k}={v}" for k, v in sorted(extra.items()))
         qs = f"query.term={query}{suffix}"  # chaîne API CT.gov réellement envoyée
-        studies = await self._ctgov.search(query, max_results, filters=filters, today=day)
+        studies = await self._ctgov.search(
+            query, self._pool(max_results), filters=filters, today=day
+        )
+        curated = await self._curate_ctgov(query, studies, max_results)
         items = [
-            RetrievedItem(SOURCE_CTGOV, s.nct_id, s.title, qs, day, _ctgov_record(s))
-            for s in studies
+            RetrievedItem(SOURCE_CTGOV, s.nct_id, s.title, qs, day, _ctgov_record(s), rationale=r)
+            for s, r in curated
         ]
         return SourceGroup(SOURCE_CTGOV, qs, items)

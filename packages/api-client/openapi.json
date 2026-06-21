@@ -2767,6 +2767,17 @@
             "title": "Query String",
             "type": "string"
           },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
           "record": {
             "additionalProperties": true,
             "title": "Record",

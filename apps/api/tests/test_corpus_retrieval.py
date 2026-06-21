@@ -11,7 +11,9 @@ from typing import cast
 import pytest
 
 from augura_api.core.errors import BadRequestError
+from augura_api.core.llm.runtime import AgentUpstreamError
 from augura_api.modules.corpus.ctgov import CTGovClient, CTGovStudy
+from augura_api.modules.corpus.curation import CuratedRef, CurationCandidate
 from augura_api.modules.corpus.filters import SearchFilters
 from augura_api.modules.corpus.known_item import (
     KNOWN_ITEM_MISS_MESSAGE,
@@ -104,6 +106,28 @@ class FakeCTGov:
     async def fetch_by_nct(self, nct_id: str) -> CTGovStudy | None:
         self.calls.append(("fetch_by_nct", nct_id))
         return self.fetch_res
+
+
+class FakeCurator:
+    """Renvoie les ids dans l'ordre inverse de réception, avec un rationale, et peut
+    simuler une panne (raise) ou une sélection partielle."""
+
+    def __init__(self, *, error: Exception | None = None, only: list[str] | None = None) -> None:
+        self.error = error
+        self.only = only
+        self.calls: list[tuple[str, str, int]] = []  # (source, premier id, nb candidats)
+
+    async def curate(
+        self, query: str, source: str, candidates: list[CurationCandidate], *, max_results: int
+    ) -> list[CuratedRef]:
+        first = candidates[0].id if candidates else ""
+        self.calls.append((source, first, len(candidates)))
+        if self.error is not None:
+            raise self.error
+        ids = [c.id for c in candidates]
+        if self.only is not None:
+            ids = [i for i in ids if i in self.only]
+        return [CuratedRef(id=i, rationale=f"rat-{i}") for i in reversed(ids)]
 
 
 def _retriever(pm: FakePubMed, ct: FakeCTGov) -> LiteratureRetriever:
@@ -241,3 +265,94 @@ async def test_topical_passes_filters_to_clients_and_captures_term() -> None:
     pmg = r.groups[0]
     assert pmg.query_string == ("(engagement and hba1c) AND (Randomized Controlled Trial[pt])")
     assert pmg.items[0].query_string == pmg.query_string
+
+
+# ---------------------------------------------------------------------------
+# Tests de curation
+# ---------------------------------------------------------------------------
+
+ART2 = PubMedArticle(
+    pmid="40000000",
+    title="PubMed paper 2",
+    abstract="abstract2",
+    url="https://doi.org/10.1/y",
+    evidence_type="review",
+)
+STUDY2 = CTGovStudy(
+    nct_id="NCT02000000",
+    title="CT study 2",
+    status="RECRUITING",
+    phase="PHASE2",
+    conditions=("Hypertension",),
+    interventions=("drug",),
+    url="https://clinicaltrials.gov/study/NCT02000000",
+)
+
+
+def _retriever_c(pm: FakePubMed, ct: FakeCTGov, cur: FakeCurator) -> LiteratureRetriever:
+    return LiteratureRetriever(cast(PubMedClient, pm), cast(CTGovClient, ct), curator=cur)
+
+
+async def test_curation_reorders_and_annotates_both_sources() -> None:
+    pm = FakePubMed(search_res=[ART, ART2])
+    ct = FakeCTGov(search_res=[STUDY, STUDY2])
+    cur = FakeCurator()  # inverse l'ordre
+    r = await _retriever_c(pm, ct, cur).retrieve("hba1c", max_results=5, today=DAY)
+
+    pmg = next(g for g in r.groups if g.source == SOURCE_PUBMED)
+    assert [i.id for i in pmg.items] == ["40000000", "35319473"]
+    assert pmg.items[0].rationale == "rat-40000000"
+    ctg = next(g for g in r.groups if g.source == SOURCE_CTGOV)
+    assert [i.id for i in ctg.items] == ["NCT02000000", "NCT01691846"]
+    assert ctg.items[0].rationale == "rat-NCT02000000"
+    assert pm.calls == [("search", "hba1c", 25)]  # pool = min(50, max(25, 5*2)) = 25
+    assert ct.calls == [("search", "hba1c", 25)]
+
+
+async def test_curation_failure_falls_back_to_relevance_order() -> None:
+    pm = FakePubMed(search_res=[ART, ART2])
+    ct = FakeCTGov(search_res=[STUDY])
+    cur = FakeCurator(error=AgentUpstreamError("LLM down"))
+    r = await _retriever_c(pm, ct, cur).retrieve("hba1c", max_results=5, today=DAY)
+
+    pmg = next(g for g in r.groups if g.source == SOURCE_PUBMED)
+    assert [i.id for i in pmg.items] == ["35319473", "40000000"]
+    assert all(i.rationale is None for i in pmg.items)
+
+
+async def test_curation_empty_selection_falls_back() -> None:
+    pm = FakePubMed(search_res=[ART, ART2])
+    ct = FakeCTGov(search_res=[])
+    cur = FakeCurator(only=["zzz"])  # rien ne matche
+    r = await _retriever_c(pm, ct, cur).retrieve("hba1c", max_results=5, today=DAY)
+    pmg = next(g for g in r.groups if g.source == SOURCE_PUBMED)
+    assert [i.id for i in pmg.items] == ["35319473", "40000000"]
+    assert all(i.rationale is None for i in pmg.items)
+
+
+async def test_known_item_is_not_curated() -> None:
+    pm = FakePubMed(fetch_res=[ART])
+    ct = FakeCTGov(search_res=[STUDY])
+    cur = FakeCurator()
+    r = await _retriever_c(pm, ct, cur).retrieve("35319473", today=DAY)
+    assert cur.calls == []
+    assert r.groups[0].items[0].rationale is None
+
+
+async def test_curation_caps_at_max_results_end_to_end() -> None:
+    # Le curator renvoie 3 refs sans caper ; le cap à max_results doit s'appliquer
+    # de bout en bout (via apply_curation dans _curate_pubmed), pas seulement dans le helper.
+    art3 = PubMedArticle(
+        pmid="50000000",
+        title="P3",
+        abstract="a3",
+        url="https://doi.org/10.1/z",
+        evidence_type="rct",
+    )
+    pm = FakePubMed(search_res=[ART, ART2, art3])
+    ct = FakeCTGov(search_res=[])
+    cur = FakeCurator()  # renvoie les 3 ids inversés
+    r = await _retriever_c(pm, ct, cur).retrieve("hba1c", max_results=2, today=DAY)
+
+    pmg = next(g for g in r.groups if g.source == SOURCE_PUBMED)
+    assert [i.id for i in pmg.items] == ["50000000", "40000000"]  # inversé puis capé à 2

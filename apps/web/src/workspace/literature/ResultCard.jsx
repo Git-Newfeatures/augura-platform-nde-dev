@@ -110,6 +110,11 @@ export function ResultCard({ result, position, status, onKeep, onDismiss, readOn
         )}
       </div>
 
+      {result.rationale && (
+        <p className="mt-2 rounded-md bg-secondary/30 px-2.5 py-1.5 text-[11.5px] italic leading-relaxed text-muted-foreground">
+          <span className="font-medium not-italic text-foreground/70">Why: </span>{result.rationale}
+        </p>
+      )}
       {showAbstract && result.abstract && (
         <p className="mt-2 text-[12px] leading-relaxed text-foreground/75">{result.abstract}</p>
       )}

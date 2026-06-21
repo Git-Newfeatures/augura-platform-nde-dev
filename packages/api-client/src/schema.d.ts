@@ -2119,6 +2119,8 @@ export interface components {
             id: string;
             /** Query String */
             query_string: string;
+            /** Rationale */
+            rationale?: string | null;
             /** Record */
             record: {
                 [key: string]: unknown;

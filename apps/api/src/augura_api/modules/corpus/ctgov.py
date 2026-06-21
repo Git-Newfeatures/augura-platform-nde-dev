@@ -90,10 +90,15 @@ class CTGovClient(Protocol):
 
 
 class CTGovApiClient:
-    """Implémentation réelle : API v2 ClinicalTrials.gov (aucune clé requise)."""
+    """Implémentation réelle : API v2 ClinicalTrials.gov (aucune clé requise).
 
-    def __init__(self, http: httpx.AsyncClient) -> None:
+    `base_url` permet de pointer vers un relais (fonction Vercel) qui réémet vers
+    CT.gov depuis un egress non bloqué — le WAF de CT.gov renvoie 403 aux IP datacenter
+    de Modal. Absent ⇒ appel direct à l'API publique."""
+
+    def __init__(self, http: httpx.AsyncClient, *, base_url: str | None = None) -> None:
         self._http = http
+        self._base = base_url or CTGOV_BASE
 
     async def search(
         self,
@@ -107,7 +112,7 @@ class CTGovApiClient:
         day = today or datetime.now(UTC).date()
         params: dict[str, str] = {"query.term": query, "pageSize": str(n), "format": "json"}
         params.update(ctgov_filter_params(filters, day))
-        resp = await self._http.get(CTGOV_BASE, params=params)
+        resp = await self._http.get(self._base, params=params)
         resp.raise_for_status()
         studies = _as_list(_as_dict(resp.json()).get("studies"))
         parsed = [_parse_study(_as_dict(s.get("protocolSection"))) for s in studies]
@@ -118,7 +123,7 @@ class CTGovApiClient:
         nct = nct_id.strip().upper()
         if not nct:
             return None
-        resp = await self._http.get(f"{CTGOV_BASE}/{nct}", params={"format": "json"})
+        resp = await self._http.get(f"{self._base}/{nct}", params={"format": "json"})
         if resp.status_code == _HTTP_NOT_FOUND:
             return None
         resp.raise_for_status()

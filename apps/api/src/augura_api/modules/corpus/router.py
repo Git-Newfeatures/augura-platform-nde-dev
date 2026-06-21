@@ -217,7 +217,7 @@ async def literature_retrieve(
             ):
                 retriever = LiteratureRetriever(
                     NCBIPubMedClient(http, api_key=settings.ncbi_api_key),
-                    CTGovApiClient(ctgov_http),
+                    CTGovApiClient(ctgov_http, base_url=settings.ctgov_relay_url),
                 )
                 result = await retriever.retrieve(
                     req.query, sources=sources, max_results=req.max_results, filters=filters

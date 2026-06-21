@@ -69,3 +69,17 @@ def test_ctgov_proxy_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setenv("AUGURA_CTGOV_PROXY_URL", "  ")
     assert Settings().ctgov_proxy_url is None  # pyright: ignore[reportCallIssue]
+
+
+def test_ctgov_relay_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AUGURA_CTGOV_RELAY_URL : absent ⇒ None (appel direct) ; posé ⇒ chargé ;
+    vide ⇒ None (couvert par le validateur blank→None)."""
+    monkeypatch.setenv("AUGURA_ENV", "dev")
+    monkeypatch.delenv("AUGURA_CTGOV_RELAY_URL", raising=False)
+    assert Settings().ctgov_relay_url is None  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("AUGURA_CTGOV_RELAY_URL", "https://front.vercel.app/api/ctgov")
+    assert Settings().ctgov_relay_url == "https://front.vercel.app/api/ctgov"  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("AUGURA_CTGOV_RELAY_URL", "   ")
+    assert Settings().ctgov_relay_url is None  # pyright: ignore[reportCallIssue]

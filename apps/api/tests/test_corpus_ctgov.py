@@ -105,3 +105,23 @@ async def test_search_applies_filters_to_params() -> None:
     assert params.get("query.term") == "diabetes"
     assert params.get("aggFilters") == "studyType:obs"
     assert params.get("filter.advanced") == "AREA[StudyFirstPostDate]RANGE[2025-01-01,MAX]"
+
+
+async def test_base_url_override_targets_relay() -> None:
+    # base_url (relais Vercel) doit remplacer l'hôte CT.gov tout en transmettant
+    # les query params — c'est le contournement du WAF 403 sur IP datacenter.
+    record: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        record.append(request)
+        return httpx.Response(200, json={"studies": [{"protocolSection": _PROTOCOL}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        client = CTGovApiClient(http, base_url="https://relay.example/api/ctgov")
+        studies = await client.search("hypertension", 3)
+
+    assert studies and studies[0].nct_id == "NCT01691846"
+    req = record[0]
+    assert req.url.host == "relay.example"
+    assert req.url.path == "/api/ctgov"
+    assert req.url.params.get("query.term") == "hypertension"

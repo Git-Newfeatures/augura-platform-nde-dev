@@ -31,6 +31,10 @@ ANTHRO="${AUGURA_ANTHROPIC_API_KEY:-${ANTHROPIC_API_KEY:-}}"
 [ -n "$ANTHRO" ] && EXTRA+=("AUGURA_ANTHROPIC_API_KEY=${ANTHRO}")
 OPENAI="${AUGURA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 [ -n "$OPENAI" ] && EXTRA+=("AUGURA_OPENAI_API_KEY=${OPENAI}")
+# Contournement du 403 WAF CT.gov sur les IP datacenter Modal (absents ⇒ appel direct,
+# dégradation gracieuse). Relais (fonction Edge) PRIVILÉGIÉ ; proxy httpx en alternative.
+[ -n "${AUGURA_CTGOV_RELAY_URL:-}" ] && EXTRA+=("AUGURA_CTGOV_RELAY_URL=${AUGURA_CTGOV_RELAY_URL}")
+[ -n "${AUGURA_CTGOV_PROXY_URL:-}" ] && EXTRA+=("AUGURA_CTGOV_PROXY_URL=${AUGURA_CTGOV_PROXY_URL}")
 
 echo "[1/3] secret Modal 'augura-api' (env=prod, cors regex=*.vercel.app${FRONT_ORIGIN:+ + $FRONT_ORIGIN})"
 uv run modal secret create augura-api --force \

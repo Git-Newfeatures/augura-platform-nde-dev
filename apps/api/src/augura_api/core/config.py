@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # même interface (core.storage). Chemin relatif → résolu depuis le CWD de l'API.
     artifacts_dir: str = "var/artifacts"
 
+    # Supabase Storage (object store) pour les octets des datasets uploadés. En prod le
+    # FS Modal est éphémère ET par conteneur : un upload servi par un conteneur ASGI n'est
+    # pas relu par celui qui lance ensuite le DQ. Quand `supabase_url` ET
+    # `supabase_service_role_key` sont définis, core.storage lit/écrit via l'API Storage
+    # (cohérent cross-conteneur) ; sinon repli disque local (dev/test/CI sans secret). La
+    # clé service_role contourne la RLS Storage : secret backend uniquement, jamais côté front.
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+    storage_bucket: str = "datasets"
+
     # LLM (agents). Clés requises pour un run live ; absentes en local ⇒ les routes
     # /agents/* renvoient une 503 explicite « clé manquante ». On accepte le nom
     # préfixé AUGURA_* ET le nom standard sans préfixe (ANTHROPIC_API_KEY…), pour

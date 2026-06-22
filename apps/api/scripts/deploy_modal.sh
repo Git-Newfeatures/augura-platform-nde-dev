@@ -35,6 +35,11 @@ OPENAI="${AUGURA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 # dégradation gracieuse). Relais (fonction Edge) PRIVILÉGIÉ ; proxy httpx en alternative.
 [ -n "${AUGURA_CTGOV_RELAY_URL:-}" ] && EXTRA+=("AUGURA_CTGOV_RELAY_URL=${AUGURA_CTGOV_RELAY_URL}")
 [ -n "${AUGURA_CTGOV_PROXY_URL:-}" ] && EXTRA+=("AUGURA_CTGOV_PROXY_URL=${AUGURA_CTGOV_PROXY_URL}")
+# Supabase Storage (octets des datasets — cohérent cross-conteneur sur Modal). Absents ⇒
+# repli disque local éphémère : REQUIS en prod pour que le run DQ relise l'upload.
+[ -n "${AUGURA_SUPABASE_URL:-}" ]              && EXTRA+=("AUGURA_SUPABASE_URL=${AUGURA_SUPABASE_URL}")
+[ -n "${AUGURA_SUPABASE_SERVICE_ROLE_KEY:-}" ] && EXTRA+=("AUGURA_SUPABASE_SERVICE_ROLE_KEY=${AUGURA_SUPABASE_SERVICE_ROLE_KEY}")
+[ -n "${AUGURA_STORAGE_BUCKET:-}" ]            && EXTRA+=("AUGURA_STORAGE_BUCKET=${AUGURA_STORAGE_BUCKET}")
 
 echo "[1/3] secret Modal 'augura-api' (env=prod, cors regex=*.vercel.app${FRONT_ORIGIN:+ + $FRONT_ORIGIN})"
 uv run modal secret create augura-api --force \

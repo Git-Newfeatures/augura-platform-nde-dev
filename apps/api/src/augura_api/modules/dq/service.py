@@ -29,7 +29,14 @@ class DqService:
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None or not dataset.storage_path:
             raise NotFoundError("dataset introuvable ou sans fichier", dataset_id=str(dataset_id))
-        data = read_bytes(settings, dataset.storage_path)
+        try:
+            data = await read_bytes(settings, dataset.storage_path)
+        except FileNotFoundError as exc:
+            # Le ref stocké ne pointe sur rien de lisible (ex. octets écrits sur un disque
+            # éphémère et par-conteneur de Modal avant le passage à l'object store) : 404 propre.
+            raise NotFoundError(
+                "fichier du dataset indisponible", dataset_id=str(dataset_id)
+            ) from exc
         sheets = parse_upload(dataset.name, data)
         bundle = run_dq(
             [{"name": s.name, "headers": s.headers, "rows": s.rows} for s in sheets],

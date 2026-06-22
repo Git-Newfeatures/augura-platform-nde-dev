@@ -94,7 +94,7 @@ class DatasetService:
         from augura_api.modules.datasets.profiling import profile_column
 
         sheets = parse_upload(filename, data)  # raises 413/415/400
-        ref = save_bytes(
+        ref = await save_bytes(
             settings,
             org_id=str(tenant.tenant_id),
             name=f"{uuid4()}-{filename}",

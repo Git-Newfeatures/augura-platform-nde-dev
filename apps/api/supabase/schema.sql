@@ -366,7 +366,7 @@ create table if not exists artifacts (
     study_id    uuid references studies(id) on delete set null,
     kind        text not null
                 check (kind in ('dataset_snapshot', 'qc_report', 'mapping', 'dag',
-                                'sap', 'run_manifest')),
+                                'sap', 'run_manifest', 'simulation_run', 'document')),
     version     integer not null default 0,        -- v0 = machine-proposé, v1 = humain-approuvé…
     sha256      text not null,                     -- hash du contenu canonique
     content     jsonb,                             -- corps inline (edge list, SAP, manifest…)

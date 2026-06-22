@@ -5,9 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, status
 from fastapi.responses import Response
 
-from augura_api.core import storage
 from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
-from augura_api.core.errors import NotFoundError
 from augura_api.jobs.runner import enqueue_job
 from augura_api.modules.documents import schemas
 from augura_api.modules.documents.service import DocumentService
@@ -51,17 +49,12 @@ async def download_document(
     document_id: UUID,
     tenant: CurrentTenantDep,
     session: SessionDep,
-    settings: SettingsDep,
 ) -> Response:
-    """Sert les octets du dossier généré (scopé tenant). 404 tant que non `ready`."""
-    doc = await DocumentService(session).get(tenant, document_id)
-    if not doc.storage_path:
-        raise NotFoundError("document non encore généré", document_id=str(document_id))
-    try:
-        data = storage.read_bytes(settings, doc.storage_path)
-    except FileNotFoundError as exc:
-        raise NotFoundError("fichier d'artefact introuvable", document_id=str(document_id)) from exc
-    filename = f"{doc.type}-{document_id}.html"
+    """Sert les octets du dossier généré (scopé tenant), lus EN BASE
+    (generated_documents.content) — cohérent cross-conteneur sur Modal, contrairement au
+    disque local éphémère. 404 tant que le dossier n'est pas `ready`."""
+    doc_type, data = await DocumentService(session).download(tenant, document_id)
+    filename = f"{doc_type}-{document_id}.html"
     return Response(
         content=data,
         media_type="text/html; charset=utf-8",

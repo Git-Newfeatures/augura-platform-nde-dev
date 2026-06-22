@@ -17,6 +17,7 @@ from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.analytics import log_usage
 from augura_api.modules.analytics.service import AnalyticsService
 from augura_api.modules.documents import schemas as doc_schemas
+from augura_api.modules.documents.repo import DocumentRepo
 from augura_api.modules.documents.service import DocumentService
 
 pytestmark = pytest.mark.integration
@@ -59,3 +60,18 @@ async def test_document_generate_creates_job_and_row(session: AsyncSession) -> N
     assert fetched.type == "report"
     listed = await DocumentService(session).list_documents(TENANT)
     assert any(d.id == created.document_id for d in listed)
+
+
+async def test_document_content_round_trips_through_db(session: AsyncSession) -> None:
+    """Les octets du dossier vivent EN BASE (generated_documents.content) : ce que le
+    worker écrit, l'ASGI le relit — cohérent cross-conteneur, contrairement au disque."""
+    created = await DocumentService(session).generate(
+        TENANT, doc_schemas.GenerateRequest(type="report")
+    )
+    html = b"<html><body>dossier de test</body></html>"
+    await DocumentRepo(session).set_status(
+        LUCIS, created.document_id, status="ready", storage_path="logical/ref", content=html
+    )
+    doc_type, data = await DocumentService(session).download(TENANT, created.document_id)
+    assert doc_type == "report"
+    assert data == html

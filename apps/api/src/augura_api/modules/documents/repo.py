@@ -45,10 +45,13 @@ class DocumentRepo:
         *,
         status: str,
         storage_path: str | None = None,
+        content: bytes | None = None,
     ) -> None:
         values: dict[str, object] = {"status": status}
         if storage_path is not None:
             values["storage_path"] = storage_path
+        if content is not None:
+            values["content"] = content
         await self.session.execute(
             update(GeneratedDocument)
             .where(

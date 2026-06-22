@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Text, text
+from sqlalchemy import DateTime, LargeBinary, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,9 @@ class GeneratedDocument(Base):
     study_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True))
     type: Mapped[str] = mapped_column(Text)
     storage_path: Mapped[str | None] = mapped_column(Text)
+    # Octets du dossier généré (HTML), stockés en base — cohérent cross-conteneur sur
+    # Modal, contrairement au disque local éphémère. Servi par GET /documents/{id}/download.
+    content: Mapped[bytes | None] = mapped_column(LargeBinary)
     status: Mapped[str] = mapped_column(Text, server_default=text("'pending'"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")

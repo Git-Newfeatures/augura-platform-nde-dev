@@ -26,6 +26,16 @@ class DocumentService:
             raise NotFoundError("document introuvable", document_id=str(document_id))
         return schemas.GeneratedDocumentOut.model_validate(doc)
 
+    async def download(self, tenant: CurrentTenant, document_id: UUID) -> tuple[str, bytes]:
+        """Renvoie (type, octets) du dossier généré, lus EN BASE (content) — cohérent
+        cross-conteneur sur Modal. NotFoundError tant que le dossier n'est pas `ready`."""
+        doc = await DocumentRepo(self.session).get(tenant.tenant_id, document_id)
+        if doc is None:
+            raise NotFoundError("document introuvable", document_id=str(document_id))
+        if doc.content is None:
+            raise NotFoundError("document non encore généré", document_id=str(document_id))
+        return doc.type, bytes(doc.content)
+
     async def generate(
         self, tenant: CurrentTenant, req: schemas.GenerateRequest
     ) -> schemas.GeneratedDocumentCreated:

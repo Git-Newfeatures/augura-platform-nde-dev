@@ -321,6 +321,9 @@ create table if not exists generated_documents (
     study_id     uuid references studies(id) on delete set null,
     type         text not null check (type in ('protocol', 'report')),
     storage_path text,
+    -- Octets du dossier généré, stockés EN BASE : sur Modal le worker et l'ASGI sont
+    -- des conteneurs distincts au FS éphémère, donc le disque local n'est pas partagé.
+    content      bytea,
     status       text not null default 'pending'
                  check (status in ('pending', 'generating', 'ready', 'failed')),
     created_at   timestamptz not null default now()

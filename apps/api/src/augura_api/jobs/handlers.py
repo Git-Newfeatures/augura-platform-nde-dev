@@ -120,14 +120,14 @@ async def handle_document(ctx: JobContext) -> str | None:
         sources=sources,
         generated_at=datetime.now(UTC),
     )
-    ref = storage.save_bytes(
-        ctx.settings,
-        org_id=str(ctx.tenant_id),
-        name=f"{document_id}.html",
-        data=html.encode("utf-8"),
-    )
+    # Octets stockés EN BASE (generated_documents.content), pas sur le disque local du
+    # conteneur : sur Modal le worker `run_job` et l'ASGI sont des conteneurs distincts au
+    # FS éphémère, donc un fichier disque serait introuvable au download (404). `storage_path`
+    # reste un identifiant logique stable (provenance), découplé du disque.
+    data = html.encode("utf-8")
+    ref = storage.build_ref(str(ctx.tenant_id), f"{document_id}.html")
     await DocumentRepo(ctx.session).set_status(
-        ctx.tenant_id, document_id, status="ready", storage_path=ref
+        ctx.tenant_id, document_id, status="ready", storage_path=ref, content=data
     )
     await analytics.create_artifact(
         ctx.session,

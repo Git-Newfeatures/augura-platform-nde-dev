@@ -282,7 +282,11 @@ export interface paths {
         put?: never;
         /** Create Session */
         post: operations["create_session_corpus_literature_sessions_post"];
-        delete?: never;
+        /**
+         * Clear Sessions
+         * @description Vide l'historique « Recent queries » du tenant (nettoyage en un clic).
+         */
+        delete: operations["clear_sessions_corpus_literature_sessions_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -299,7 +303,11 @@ export interface paths {
         get: operations["get_session_corpus_literature_sessions__session_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Session
+         * @description Supprime une entrée de l'historique « Recent queries » (suppression unitaire).
+         */
+        delete: operations["delete_session_corpus_literature_sessions__session_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -972,7 +980,8 @@ export interface paths {
         };
         /**
          * Enrich Proposals
-         * @description Sert l'artifact JSON des propositions d'un job réussi (scopé tenant).
+         * @description Sert les propositions d'un job réussi (scopé tenant). Lues EN BASE
+         *     (jobs.result_json), pas sur disque — relisibles depuis n'importe quel conteneur Modal.
          */
         get: operations["enrich_proposals_semantic_enrich_proposals__job_id__get"];
         put?: never;
@@ -3849,6 +3858,24 @@ export interface operations {
             };
         };
     };
+    clear_sessions_corpus_literature_sessions_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     get_session_corpus_literature_sessions__session_id__get: {
         parameters: {
             query?: never;
@@ -3868,6 +3895,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SearchSession"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_session_corpus_literature_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

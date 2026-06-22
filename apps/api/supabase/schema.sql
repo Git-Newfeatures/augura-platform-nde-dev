@@ -290,6 +290,7 @@ create table if not exists jobs (
     progress        numeric not null default 0,
     payload         jsonb not null default '{}'::jsonb,
     result_ref      text,
+    result_json     jsonb,
     error           text,
     idempotency_key text,
     modal_call_id   text,

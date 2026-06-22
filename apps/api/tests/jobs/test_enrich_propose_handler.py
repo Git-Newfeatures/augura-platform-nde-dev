@@ -1,6 +1,5 @@
-"""handle_enrich_propose : exécute le pipeline (mocké) et persiste l'artifact JSON."""
+"""handle_enrich_propose : exécute le pipeline (mocké) et persiste le résultat EN BASE."""
 
-import json
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -12,10 +11,7 @@ from augura_api.core.ids import TenantId, UserId
 
 
 @pytest.mark.asyncio
-async def test_handle_enrich_propose_writes_artifact(
-    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("AUGURA_ARTIFACTS_DIR", str(tmp_path))
+async def test_handle_enrich_propose_stores_result_in_db(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     async def fake_read_bundle(self: Any) -> dict[str, Any]:
@@ -32,11 +28,20 @@ async def test_handle_enrich_propose_writes_artifact(
     async def fake_log_usage(*_a: Any, **_k: Any) -> None:
         return None
 
+    captured: dict[str, Any] = {}
+
+    async def fake_set_result_json(
+        _session: Any, _tenant_id: Any, _job_id: Any, result_json: dict[str, Any]
+    ) -> None:
+        captured["result"] = result_json
+
     monkeypatch.setattr(
         "augura_api.modules.semantic.repo.SemanticRepo.read_bundle", fake_read_bundle
     )
     monkeypatch.setattr("augura_api.modules.semantic.enrich_propose.propose", fake_propose)
     monkeypatch.setattr("augura_api.modules.analytics.log_usage", fake_log_usage)
+    # Le résultat est stocké EN BASE (jobs.result_json), pas sur disque.
+    monkeypatch.setattr("augura_api.modules.jobs.set_result_json", fake_set_result_json)
 
     from augura_api.jobs.handlers import handle_enrich_propose
 
@@ -54,11 +59,9 @@ async def test_handle_enrich_propose_writes_artifact(
     )
 
     ref = await handle_enrich_propose(ctx)  # type: ignore[arg-type]
-    assert ref is not None and ref.startswith("org/")
+    assert ref is None  # plus d'artefact disque : le résultat est en base
 
-    from augura_api.core import storage
-
-    data = json.loads(storage.read_bytes(ctx.settings, ref))
+    data = captured["result"]
     assert "proposals" in data
     assert "coverage_summary" in data
     assert "generated_at" in data

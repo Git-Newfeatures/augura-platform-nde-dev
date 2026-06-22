@@ -115,9 +115,31 @@ def enqueue_job(
     *,
     settings: Settings | None = None,
 ) -> None:
-    """Planifie l'exécution d'un job après la réponse HTTP. Point de bascule unique
-    vers Modal (`modal.Function.spawn`) le jour venu."""
+    """Planifie l'exécution d'un job hors du cycle requête/réponse.
+
+    Deux exécuteurs, choisis par environnement — point de bascule UNIQUE :
+    - Sur Modal (conteneur distant) : `modal.Function.spawn` lance le worker dédié
+      `run_job` dans un autre conteneur. Indispensable car les `BackgroundTasks`
+      Starlette ne s'exécutent PAS de façon fiable sur Modal (le conteneur peut être
+      gelé dès la réponse HTTP renvoyée → le job resterait bloqué en `queued`).
+    - En local (`modal.is_local()`) : `BackgroundTasks` exécute le job in-process
+      après la réponse, sans dépendance Modal.
+    """
     cfg = settings or get_settings()
+
+    try:
+        import modal
+
+        on_modal = not modal.is_local()
+    except Exception:  # noqa: BLE001 — modal absent/non initialisé ⇒ chemin local
+        on_modal = False
+
+    if on_modal:
+        from augura_api.jobs.modal_spawn import spawn_run_job
+
+        spawn_run_job(str(tenant.tenant_id), str(tenant.user_id), str(job_id))
+        return
+
     background_tasks.add_task(execute_job, cfg, tenant.tenant_id, tenant.user_id, job_id)
 
 

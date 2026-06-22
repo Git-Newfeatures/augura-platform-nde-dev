@@ -94,6 +94,7 @@ def _pubmed_record(a: PubMedArticle) -> dict[str, Any]:
         "abstract": a.abstract,
         "journal": a.journal,
         "doi": a.doi,
+        "authors": list(a.authors),
         "published_at": a.published_at.isoformat() if a.published_at else None,
         "evidence_type": a.evidence_type,
         "article_types": list(a.article_types),

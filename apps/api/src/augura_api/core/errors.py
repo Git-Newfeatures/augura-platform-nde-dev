@@ -1,7 +1,11 @@
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
+
+log = structlog.get_logger(__name__)
 
 
 class AppError(Exception):
@@ -74,5 +78,25 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.http_status,
             content=body,
+            media_type="application/problem+json",
+        )
+
+    @app.exception_handler(SQLAlchemyError)
+    async def handle_db_error(_request: Request, exc: SQLAlchemyError) -> JSONResponse:
+        # Une erreur base non mappée (violation RLS, contrainte, panne) remonterait sinon
+        # en 500 brut AU-DESSUS du middleware CORS (généré par ServerErrorMiddleware) :
+        # le navigateur la lit alors « Failed to fetch » sans en-tête CORS, donc sans
+        # message. En la rattrapant ici (ExceptionMiddleware, sous CORS) la réponse
+        # repasse par CORS et le front voit une vraie erreur 500.
+        log.exception("db_error", error=str(exc))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "https://augura.dev/errors/database_error",
+                "title": "Database error",
+                "status": 500,
+                "detail": "l'opération base de données a échoué",
+                "code": "database_error",
+            },
             media_type="application/problem+json",
         )

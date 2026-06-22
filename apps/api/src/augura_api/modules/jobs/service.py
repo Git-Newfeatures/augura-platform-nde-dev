@@ -43,11 +43,28 @@ async def set_progress(
 
 
 async def mark_succeeded(
-    session: AsyncSession, tenant_id: TenantId, job_id: UUID, *, result_ref: str | None = None
+    session: AsyncSession,
+    tenant_id: TenantId,
+    job_id: UUID,
+    *,
+    result_ref: str | None = None,
+    result_json: dict[str, Any] | None = None,
 ) -> None:
     await JobRepo(session).update(
-        tenant_id, job_id, status="succeeded", progress=1.0, result_ref=result_ref
+        tenant_id,
+        job_id,
+        status="succeeded",
+        progress=1.0,
+        result_ref=result_ref,
+        result_json=result_json,
     )
+
+
+async def set_result_json(
+    session: AsyncSession, tenant_id: TenantId, job_id: UUID, result_json: dict[str, Any]
+) -> None:
+    """Persiste le résultat structuré du job EN BASE (relisible cross-conteneur sur Modal)."""
+    await JobRepo(session).update(tenant_id, job_id, result_json=result_json)
 
 
 async def mark_failed(

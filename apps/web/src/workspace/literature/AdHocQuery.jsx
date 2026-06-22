@@ -9,7 +9,7 @@ import { SavedEvidence } from './SavedEvidence'
 import { SessionActions } from './SessionActions'
 import { StudyPicker } from './StudyPicker'
 import {
-  streamRetrieve, createSession, listSessions, logEvent,
+  streamRetrieve, createSession, listSessions, deleteSession, clearSessions, logEvent,
   saveSnapshot, listSnapshots, getSnapshot, flattenItem, resultId,
 } from './literatureClient'
 
@@ -51,6 +51,38 @@ const initialState = {
 
 const blankGroups = (sources) => Object.fromEntries(sources.map((s) => [s, { results: [], loading: true }]))
 
+// Persistance de session (Recent queries #2) : la dernière recherche est conservée
+// côté client pour qu'un aller-retour de navigation (ou un reload) la restaure. Ce
+// n'est PAS un mock — c'est l'état réel de la recherche de l'utilisateur, mis en cache.
+const PERSIST_KEY = 'augura.literature.adhoc'
+
+function loadPersisted() {
+  try {
+    const raw = sessionStorage.getItem(PERSIST_KEY)
+    if (!raw) return initialState
+    const s = JSON.parse(raw)
+    // Pas de flux actif au retour : une recherche « querying » devient complete (si
+    // des résultats sont déjà arrivés) ou idle, et le bandeau transitoire est purgé.
+    const hasResults = Object.values(s.groups || {}).some((g) => g.results && g.results.length)
+    if (s.status === 'querying') s.status = hasResults ? 'complete' : 'idle'
+    return { ...initialState, ...s, saved: null }
+  } catch {
+    return initialState
+  }
+}
+
+function persist(state) {
+  try {
+    if (state.status === 'idle' && !state.question) {
+      sessionStorage.removeItem(PERSIST_KEY)
+      return
+    }
+    sessionStorage.setItem(PERSIST_KEY, JSON.stringify(state))
+  } catch {
+    /* quota dépassé / indisponible : best-effort, on ignore */
+  }
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'set_question': return { ...state, question: action.value }
@@ -86,17 +118,32 @@ function reducer(state, action) {
 }
 
 export function AdHocQuery() {
-  const [state, dispatch] = useReducer(reducer, initialState)
+  const [state, dispatch] = useReducer(reducer, initialState, loadPersisted)
   const [history, setHistory] = useState([])
   const [saved, setSavedList] = useState([])
   const [picking, setPicking] = useState(false)
   const [notice, setNotice] = useState(null)   // avertissement transitoire (rien de sélectionné)
   const abortRef = useRef(null)
 
+  // Restaure la dernière recherche au montage et la persiste à chaque évolution (#2).
+  useEffect(() => { persist(state) }, [state])
+
   const refreshHistory = useCallback(async () => {
     try {
       const rows = await listSessions()
-      setHistory(rows.map((s) => ({ id: s.id, question: s.query, createdAt: s.created_at })))
+      // Dédoublonnage par texte de requête (#4) : on regroupe les sessions identiques,
+      // en gardant la plus récente comme représentante + tous leurs ids (pour le delete).
+      const byKey = new Map()
+      const order = []
+      for (const s of rows) {
+        const key = (s.query || '').trim().toLowerCase() || `__${s.id}`
+        if (!byKey.has(key)) {
+          byKey.set(key, { id: s.id, ids: [], question: s.query, createdAt: s.created_at })
+          order.push(key)
+        }
+        byKey.get(key).ids.push(s.id)
+      }
+      setHistory(order.map((k) => byKey.get(k)))
     } catch { /* non-bloquant */ }
   }, [])
   const refreshSaved = useCallback(async () => {
@@ -183,6 +230,16 @@ export function AdHocQuery() {
   }
 
   const reopenRecent = (id, question) => { abortRef.current?.abort(); dispatch({ type: 'set_question', value: question || '' }) }
+  // Suppression unitaire (#4) : retire toutes les sessions partageant ce texte (la ligne
+  // affichée est dédoublonnée), puis rafraîchit. « Clear all » vide tout l'historique.
+  const removeRecent = async (entry) => {
+    try { await Promise.all((entry.ids || [entry.id]).map((id) => deleteSession(id))) } catch { /* ignore */ }
+    refreshHistory()
+  }
+  const clearRecent = async () => {
+    try { await clearSessions() } catch { /* ignore */ }
+    refreshHistory()
+  }
   const reopenSaved = async (id) => {
     abortRef.current?.abort()
     try { const snap = await getSnapshot(id); dispatch({ type: 'restore_frozen', snapshot: snap }) } catch { /* ignore */ }
@@ -207,7 +264,7 @@ export function AdHocQuery() {
         Ask a clinical question; the agent searches PubMed and ClinicalTrials.gov and returns structured, cited evidence, grouped by source. A live search takes up to ~90 seconds.
       </div>
 
-      <RecentQueries entries={history} activeId={state.sessionId} onOpen={reopenRecent} />
+      <RecentQueries entries={history} activeId={state.sessionId} onOpen={reopenRecent} onDelete={removeRecent} onClear={clearRecent} />
       <SavedEvidence entries={saved} activeId={null} onOpen={reopenSaved} />
 
       {!frozen && (

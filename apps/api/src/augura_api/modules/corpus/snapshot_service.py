@@ -168,6 +168,13 @@ class LiteratureSnapshotService:
         rows = await self.repo.list_sessions(tenant.tenant_id, status=status)
         return [self._to_session(r) for r in rows]
 
+    async def delete_session(self, tenant: CurrentTenant, session_id: UUID) -> None:
+        """Suppression unitaire idempotente (un re-clic ne lève pas d'erreur)."""
+        await self.repo.delete_session(tenant.tenant_id, session_id)
+
+    async def clear_sessions(self, tenant: CurrentTenant) -> None:
+        await self.repo.delete_all_sessions(tenant.tenant_id)
+
     def _to_session(self, row: SearchSession) -> schemas.SearchSession:
         return schemas.SearchSession(
             id=row.id,

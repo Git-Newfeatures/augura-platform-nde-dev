@@ -8,10 +8,11 @@ analytics/provenance. Chaque handler persiste son résultat, émet un event de p
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
+
+import structlog
 
 from augura_api.core.ids import StudyId
 from augura_api.modules import analytics
@@ -26,6 +27,8 @@ if TYPE_CHECKING:
     from augura_api.jobs.runner import JobContext, JobHandler
 
 from augura_api.core import storage
+
+log = structlog.get_logger(__name__)
 
 
 async def handle_bootstrap(ctx: JobContext) -> str | None:
@@ -149,8 +152,10 @@ async def handle_document(ctx: JobContext) -> str | None:
 
 async def handle_enrich_propose(ctx: JobContext) -> str | None:
     """Pipeline de proposition d'enrichissement (B4) : lit le bundle, exécute les
-    batchs LLM, persiste le batch de propositions en artifact JSON. La progression
-    passe par set_progress (float) ; le log textuel détaillé vit dans l'artifact."""
+    batchs LLM, persiste le batch de propositions EN BASE (jobs.result_json). Le
+    résultat n'est PAS écrit sur disque : sur Modal le FS est éphémère et propre au
+    conteneur, donc un artefact fichier ne serait pas relisible par le conteneur ASGI."""
+    from augura_api.core.db import get_sessionmaker, set_tenant_stmt, set_user_stmt
     from augura_api.core.llm.runtime import get_anthropic_client
     from augura_api.modules import jobs as jobs_iface
     from augura_api.modules.semantic.enrich_propose import propose
@@ -160,8 +165,25 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
     bundle = await SemanticRepo(ctx.session).read_bundle()
     client = get_anthropic_client(ctx.settings)
 
+    last_pct = -1
+
     async def on_progress(frac: float, _message: str) -> None:
-        await jobs_iface.set_progress(ctx.session, ctx.tenant_id, ctx.job.id, frac)
+        # La transaction de travail du runner ne committe qu'à la fin : une progression
+        # écrite dessus resterait invisible au polling. On la committe dans une
+        # transaction courte DÉDIÉE (throttlée au point de pourcentage) pour qu'elle remonte.
+        # Best-effort : la progression ne doit jamais faire échouer le job lui-même.
+        nonlocal last_pct
+        pct = round(max(0.0, min(1.0, frac)) * 100)
+        if pct == last_pct and frac < 1.0:
+            return
+        last_pct = pct
+        try:
+            async with get_sessionmaker(ctx.settings)() as s, s.begin():
+                await s.execute(set_user_stmt(ctx.user_id))
+                await s.execute(set_tenant_stmt(ctx.tenant_id))
+                await jobs_iface.set_progress(s, ctx.tenant_id, ctx.job.id, frac)
+        except Exception:  # noqa: BLE001 — progression best-effort
+            log.warning("enrich.progress.skipped", job_id=str(ctx.job.id), frac=frac)
 
     result = await propose(
         client=client,
@@ -172,12 +194,7 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
         on_progress=on_progress,
     )
     result["generated_at"] = datetime.now(UTC).isoformat()
-    ref = storage.save_bytes(
-        ctx.settings,
-        org_id=str(ctx.tenant_id),
-        name=f"enrich-proposals-{ctx.job.id}.json",
-        data=json.dumps(result).encode("utf-8"),
-    )
+    await jobs_iface.set_result_json(ctx.session, ctx.tenant_id, ctx.job.id, result)
     await analytics.log_usage(
         ctx.session,
         tenant_id=ctx.tenant_id,
@@ -186,7 +203,7 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
         route="/semantic/enrich/propose",
         metadata={"job_id": str(ctx.job.id), **result.get("summary", {})},
     )
-    return ref
+    return None
 
 
 def build_handlers() -> dict[str, JobHandler]:

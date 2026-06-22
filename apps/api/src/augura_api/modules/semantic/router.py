@@ -1,5 +1,6 @@
 """Adaptateur HTTP du module semantic."""
 
+import json
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
@@ -7,7 +8,6 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from fastapi.responses import Response
 
-from augura_api.core import storage
 from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, require_role
 from augura_api.core.errors import NotFoundError
 from augura_api.core.tenancy import CurrentTenant
@@ -103,14 +103,10 @@ async def enrich_proposals(
     job_id: UUID,
     tenant: CurrentTenantDep,
     session: SessionDep,
-    settings: SettingsDep,
 ) -> Response:
-    """Sert l'artifact JSON des propositions d'un job réussi (scopé tenant)."""
+    """Sert les propositions d'un job réussi (scopé tenant). Lues EN BASE
+    (jobs.result_json), pas sur disque — relisibles depuis n'importe quel conteneur Modal."""
     job = await jobs_iface.get_job(session, tenant.tenant_id, job_id)
-    if job is None or not job.result_ref:
+    if job is None or job.result_json is None:
         raise NotFoundError("propositions non disponibles", job_id=str(job_id))
-    try:
-        data = storage.read_bytes(settings, job.result_ref)
-    except FileNotFoundError as exc:
-        raise NotFoundError("artifact introuvable", job_id=str(job_id)) from exc
-    return Response(content=data, media_type="application/json")
+    return Response(content=json.dumps(job.result_json), media_type="application/json")

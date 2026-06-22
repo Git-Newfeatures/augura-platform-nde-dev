@@ -631,7 +631,7 @@ export function SemanticLayerPage() {
           tabs={[
             { id: 'taxonomy',    label: 'Taxonomy',        icon: <BookOpen  size={13} /> },
             { id: 'causal',      label: 'Causal ontology', icon: <GitMerge  size={13} /> },
-            { id: 'enrichment',  label: 'Enrichissement',  icon: <Sparkles  size={13} /> },
+            { id: 'enrichment',  label: 'Enrichment',       icon: <Sparkles  size={13} /> },
             { id: 'versions',    label: 'Versions',        icon: <History   size={13} /> },
           ]}
           active={sub}

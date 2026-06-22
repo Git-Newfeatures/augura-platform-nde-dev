@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.ids import TenantId, UserId
@@ -101,6 +101,20 @@ class LiveRepo:
             stmt = stmt.where(SearchSession.status == status)
         res = await self.session.execute(stmt.order_by(SearchSession.created_at.desc()))
         return list(res.scalars().all())
+
+    async def delete_session(self, tenant_id: TenantId, session_id: UUID) -> None:
+        """Supprime une session (scopée tenant). Idempotent : aucun effet si absente."""
+        await self.session.execute(
+            delete(SearchSession).where(
+                SearchSession.id == session_id, SearchSession.org_id == tenant_id
+            )
+        )
+        await self.session.flush()
+
+    async def delete_all_sessions(self, tenant_id: TenantId) -> None:
+        """Vide l'historique de recherche du tenant."""
+        await self.session.execute(delete(SearchSession).where(SearchSession.org_id == tenant_id))
+        await self.session.flush()
 
     # ── Events ───────────────────────────────────────────────────────────────
     async def append_event(

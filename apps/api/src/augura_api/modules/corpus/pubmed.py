@@ -62,6 +62,7 @@ class PubMedArticle:
     published_at: date | None = None
     journal: str | None = None
     doi: str | None = None
+    authors: tuple[str, ...] = ()
 
 
 def _evidence_type(article_types: list[str]) -> str:
@@ -101,6 +102,22 @@ def _text(el: ET.Element | None) -> str:
     return "".join(el.itertext()).strip() if el is not None else ""
 
 
+def _parse_authors(article_el: ET.Element) -> tuple[str, ...]:
+    """Auteurs sous forme « Nom Initiales » (ex. « Smith JA ») dans l'ordre PubMed.
+    Tolère les auteurs collectifs (CollectiveName) et les champs manquants."""
+    out: list[str] = []
+    for author in article_el.findall(".//Article/AuthorList/Author"):
+        last = _text(author.find("LastName"))
+        if last:
+            initials = _text(author.find("Initials"))
+            out.append(f"{last} {initials}".strip() if initials else last)
+            continue
+        collective = _text(author.find("CollectiveName"))
+        if collective:
+            out.append(collective)
+    return tuple(out)
+
+
 def _parse_article(article_el: ET.Element) -> PubMedArticle | None:
     pmid = _text(article_el.find(".//MedlineCitation/PMID"))
     title = _text(article_el.find(".//Article/ArticleTitle"))
@@ -128,6 +145,7 @@ def _parse_article(article_el: ET.Element) -> PubMedArticle | None:
         published_at=_parse_pubdate(article_el),
         journal=journal,
         doi=doi,
+        authors=_parse_authors(article_el),
     )
 
 

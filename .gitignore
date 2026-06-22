@@ -15,4 +15,7 @@ node_modules/
 !.env.example
 .DS_Store
 
+# Artefacts générés localement (stockage dossiers/exports — core.storage)
+apps/api/var/
+
 reference

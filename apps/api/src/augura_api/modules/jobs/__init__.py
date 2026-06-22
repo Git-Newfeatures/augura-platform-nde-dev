@@ -9,6 +9,7 @@ from augura_api.modules.jobs.service import (
     mark_running,
     mark_succeeded,
     set_progress,
+    set_result_json,
 )
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "mark_running",
     "set_progress",
     "mark_succeeded",
+    "set_result_json",
     "mark_failed",
 ]

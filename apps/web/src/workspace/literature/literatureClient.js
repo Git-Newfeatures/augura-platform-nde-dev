@@ -80,6 +80,12 @@ export const createSession = (query, studyId = null) =>
 
 export const listSessions = () => apiJson('/corpus/literature/sessions')
 
+// Suppression d'historique (Recent queries). Best-effort : renvoie un booléen ok.
+export const deleteSession = (id) =>
+  apiFetch(`/corpus/literature/sessions/${id}`, { method: 'DELETE' }).then((r) => r.ok).catch(() => false)
+export const clearSessions = () =>
+  apiFetch('/corpus/literature/sessions', { method: 'DELETE' }).then((r) => r.ok).catch(() => false)
+
 // Best-effort : ne jette jamais (l'audit ne doit pas casser le flux).
 export const logEvent = (sessionId, eventType, payload = {}) =>
   apiFetch(`/corpus/literature/sessions/${sessionId}/events`, {

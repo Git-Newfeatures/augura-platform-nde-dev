@@ -49,6 +49,9 @@ export function ResultCard({ result, position, status, onKeep, onDismiss, readOn
               </a>
             </h4>
           </div>
+          {!isCtgov && result.authors?.length > 0 && (
+            <div className="mt-1 truncate text-[11.5px] text-foreground/70">{formatAuthors(result.authors)}</div>
+          )}
           <div className="mt-1 text-[11.5px] text-muted-foreground">
             {isCtgov ? (
               <>
@@ -124,4 +127,10 @@ export function ResultCard({ result, position, status, onKeep, onDismiss, readOn
 
 function titleCase(s) {
   return String(s).toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// Liste d'auteurs : 3 premiers + « et al. » au-delà (forme citation type PubMed).
+function formatAuthors(authors) {
+  const list = authors.slice(0, 3).join(', ')
+  return authors.length > 3 ? `${list}, et al.` : list
 }

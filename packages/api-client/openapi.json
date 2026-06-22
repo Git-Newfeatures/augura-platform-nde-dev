@@ -6527,6 +6527,19 @@
       }
     },
     "/corpus/literature/sessions": {
+      "delete": {
+        "description": "Vide l'historique « Recent queries » du tenant (nettoyage en un clic).",
+        "operationId": "clear_sessions_corpus_literature_sessions_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear Sessions",
+        "tags": [
+          "corpus"
+        ]
+      },
       "get": {
         "operationId": "list_sessions_corpus_literature_sessions_get",
         "parameters": [
@@ -6619,6 +6632,41 @@
       }
     },
     "/corpus/literature/sessions/{session_id}": {
+      "delete": {
+        "description": "Supprime une entrée de l'historique « Recent queries » (suppression unitaire).",
+        "operationId": "delete_session_corpus_literature_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Session",
+        "tags": [
+          "corpus"
+        ]
+      },
       "get": {
         "operationId": "get_session_corpus_literature_sessions__session_id__get",
         "parameters": [
@@ -8132,7 +8180,7 @@
     },
     "/semantic/enrich/proposals/{job_id}": {
       "get": {
-        "description": "Sert l'artifact JSON des propositions d'un job réussi (scopé tenant).",
+        "description": "Sert les propositions d'un job réussi (scopé tenant). Lues EN BASE\n(jobs.result_json), pas sur disque — relisibles depuis n'importe quel conteneur Modal.",
         "operationId": "enrich_proposals_semantic_enrich_proposals__job_id__get",
         "parameters": [
           {

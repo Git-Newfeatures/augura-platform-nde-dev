@@ -37,3 +37,27 @@ def api() -> FastAPI:
     from augura_api.main import create_app
 
     return create_app()
+
+
+# Worker de jobs (traitements longs : enrichissement sémantique, bootstrap, dossiers).
+# Spawné par `jobs.runner.enqueue_job` (`run_job.spawn(...)`) DEPUIS le conteneur ASGI :
+# tourne dans un conteneur dédié, écrit son résultat EN BASE (jamais sur disque éphémère)
+# et progresse par transactions courtes — le polling `/jobs/{id}` le voit avancer.
+# timeout généreux : un run d'enrichissement enchaîne plusieurs appels LLM.
+@app.function(image=image, secrets=[_secret], timeout=900)
+def run_job(tenant_id: str, user_id: str, job_id: str) -> None:
+    import asyncio
+    from uuid import UUID
+
+    from augura_api.core.config import get_settings
+    from augura_api.core.ids import TenantId, UserId
+    from augura_api.jobs.runner import execute_job
+
+    asyncio.run(
+        execute_job(
+            get_settings(),
+            TenantId(UUID(tenant_id)),
+            UserId(UUID(user_id)),
+            UUID(job_id),
+        )
+    )

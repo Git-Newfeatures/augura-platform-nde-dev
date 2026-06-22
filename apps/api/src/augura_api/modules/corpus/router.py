@@ -8,7 +8,7 @@ from uuid import UUID
 import httpx
 import structlog
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
 from augura_api.core.errors import BadRequestError
@@ -300,6 +300,22 @@ async def get_session(
     session_id: UUID, tenant: CurrentTenantDep, session: SessionDep
 ) -> schemas.SearchSession:
     return await _live_service(session).get_session(tenant, session_id)
+
+
+@router.delete("/literature/sessions", status_code=204)
+async def clear_sessions(tenant: CurrentTenantDep, session: SessionDep) -> Response:
+    """Vide l'historique « Recent queries » du tenant (nettoyage en un clic)."""
+    await _live_service(session).clear_sessions(tenant)
+    return Response(status_code=204)
+
+
+@router.delete("/literature/sessions/{session_id}", status_code=204)
+async def delete_session(
+    session_id: UUID, tenant: CurrentTenantDep, session: SessionDep
+) -> Response:
+    """Supprime une entrée de l'historique « Recent queries » (suppression unitaire)."""
+    await _live_service(session).delete_session(tenant, session_id)
+    return Response(status_code=204)
 
 
 @router.post("/literature/sessions/{session_id}/events", response_model=schemas.LiteratureEvent)

@@ -51,6 +51,7 @@ class JobRepo:
         status: str | None = None,
         progress: float | None = None,
         result_ref: str | None = None,
+        result_json: dict[str, Any] | None = None,
         error: str | None = None,
     ) -> None:
         """Met à jour les champs de suivi d'un job (écrit par le runner). Scopé tenant
@@ -62,6 +63,8 @@ class JobRepo:
             values["progress"] = progress
         if result_ref is not None:
             values["result_ref"] = result_ref
+        if result_json is not None:
+            values["result_json"] = result_json
         if error is not None:
             values["error"] = error
         await self.session.execute(

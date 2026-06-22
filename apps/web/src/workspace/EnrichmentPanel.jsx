@@ -212,13 +212,16 @@ export function EnrichmentPanel() {
 
       const { job_id } = await enrichPropose(body)
 
-      // Polling jusqu'à succeeded / failed
+      // Polling jusqu'à succeeded / failed. job.progress est une fraction 0..1 côté
+      // backend → on la convertit en pourcentage pour la barre (0..100).
+      let attempts = 0
       for (;;) {
         await new Promise((r) => setTimeout(r, 1500))
         const job = await pollJob(job_id)
-        setProgress(job.progress ?? 0)
+        setProgress(Math.round((job.progress ?? 0) * 100))
         if (job.status === 'succeeded') break
-        if (job.status === 'failed') throw new Error(job.error || 'Job échoué')
+        if (job.status === 'failed') throw new Error(job.error || 'Analysis failed')
+        if (++attempts > 240) throw new Error('Analysis timed out — please try again')
       }
 
       const fetched = await fetchEnrichProposals(job_id)
@@ -291,13 +294,13 @@ export function EnrichmentPanel() {
         <div className="flex flex-col gap-3">
           <div>
             <label className="mb-1.5 block text-[12px] font-medium text-foreground">
-              Question clinique (PICOT)
+              Clinical question (PICOT)
             </label>
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               disabled={phase === 'running' || phase === 'applying'}
-              placeholder="Ex : Chez les patients diabétiques de type 2, l'empagliflozine réduit-elle la mortalité cardiovasculaire par rapport au placebo ?"
+              placeholder="e.g. In adults with type 2 diabetes, does empagliflozin reduce cardiovascular mortality compared with placebo?"
               rows={3}
               className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
             />
@@ -308,7 +311,7 @@ export function EnrichmentPanel() {
             className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Sparkles size={13} />
-            Lancer l'analyse
+            Run analysis
           </button>
         </div>
       )}
@@ -317,7 +320,7 @@ export function EnrichmentPanel() {
       {phase === 'running' && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-[11.5px]">
-            <span className="text-muted-foreground">Analyse en cours…</span>
+            <span className="text-muted-foreground">Analysis in progress…</span>
             <span className="font-mono text-muted-foreground">{progress}%</span>
           </div>
           <ProgressBar value={progress} />
@@ -330,14 +333,14 @@ export function EnrichmentPanel() {
           {/* En-tête revue */}
           <div className="flex items-center justify-between">
             <p className="text-[11.5px] text-muted-foreground">
-              Toutes les propositions sont pré-sélectionnées. Décochez celles à ignorer.
+              All proposals are pre-selected. Uncheck any you want to skip.
             </p>
             {totalItems > 0 && (
               <button
                 onClick={toggleAll}
                 className="text-[11px] text-primary hover:underline whitespace-nowrap"
               >
-                {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
+                {allSelected ? 'Deselect all' : 'Select all'}
               </button>
             )}
           </div>
@@ -345,15 +348,15 @@ export function EnrichmentPanel() {
           {/* Résumé de couverture */}
           {artifact?.coverage_summary && (
             <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5 text-[11.5px] text-muted-foreground">
-              {artifact.summary || `Couverture : ${JSON.stringify(artifact.coverage_summary)}`}
+              {artifact.summary || `Coverage: ${JSON.stringify(artifact.coverage_summary)}`}
             </div>
           )}
 
           {/* Aucune proposition */}
           {totalItems === 0 && (
             <div className="rounded-md border border-border bg-muted/40 px-3 py-4 text-center text-[11.5px] text-muted-foreground">
-              Aucune nouvelle proposition — la couche sémantique couvre peut-être déjà cette question,
-              ou le pré-check a rejeté des entrées conflictuelles.
+              No new proposals — the semantic layer may already cover this question,
+              or the pre-check rejected conflicting entries.
             </div>
           )}
 
@@ -365,7 +368,7 @@ export function EnrichmentPanel() {
                   Concepts
                 </span>
                 <span className="font-mono text-[9px] text-muted-foreground/60">
-                  {selectedConceptCount}/{concepts.length} sélectionné{selectedConceptCount !== 1 ? 's' : ''}
+                  {selectedConceptCount}/{concepts.length} selected
                 </span>
               </div>
               <Card className="gap-0 p-0 overflow-hidden">
@@ -389,10 +392,10 @@ export function EnrichmentPanel() {
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Relations causales
+                  Causal relations
                 </span>
                 <span className="font-mono text-[9px] text-muted-foreground/60">
-                  {selectedRelationCount}/{relations.length} sélectionné{selectedRelationCount !== 1 ? 's' : ''}
+                  {selectedRelationCount}/{relations.length} selected
                 </span>
               </div>
               <Card className="gap-0 p-0 overflow-hidden">
@@ -418,7 +421,7 @@ export function EnrichmentPanel() {
               onClick={applySelected}
               className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Appliquer {totalSelected} proposition{totalSelected !== 1 ? 's' : ''} →
+              Apply {totalSelected} proposal{totalSelected !== 1 ? 's' : ''} →
             </button>
           )}
         </div>
@@ -428,7 +431,7 @@ export function EnrichmentPanel() {
       {phase === 'applying' && (
         <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground">
           <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          Écriture dans la couche sémantique…
+          Writing to the semantic layer…
         </div>
       )}
 
@@ -437,7 +440,7 @@ export function EnrichmentPanel() {
         <div className="flex flex-col gap-4">
           <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3.5">
             <div className="text-[12px] font-semibold text-green-800">
-              Couche sémantique mise à jour
+              Semantic layer updated
               {result?.new_version ? ` → v${result.new_version}` : ''}
             </div>
             {(result?.concepts_added != null || result?.relations_added != null) && (
@@ -448,7 +451,7 @@ export function EnrichmentPanel() {
               </div>
             )}
             <div className="mt-1.5 text-[10.5px] text-green-600">
-              Index taxonomique rechargé — les nouvelles entrées sont disponibles immédiatement.
+              Taxonomic index reloaded — the new entries are available immediately.
             </div>
           </div>
           <button
@@ -462,7 +465,7 @@ export function EnrichmentPanel() {
             }}
             className="rounded-md border border-border px-4 py-2 text-[12.5px] font-medium text-foreground transition-colors hover:bg-muted/50"
           >
-            Nouvelle analyse →
+            New analysis →
           </button>
         </div>
       )}
@@ -471,13 +474,13 @@ export function EnrichmentPanel() {
       {phase === 'error' && (
         <div className="flex flex-col gap-3">
           <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[11.5px] text-destructive">
-            {error || 'Une erreur inattendue est survenue.'}
+            {error || 'An unexpected error occurred.'}
           </div>
           <button
             onClick={() => { setPhase('idle'); setError('') }}
             className="rounded-md border border-border px-4 py-2 text-[12.5px] font-medium text-foreground transition-colors hover:bg-muted/50"
           >
-            Réessayer
+            Retry
           </button>
         </div>
       )}

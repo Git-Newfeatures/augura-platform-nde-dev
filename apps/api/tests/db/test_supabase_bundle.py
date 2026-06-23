@@ -242,3 +242,81 @@ def test_seed_includes_ontology() -> None:
     seed = _read("seed.sql").lower()
     for t in ("ontology_relations", "causal_predicates", "taxonomy_standard_codes"):
         assert f"insert into {t} " in seed
+
+
+# ── Seed hygiene: seed.sql must stay demo-free (tenant/demo data lives only in
+# tests/integration/fixtures.sql). Reference/ontology catalogs are allowed. ──
+TENANT_DATA_TABLES = {
+    "orgs",
+    "memberships",
+    "studies",
+    "study_members",
+    "study_state",
+    "datasets",
+    "dataset_columns",
+    "dataset_files",
+    "cohort_members",
+    "cohort_biomarkers",
+    "documents",
+    "chunks",
+    "agent_runs",
+    "simulation_runs",
+    "simulation_results",
+    "jobs",
+    "generated_documents",
+    "usage_events",
+    "artifacts",
+    "dq_bundles",
+    "literature_snapshots",
+    "search_sessions",
+    "literature_events",
+    "literature_queries",
+}
+
+
+def test_seed_has_no_tenant_data_inserts() -> None:
+    seed = _read("seed.sql").lower()
+    inserted = set(re.findall(r"insert into (\w+)", seed))
+    leaked = inserted & TENANT_DATA_TABLES
+    assert not leaked, f"seed.sql must stay demo-free; tenant-data inserts found: {sorted(leaked)}"
+
+
+# ── schema.sql ↔ alembic guard: a table added to schema.sql after baseline but
+# with no migration exists on fresh DBs/CI yet is MISSING on already-migrated prod. ──
+ALEMBIC_VERSIONS = Path(__file__).parents[2] / "alembic" / "versions"
+
+# Tables introduced AFTER the 0001 baseline (each must ship in a >=0002 migration).
+POST_BASELINE_TABLES = {
+    "literature_snapshots",
+    "search_sessions",
+    "literature_events",
+    "literature_queries",
+    "semantic_releases",
+    "dataset_files",
+} | REFERENCE_CATALOGS
+
+# Everything the baseline bundle (0001 applies schema.sql wholesale) already created.
+BASELINE_TABLES = EXPECTED_TABLES - POST_BASELINE_TABLES
+
+
+def _tables_created_in_migrations() -> set[str]:
+    tables: set[str] = set()
+    for path in sorted(ALEMBIC_VERSIONS.glob("0*.py")):
+        if path.name.startswith("0001"):
+            continue
+        src = path.read_text(encoding="utf-8").lower()
+        tables |= set(re.findall(r"create table(?: if not exists)? (\w+)", src))
+        tables |= set(re.findall(r"create_table\(\s*[\"'](\w+)", src))
+    return tables
+
+
+def test_post_baseline_tables_each_have_a_migration() -> None:
+    """Any table in schema.sql that isn't part of the 0001 baseline MUST also be
+    created by a >=0002 migration, or it will be missing on already-migrated prod DBs."""
+    schema_tables = set(re.findall(r"create table if not exists (\w+)", _read("schema.sql")))
+    in_migrations = _tables_created_in_migrations()
+    unguarded = {t for t in schema_tables if t not in BASELINE_TABLES and t not in in_migrations}
+    assert not unguarded, (
+        "tables in schema.sql with no >=0002 migration (would be missing on prod): "
+        f"{sorted(unguarded)}. Add a migration, or add to BASELINE_TABLES if it predates 0002."
+    )

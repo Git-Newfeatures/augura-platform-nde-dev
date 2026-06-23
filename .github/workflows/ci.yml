@@ -2,8 +2,12 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, Quentin]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   api:
@@ -16,6 +20,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+          enable-cache: true
       - run: uv sync --dev
       - run: uv run ruff format --check .
       - run: uv run ruff check .
@@ -56,6 +61,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+          enable-cache: true
       - run: uv sync --dev
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -110,9 +116,12 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+          enable-cache: true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/api-client/package-lock.json
       - run: uv sync --dev
         working-directory: apps/api
       - run: npm install --no-audit --no-fund
@@ -130,3 +139,44 @@ jobs:
       - name: Typecheck the client
         run: npx tsc --noEmit
         working-directory: packages/api-client
+
+  web:
+    # The frontend deployed to Vercel must at least lint + build in CI.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  commit-trailers:
+    # Server-side enforcement of the no-AI-attribution-trailer rule (the local
+    # .githooks/commit-msg hook is opt-in per clone).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject AI-attribution trailers in new commits
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet || true
+          if git rev-parse --verify --quiet origin/main >/dev/null; then
+            range="origin/main..HEAD"
+          else
+            range="HEAD~1..HEAD"
+          fi
+          msgs="$(git log --format='%B' "$range" || true)"
+          if printf '%s' "$msgs" | grep -Eni 'co-authored-by:[[:space:]]*claude|co-authored-by:.*anthropic|noreply@anthropic\.com|generated with .*claude code|🤖 generated'; then
+            echo "::error::AI-attribution trailer found in a commit message (see CLAUDE.md)"
+            exit 1
+          fi
+          echo "no AI-attribution trailers found in $range"

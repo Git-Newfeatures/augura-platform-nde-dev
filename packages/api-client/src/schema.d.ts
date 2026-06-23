@@ -587,6 +587,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets/{dataset_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Files */
+        get: operations["list_files_datasets__dataset_id__files_get"];
+        put?: never;
+        /** Add Files */
+        post: operations["add_files_datasets__dataset_id__files_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/{dataset_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove File */
+        delete: operations["remove_file_datasets__dataset_id__files__file_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/datasets/{dataset_id}/map": {
         parameters: {
             query?: never;
@@ -1289,10 +1324,15 @@ export interface components {
             /** Value Min */
             value_min?: number | null;
         };
+        /** Body_add_files_datasets__dataset_id__files_post */
+        Body_add_files_datasets__dataset_id__files_post: {
+            /** Files */
+            files: string[];
+        };
         /** Body_upload_dataset_datasets_upload_post */
         Body_upload_dataset_datasets_upload_post: {
-            /** File */
-            file: string;
+            /** Files */
+            files: string[];
             /** Name */
             name?: string | null;
             /** Study Id */
@@ -1771,6 +1811,33 @@ export interface components {
             /** Study Id */
             study_id?: string | null;
         };
+        /** DatasetFileOut */
+        DatasetFileOut: {
+            /**
+             * Column Count
+             * @default 0
+             */
+            column_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            /** Row Count */
+            row_count?: number | null;
+        };
         /** DatasetOut */
         DatasetOut: {
             /**
@@ -1783,6 +1850,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * File Count
+             * @default 0
+             */
+            file_count: number;
             /**
              * Id
              * Format: uuid
@@ -3145,6 +3217,16 @@ export interface components {
             /** Columns */
             columns: components["schemas"]["ColumnOut"][];
             dataset: components["schemas"]["DatasetOut"];
+            /**
+             * Files
+             * @default []
+             */
+            files: components["schemas"]["DatasetFileOut"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -4489,6 +4571,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DqRunResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_datasets__dataset_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetFileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_files_datasets__dataset_id__files_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_files_datasets__dataset_id__files_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_file_datasets__dataset_id__files__file_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResult"];
                 };
             };
             /** @description Validation Error */

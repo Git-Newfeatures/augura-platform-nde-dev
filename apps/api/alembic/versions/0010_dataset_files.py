@@ -35,9 +35,7 @@ def upgrade() -> None:
         );
         """
     )
-    op.execute(
-        "create index if not exists ix_dataset_files_dataset on dataset_files(dataset_id);"
-    )
+    op.execute("create index if not exists ix_dataset_files_dataset on dataset_files(dataset_id);")
     op.execute("alter table dataset_files enable row level security;")
     op.execute("alter table dataset_files force row level security;")
     op.execute("drop policy if exists tenant_via_dataset on dataset_files;")

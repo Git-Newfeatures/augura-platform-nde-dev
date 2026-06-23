@@ -22,9 +22,7 @@ class DatasetService:
         return dataset
 
     @staticmethod
-    def _to_out(
-        dataset: Dataset, column_count: int, file_count: int = 0
-    ) -> schemas.DatasetOut:
+    def _to_out(dataset: Dataset, column_count: int, file_count: int = 0) -> schemas.DatasetOut:
         return schemas.DatasetOut.model_validate(dataset).model_copy(
             update={"column_count": column_count, "file_count": file_count}
         )

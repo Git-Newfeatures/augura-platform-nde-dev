@@ -123,6 +123,21 @@ create table if not exists dataset_columns (
 );
 create index if not exists ix_dataset_columns_dataset on dataset_columns(dataset_id);
 
+-- A dataset holds one or more uploaded files (same columns, appended). Profiling,
+-- mapping and DQ run once over the union; datasets.row_count is the sum and
+-- datasets.storage_path the first file (legacy/DQ guard).
+create table if not exists dataset_files (
+    id           uuid primary key default gen_random_uuid(),
+    dataset_id   uuid not null references datasets(id) on delete cascade,
+    filename     text not null,
+    storage_path text not null,
+    row_count    integer,
+    headers      jsonb,
+    position     integer not null default 0,
+    created_at   timestamptz not null default now()
+);
+create index if not exists ix_dataset_files_dataset on dataset_files(dataset_id);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Module: dq (A3a) — data-quality bundles (tenant-scoped)
 -- ─────────────────────────────────────────────────────────────────────────

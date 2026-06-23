@@ -147,6 +147,20 @@ create policy tenant_via_dataset on dataset_columns
           and d.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     ));
 
+alter table dataset_files enable row level security;
+alter table dataset_files force row level security;
+create policy tenant_via_dataset on dataset_files
+    using (exists (
+        select 1 from datasets d
+        where d.id = dataset_files.dataset_id
+          and d.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+    ))
+    with check (exists (
+        select 1 from datasets d
+        where d.id = dataset_files.dataset_id
+          and d.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
+    ));
+
 -- ── Corpus: org_id NULL ⇒ global, readable by all ────────────────────────
 alter table documents enable row level security;
 alter table documents force row level security;

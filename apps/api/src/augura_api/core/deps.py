@@ -1,8 +1,8 @@
-"""Dépendances FastAPI : du header Authorization au tenant et à la session scopée.
+"""FastAPI dependencies: from the Authorization header to the tenant and scoped session.
 
-Chaîne : Bearer → `authenticate` (JWT) → `Principal` → résolution `memberships`
-(session user-scopée, RLS de bootstrap) → `CurrentTenant` → session de requête
-(user_id + tenant_id posés, RLS complète active).
+Chain: Bearer → `authenticate` (JWT) → `Principal` → `memberships` resolution
+(user-scoped session, bootstrap RLS) → `CurrentTenant` → request session
+(user_id + tenant_id set, full RLS active).
 """
 
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -27,9 +27,9 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 def membership_lookup_stmt(requested_org: TenantId | None) -> TextClause:
-    """Requête `memberships` scopée à l'utilisateur courant (RLS), filtrée optionnellement
-    sur un org demandé. Le `cast(:org as uuid)` est obligatoire : `:org::uuid` est mal
-    analysé par `text()` (le `::` masque le paramètre lié → `ArgumentError`)."""
+    """`memberships` query scoped to the current user (RLS), optionally filtered
+    on a requested org. The `cast(:org as uuid)` is mandatory: `:org::uuid` is poorly
+    parsed by `text()` (the `::` hides the bound parameter → `ArgumentError`)."""
     return text(
         "select org_id, role from memberships "
         "where (cast(:org as uuid) is null or org_id = cast(:org as uuid)) "
@@ -41,7 +41,7 @@ def _bearer_token(request: Request) -> str:
     header = request.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
-        raise UnauthorizedError("token Bearer manquant")
+        raise UnauthorizedError("missing Bearer token")
     return token.strip()
 
 
@@ -71,13 +71,13 @@ CurrentTenantDep = Annotated[CurrentTenant, Depends(get_current_tenant)]
 
 
 def require_role(*allowed: str) -> Callable[[CurrentTenant], Awaitable[CurrentTenant]]:
-    """Dépendance d'autorisation : exige que le rôle du tenant courant soit dans
-    `allowed`, sinon 403. Utilisée pour gater les routes sensibles (ex. analytics)."""
+    """Authorization dependency: requires the current tenant's role to be in
+    `allowed`, otherwise 403. Used to gate sensitive routes (e.g. analytics)."""
 
     async def _require(tenant: CurrentTenantDep) -> CurrentTenant:
         if tenant.role not in allowed:
             raise ForbiddenError(
-                "rôle insuffisant pour cette ressource",
+                "insufficient role for this resource",
                 required=list(allowed),
                 role=tenant.role,
             )

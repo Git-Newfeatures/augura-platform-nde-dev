@@ -1,14 +1,14 @@
-"""Service retrieve-and-freeze : gel d'un jeu de preuves + relecture vérifiée.
+"""Retrieve-and-freeze service: freezing an evidence set + verified re-read.
 
-Verbe distinct de l'ingestion (`LiteratureService.search_and_ingest`, intouchée).
-  - freeze        : construit la charge canonique, calcule le content_hash, insère.
-  - read_snapshot : relit, RECALCULE le hash et compare (erreur dure si divergence) —
-                    lecture base PURE, zéro appel live (PubMed/CT.gov).
-  - sessions/events : journal de l'interaction de recherche.
+Verb distinct from ingestion (`LiteratureService.search_and_ingest`, untouched).
+  - freeze        : builds the canonical payload, computes the content_hash, inserts.
+  - read_snapshot : re-reads, RECOMPUTES the hash and compares (hard error on divergence) —
+                    PURE DB read, zero live calls (PubMed/CT.gov).
+  - sessions/events : log of the search interaction.
 
-`to_retrieve_response` mappe le résultat du fan-out (LiteratureRetriever) vers le
-schéma de réponse ; la récupération live elle-même vit côté routeur (clients HTTP
-request-scoped), pas dans ce service base.
+`to_retrieve_response` maps the fan-out result (LiteratureRetriever) to the
+response schema; the live retrieval itself lives on the router side (request-scoped
+HTTP clients), not in this DB service.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def to_retrieve_response(result: RetrievalResult) -> schemas.LiteratureRetrieveR
 def _build_payload(
     req: schemas.SnapshotWriteRequest, *, created_by: UUID, created_at: datetime
 ) -> dict[str, Any]:
-    """Artefact canonique haché — toutes les valeurs sont JSON-stables (dates en ISO)."""
+    """Hashed canonical artifact — all values are JSON-stable (dates in ISO)."""
     return {
         "query": req.query,
         "sources": list(req.sources),
@@ -109,9 +109,9 @@ class LiteratureSnapshotService:
     ) -> schemas.LiteratureSnapshot:
         row = await self.repo.get_snapshot(tenant.tenant_id, snapshot_id)
         if row is None:
-            raise NotFoundError("snapshot introuvable", id=str(snapshot_id))
-        # Vérification d'intégrité : recalcul du hash sur le payload stocké. Aucune
-        # source externe sollicitée — relecture base pure (rejeu sans appel live).
+            raise NotFoundError("snapshot not found", id=str(snapshot_id))
+        # Integrity check: recompute the hash over the stored payload. No
+        # external source queried — pure DB re-read (replay without a live call).
         verify_content_hash({**row.payload, "content_hash": row.content_hash})
         return self._to_snapshot(row)
 
@@ -159,7 +159,7 @@ class LiteratureSnapshotService:
     async def get_session(self, tenant: CurrentTenant, session_id: UUID) -> schemas.SearchSession:
         row = await self.repo.get_session(tenant.tenant_id, session_id)
         if row is None:
-            raise NotFoundError("session introuvable", id=str(session_id))
+            raise NotFoundError("session not found", id=str(session_id))
         return self._to_session(row)
 
     async def list_sessions(
@@ -169,7 +169,7 @@ class LiteratureSnapshotService:
         return [self._to_session(r) for r in rows]
 
     async def delete_session(self, tenant: CurrentTenant, session_id: UUID) -> None:
-        """Suppression unitaire idempotente (un re-clic ne lève pas d'erreur)."""
+        """Idempotent single deletion (a re-click does not raise an error)."""
         await self.repo.delete_session(tenant.tenant_id, session_id)
 
     async def clear_sessions(self, tenant: CurrentTenant) -> None:
@@ -190,9 +190,9 @@ class LiteratureSnapshotService:
     async def append_event(
         self, tenant: CurrentTenant, session_id: UUID, req: schemas.EventAppendRequest
     ) -> schemas.LiteratureEvent:
-        # La session doit exister pour ce tenant avant d'y rattacher un événement.
+        # The session must exist for this tenant before attaching an event to it.
         if await self.repo.get_session(tenant.tenant_id, session_id) is None:
-            raise NotFoundError("session introuvable", id=str(session_id))
+            raise NotFoundError("session not found", id=str(session_id))
         row = await self.repo.append_event(
             tenant.tenant_id,
             session_id=session_id,

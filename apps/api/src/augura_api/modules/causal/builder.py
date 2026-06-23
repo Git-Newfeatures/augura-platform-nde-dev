@@ -1,7 +1,7 @@
-"""Assemblage déterministe du graphe à partir de la décision LLM.
+"""Deterministic graph assembly from the LLM decision.
 
-Port de la seconde moitié de `dag-generator.js` (makeNode/makeEdge, montée de rôle,
-déduplication, anti-cycle, layout, qualité). Pur, sans I/O — testable directement.
+Port of the second half of `dag-generator.js` (makeNode/makeEdge, role upgrade,
+deduplication, anti-cycle, layout, quality). Pure, no I/O — directly testable.
 """
 
 from dataclasses import dataclass
@@ -19,7 +19,7 @@ from augura_api.modules.causal.schemas import (
 )
 from augura_api.modules.causal.subgraph import ConceptMeta, Relation
 
-_MIN_NODE_CONFIDENCE = 0.40  # cf. dag-generator.js : concepts mappés faibles ignorés
+_MIN_NODE_CONFIDENCE = 0.40  # cf. dag-generator.js: low-confidence mapped concepts ignored
 
 _ROLES = {"exposure", "outcome", "confounder", "mediator", "effect_modifier", "collider", "other"}
 _ROLE_X = {
@@ -196,7 +196,7 @@ def assess_quality(
     )
 
 
-# ── Assemblage (port de generateDAG, étapes 4→6) ─────────────────────────────
+# ── Assembly (port of generateDAG, steps 4→6) ───────────────────────────────
 
 
 @dataclass(frozen=True)

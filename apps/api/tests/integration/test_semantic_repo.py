@@ -1,6 +1,6 @@
-"""Intégration du module semantic — taxonomie globale + RLS lecture seule.
+"""Integration for the semantic module — global taxonomy + read-only RLS.
 
-Sauté si AUGURA_DATABASE_URL absent. CI : après seed, sous le rôle augura_app.
+Skipped if AUGURA_DATABASE_URL is not set. CI: after seed, under the augura_app role.
 """
 
 import os
@@ -25,7 +25,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def sm() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
@@ -80,11 +80,11 @@ async def test_ontology_relations_readable_and_seeded(
         repo = SemanticRepo(session)
         relations = await repo.list_relations()
         predicates = await repo.list_causal_predicates()
-    assert len(relations) > 50  # ~75 seedées
+    assert len(relations) > 50  # ~75 seeded
     assert all(r.active for r in relations)
     assert [r.relation_id for r in relations] == sorted(r.relation_id for r in relations)
     assert len(predicates) >= 1
-    # Intégrité FK : sujet et objet pointent sur des concepts (ids non vides).
+    # FK integrity: subject and object point to concepts (non-empty ids).
     assert all(r.subject_concept_id and r.object_concept_id for r in relations)
 
 
@@ -97,5 +97,5 @@ async def test_relations_for_concepts_returns_subgraph(
         repo = SemanticRepo(session)
         anchor = (await repo.list_relations())[0].subject_concept_id
         subgraph = await repo.relations_for_concepts([anchor])
-    assert subgraph, "sous-graphe vide pour un concept présent dans l'ontologie"
+    assert subgraph, "empty subgraph for a concept present in the ontology"
     assert all(anchor in (r.subject_concept_id, r.object_concept_id) for r in subgraph)

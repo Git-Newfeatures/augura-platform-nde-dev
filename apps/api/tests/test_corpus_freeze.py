@@ -1,7 +1,7 @@
-"""Tier 2 — hash de contenu reproductible (gates 5 & 6).
+"""Tier 2 — reproducible content hash (gates 5 & 6).
 
-Pur, sans base : mêmes données → même hash (indépendant de l'ordre des clés) ;
-toute altération d'un octet stocké lève une erreur dure à la vérification.
+Pure, no database: same data → same hash (independent of key order);
+any tampering with a stored byte raises a hard error on verification.
 """
 
 from datetime import date
@@ -58,7 +58,7 @@ def test_content_hash_field_is_excluded_from_hash() -> None:
     art = _artifact()
     h = content_hash(art)
     art_with_hash = {**art, "content_hash": h}
-    # Ajouter le champ content_hash ne change pas le hash calculé.
+    # Adding the content_hash field does not change the computed hash.
     assert content_hash(art_with_hash) == h
 
 
@@ -82,7 +82,7 @@ def test_verify_missing_hash_raises() -> None:
 def test_verify_tamper_one_byte_raises() -> None:
     art = _artifact()
     art["content_hash"] = content_hash(art)
-    # Altère un octet de la charge après coup → divergence à la relecture.
+    # Tamper with one byte of the payload after the fact → mismatch on re-read.
     results = art["results"]
     assert isinstance(results, list)
     results[0]["title"] = "Paperr"
@@ -92,8 +92,8 @@ def test_verify_tamper_one_byte_raises() -> None:
 
 def test_to_retrieve_response_carries_rationale() -> None:
     item = RetrievedItem(
-        "pubmed", "1", "T", "term", date(2026, 6, 21), {"pmid": "1"}, rationale="le plus pertinent"
+        "pubmed", "1", "T", "term", date(2026, 6, 21), {"pmid": "1"}, rationale="the most relevant"
     )
     res = RetrievalResult("q", ["pubmed"], False, None, [SourceGroup("pubmed", "term", [item])])
     out = to_retrieve_response(res)
-    assert out.groups[0].items[0].rationale == "le plus pertinent"
+    assert out.groups[0].items[0].rationale == "the most relevant"

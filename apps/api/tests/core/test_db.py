@@ -19,6 +19,6 @@ def test_asyncpg_url_normalisation() -> None:
 
 
 def test_get_engine_fails_fast_without_url() -> None:
-    settings = Settings(env="dev")  # pyright: ignore[reportCallIssue] -- champs env
+    settings = Settings(env="dev")  # pyright: ignore[reportCallIssue] -- env fields
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         get_engine(settings)

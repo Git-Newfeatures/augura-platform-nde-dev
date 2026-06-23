@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module simulation."""
+"""SQLAlchemy models of the simulation module."""
 
 from datetime import datetime
 from typing import Any
@@ -13,7 +13,7 @@ from augura_api.core.db import Base
 
 
 class SimulationResult(Base):
-    """Read-model précalculé (mode VALIDATED du front)."""
+    """Precomputed read-model (frontend VALIDATED mode)."""
 
     __tablename__ = "simulation_results"
 
@@ -29,7 +29,7 @@ class SimulationResult(Base):
     ci_upper: Mapped[float | None] = mapped_column(Numeric)
     power: Mapped[float | None] = mapped_column(Numeric)
     p_value: Mapped[float | None] = mapped_column(Numeric)
-    # Métriques bootstrap (scatter Bias-vs-MSE) + paramètres de cohorte par scénario.
+    # Bootstrap metrics (Bias-vs-MSE scatter) + per-scenario cohort parameters.
     bias: Mapped[float | None] = mapped_column(Numeric)
     variance: Mapped[float | None] = mapped_column(Numeric)
     mse: Mapped[float | None] = mapped_column(Numeric)
@@ -39,7 +39,7 @@ class SimulationResult(Base):
 
 
 class SimulationRun(Base):
-    """Run de bootstrap à la demande (lié à un job)."""
+    """On-demand bootstrap run (linked to a job)."""
 
     __tablename__ = "simulation_runs"
 

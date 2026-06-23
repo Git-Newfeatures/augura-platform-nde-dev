@@ -1,18 +1,18 @@
-"""literature live-search : snapshots gelés, sessions, events, cache de requêtes
+"""literature live-search: frozen snapshots, sessions, events, query cache
 
-Nouvelles tables du verbe retrieve-and-freeze (distinct de l'ingestion existante) :
-  - literature_snapshots : artefact gelé (résultats + provenance + content_hash),
-    porte `study_id` (NULL ⇒ standalone) pour l'accès par-étude délégué à la RLS.
-  - search_sessions      : sessions de recherche (active/list/by-id).
-  - literature_events    : journal d'événements append-only par session.
-  - literature_queries   : cache (org, source, query_string) → résultat.
+New tables for the retrieve-and-freeze verb (distinct from the existing ingestion):
+  - literature_snapshots: frozen artifact (results + provenance + content_hash),
+    carries `study_id` (NULL ⇒ standalone) for per-study access delegated to RLS.
+  - search_sessions      : search sessions (active/list/by-id).
+  - literature_events    : append-only event log per session.
+  - literature_queries   : cache (org, source, query_string) → result.
 
-Refs externes (org_id, study_id, created_by) = UUID nus, comme `documents.org_id`
-(les orgs/users vivent côté Supabase auth ; pas de FK cross-schema). Seul
-events.session_id est une vraie FK intra-tables.
+External refs (org_id, study_id, created_by) = bare UUIDs, like `documents.org_id`
+(orgs/users live on the Supabase auth side; no cross-schema FK). Only
+events.session_id is a true intra-table FK.
 
-RLS de base ici : isolation par tenant (org_id = app.tenant_id). La visibilité
-par-étude (study_members) et le gating standalone arrivent en Tier 3.
+Baseline RLS here: per-tenant isolation (org_id = app.tenant_id). Per-study
+visibility (study_members) and standalone gating arrive in Tier 3.
 
 Revision ID: 0002_literature_live_search
 Revises: 0001_baseline
@@ -36,10 +36,10 @@ _TABLES = (
 
 
 def upgrade() -> None:
-    # Idempotent (IF NOT EXISTS / DROP-then-CREATE) : ces objets vivent AUSSI dans le
-    # bundle canonique supabase/schema.sql + policies.sql (source de vérité, exécutée
-    # par 0001_baseline). Cette migration doit donc pouvoir s'empiler sans erreur
-    # par-dessus une base déjà créée par le baseline — comme par-dessus une base nue.
+    # Idempotent (IF NOT EXISTS / DROP-then-CREATE): these objects ALSO live in the
+    # canonical bundle supabase/schema.sql + policies.sql (source of truth, executed
+    # by 0001_baseline). This migration must therefore be able to stack without error
+    # on top of a database already created by the baseline — as on top of a bare one.
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS literature_snapshots (
@@ -47,10 +47,10 @@ def upgrade() -> None:
             org_id        uuid NOT NULL,
             study_id      uuid,
             created_by    uuid NOT NULL,
-            -- payload = l'artefact canonique EXACT qui a été haché (autorité du hash) :
+            -- payload = the EXACT canonical artifact that was hashed (hash authority):
             -- {query, sources, model_version, prompt_version, study_id, created_by,
-            --  created_at, results:[…]}. Les colonnes ci-dessus le dénormalisent pour
-            -- la RLS / l'indexation / le tri ; le hash ne fait foi que sur payload.
+            --  created_at, results:[…]}. The columns above denormalize it for
+            -- RLS / indexing / sorting; the hash is authoritative only over payload.
             payload       jsonb NOT NULL,
             content_hash  text NOT NULL,
             created_at    timestamptz NOT NULL DEFAULT now()
@@ -102,8 +102,8 @@ def upgrade() -> None:
         """
     )
 
-    # RLS : isolation tenant. Le rôle applicatif n'est pas exempt de RLS ; il pose
-    # app.tenant_id par transaction (cf. core.db.set_tenant_stmt).
+    # RLS: tenant isolation. The application role is not exempt from RLS; it sets
+    # app.tenant_id per transaction (see core.db.set_tenant_stmt).
     for table in (
         "literature_snapshots",
         "search_sessions",
@@ -112,8 +112,8 @@ def upgrade() -> None:
     ):
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
 
-    # search_sessions / events / queries : policy `tenant_isolation` (nom aligné sur
-    # le bundle policies.sql et la base distante). DROP-then-CREATE ⇒ ré-empilable.
+    # search_sessions / events / queries: policy `tenant_isolation` (name aligned with
+    # the policies.sql bundle and the remote database). DROP-then-CREATE ⇒ re-stackable.
     for table in ("search_sessions", "literature_events", "literature_queries"):
         op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table};")
         op.execute(
@@ -124,8 +124,8 @@ def upgrade() -> None:
             """
         )
 
-    # literature_snapshots : policy de base (isolation tenant seule). 0003 la remplace
-    # par le gating par-étude. Nom historique conservé pour que 0003 sache la retirer.
+    # literature_snapshots: baseline policy (tenant isolation only). 0003 replaces it
+    # with per-study gating. Historical name kept so 0003 knows how to drop it.
     op.execute(
         "DROP POLICY IF EXISTS literature_snapshots_tenant_isolation ON literature_snapshots;"
     )

@@ -1,8 +1,8 @@
-"""Couche d'accès base : engine async, sessions, scoping tenant par transaction.
+"""Database access layer: async engine, sessions, per-transaction tenant scoping.
 
-Le scoping tenant est appliqué via `set_config('app.tenant_id', …, true)` (local
-à la transaction) ; les policies RLS (supabase/policies.sql) s'y adossent. L'API
-se connecte avec un rôle Postgres NON exempt de RLS (spec §7).
+Tenant scoping is applied via `set_config('app.tenant_id', …, true)` (transaction-local);
+the RLS policies (supabase/policies.sql) rely on it. The API connects with a Postgres
+role that is NOT exempt from RLS (spec §7).
 """
 
 from collections.abc import AsyncIterator
@@ -19,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase
 from augura_api.core.config import Settings
 from augura_api.core.ids import TenantId, UserId
 
-# Convention de nommage des contraintes/index → migrations Alembic déterministes.
+# Naming convention for constraints/indexes → deterministic Alembic migrations.
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -30,18 +30,18 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Base déclarative partagée. Les modèles vivent dans chaque module."""
+    """Shared declarative base. The models live in each module."""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-# Caches process-wide, indexés par URL (un engine/sessionmaker par base).
+# Process-wide caches, indexed by URL (one engine/sessionmaker per database).
 _engines: dict[str, AsyncEngine] = {}
 _sessionmakers: dict[str, async_sessionmaker[AsyncSession]] = {}
 
 
 def to_asyncpg_url(database_url: str) -> str:
-    """Force le driver asyncpg (Supabase fournit une URL `postgresql://`)."""
+    """Force the asyncpg driver (Supabase provides a `postgresql://` URL)."""
     if database_url.startswith("postgresql+asyncpg://"):
         return database_url
     if database_url.startswith("postgresql://"):
@@ -53,7 +53,7 @@ def to_asyncpg_url(database_url: str) -> str:
 
 def get_engine(settings: Settings) -> AsyncEngine:
     if settings.database_url is None:
-        raise RuntimeError("AUGURA_DATABASE_URL manquant — requis pour l'accès base.")
+        raise RuntimeError("AUGURA_DATABASE_URL missing — required for database access.")
     url = to_asyncpg_url(settings.database_url)
     engine = _engines.get(url)
     if engine is None:
@@ -73,17 +73,17 @@ def get_sessionmaker(settings: Settings) -> async_sessionmaker[AsyncSession]:
 
 
 def set_tenant_stmt(tenant_id: TenantId) -> TextClause:
-    """Statement qui pose le tenant courant, local à la transaction."""
+    """Statement that sets the current tenant, transaction-local."""
     return text("SELECT set_config('app.tenant_id', :tid, true)").bindparams(tid=str(tenant_id))
 
 
 def set_user_stmt(user_id: UserId) -> TextClause:
-    """Statement qui pose l'utilisateur courant (RLS de bootstrap sur memberships)."""
+    """Statement that sets the current user (bootstrap RLS on memberships)."""
     return text("SELECT set_config('app.user_id', :uid, true)").bindparams(uid=str(user_id))
 
 
 async def tenant_session(tenant_id: TenantId, settings: Settings) -> AsyncIterator[AsyncSession]:
-    """Ouvre une transaction scopée au tenant (RLS active via app.tenant_id)."""
+    """Opens a tenant-scoped transaction (RLS active via app.tenant_id)."""
     sessionmaker = get_sessionmaker(settings)
     async with sessionmaker() as session, session.begin():
         await session.execute(set_tenant_stmt(tenant_id))
@@ -93,7 +93,7 @@ async def tenant_session(tenant_id: TenantId, settings: Settings) -> AsyncIterat
 async def request_session(
     settings: Settings, tenant_id: TenantId, user_id: UserId
 ) -> AsyncIterator[AsyncSession]:
-    """Transaction de requête : pose user_id ET tenant_id (RLS complète)."""
+    """Request transaction: sets user_id AND tenant_id (full RLS)."""
     sessionmaker = get_sessionmaker(settings)
     async with sessionmaker() as session, session.begin():
         await session.execute(set_user_stmt(user_id))

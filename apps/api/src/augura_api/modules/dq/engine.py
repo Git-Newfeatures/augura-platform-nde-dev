@@ -1,4 +1,4 @@
-"""Moteur DQ : profile → checks (file/column) → bundle scoré (A3a, sync, sans concept)."""
+"""DQ engine: profile → checks (file/column) → scored bundle (A3a, sync, concept-free)."""
 
 from __future__ import annotations
 

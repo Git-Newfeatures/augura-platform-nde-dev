@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module documents."""
+"""HTTP adapter of the documents module."""
 
 from uuid import UUID
 
@@ -31,8 +31,8 @@ async def generate(
     background_tasks: BackgroundTasks,
 ) -> schemas.GeneratedDocumentCreated:
     created = await DocumentService(session).generate(tenant, req)
-    # Le worker rend le dossier (HTML print-friendly) et marque le document `ready`
-    # après la réponse — fallback local du worker Modal WeasyPrint/python-docx.
+    # The worker renders the document (print-friendly HTML) and marks it `ready`
+    # after the response — local fallback of the Modal WeasyPrint/python-docx worker.
     enqueue_job(background_tasks, tenant, created.job_id, settings=settings)
     return created
 
@@ -50,9 +50,9 @@ async def download_document(
     tenant: CurrentTenantDep,
     session: SessionDep,
 ) -> Response:
-    """Sert les octets du dossier généré (scopé tenant), lus EN BASE
-    (generated_documents.content) — cohérent cross-conteneur sur Modal, contrairement au
-    disque local éphémère. 404 tant que le dossier n'est pas `ready`."""
+    """Serves the bytes of the generated document (tenant-scoped), read FROM THE DATABASE
+    (generated_documents.content) — consistent cross-container on Modal, unlike the
+    ephemeral local disk. 404 until the document is `ready`."""
     doc_type, data = await DocumentService(session).download(tenant, document_id)
     filename = f"{doc_type}-{document_id}.html"
     return Response(

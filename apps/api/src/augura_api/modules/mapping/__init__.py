@@ -1,4 +1,4 @@
-"""Module mapping — appariement lexical colonnes→concepts (A4)."""
+"""Mapping module — lexical column→concept matching (A4)."""
 
 from augura_api.modules.mapping.router import router
 

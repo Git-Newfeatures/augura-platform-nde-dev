@@ -1,4 +1,4 @@
-"""Logique métier du module reference. Le router est un adaptateur fin."""
+"""Business logic for the reference module. The router is a thin adapter."""
 
 from typing import Protocol
 
@@ -50,7 +50,7 @@ class ReferenceService:
     async def tenant_profile(self, tenant: CurrentTenant) -> schemas.TenantProfileOut:
         org = await self.repo.get_org(tenant.tenant_id)
         if org is None:
-            raise NotFoundError("organisation introuvable", tenant_id=str(tenant.tenant_id))
+            raise NotFoundError("organization not found", tenant_id=str(tenant.tenant_id))
         return schemas.TenantProfileOut.model_validate(org)
 
     async def cesl_sources(self) -> list[schemas.CeslSourceOut]:

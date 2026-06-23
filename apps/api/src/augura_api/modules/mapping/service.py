@@ -1,4 +1,4 @@
-"""Logique métier du module mapping : colonnes d'un dataset → concepts (lexical)."""
+"""Business logic for the mapping module: dataset columns → concepts (lexical)."""
 
 from uuid import UUID
 
@@ -23,7 +23,7 @@ class MappingService:
     async def map_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.MapResult:
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None:
-            raise NotFoundError("dataset introuvable", dataset_id=str(dataset_id))
+            raise NotFoundError("dataset not found", dataset_id=str(dataset_id))
         columns = await self.datasets.list_columns(dataset_id)
         concepts = await self.semantic.list_concepts()
         synonyms = await self.semantic.list_synonyms()

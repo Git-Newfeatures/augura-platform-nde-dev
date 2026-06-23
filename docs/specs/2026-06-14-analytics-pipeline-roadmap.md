@@ -1,46 +1,46 @@
-# Augura Analytics Pipeline — plan d'implémentation mappé au code
+# Augura Analytics Pipeline — implementation plan mapped to the code
 
-**Statut :** plan de travail — 2026-06-14. Traduit le draft « Augura Analytics
-Pipeline/Roadmap (June 2026) » en chantiers concrets, séquencés, ancrés dans le code
-existant (`augura-platform`). Décisions tranchées : **moteur Phase 6 en Python** (pas R),
-**plan d'abord** (ce document) avant tout build.
+**Status:** work plan — 2026-06-14. Translates the "Augura Analytics
+Pipeline/Roadmap (June 2026)" draft into concrete, sequenced workstreams, anchored in the
+existing code (`augura-platform`). Settled decisions: **Phase 6 engine in Python** (not R),
+**plan first** (this document) before any build.
 
-Réfs : spec produit (draft fourni) ; architecture backend
-[2026-06-11](2026-06-11-augura-backend-architecture-design.md) ;
-livraison [2026-06-13](2026-06-13-delivery-design.md).
-
----
-
-## 1. North star (les 3 propriétés) — et comment on les tient en Python
-
-La spec impose trois propriétés à **chaque** phase :
-
-- **Fonctionnel** — chaque phase produit un artefact consommable par la suivante + un
-  critère d'acceptation concret.
-- **Auditable** — chaque transformation / suggestion / décision humaine est loggée
-  (user, timestamp, rationale). **C'est LE différenciateur réglementaire.** Construit dès
-  le jour 1.
-- **Reproductible** — la repro vient d'**artefacts versionnés + hashés**, jamais du
-  re-run d'un process stochastique. **Le LLM n'est jamais sur le chemin critique d'une
-  décision scientifique** : il rédige, récupère, explique ; ce sont des règles
-  déterministes ou des décisions humaines loggées qui tranchent.
-
-> **Pourquoi Python ne casse rien.** La reproductibilité de la spec ne dépend PAS de R :
-> elle vient des **artefacts hashés + du run manifest + de l'environnement épinglé**. En
-> Python on tient exactement la même garantie via `uv.lock` (dépendances figées) + digest
-> de l'image conteneur + seed RNG + manifest. Le choix R/Python est un choix de
-> *bibliothèques d'inférence causale*, pas un choix de rigueur. Voir §5 (décision moteur).
+Refs: product spec (draft provided); backend architecture
+[2026-06-11](2026-06-11-augura-backend-architecture-design.md);
+delivery [2026-06-13](2026-06-13-delivery-design.md).
 
 ---
 
-## 2. La colonne vertébrale : audit/provenance + lock de pré-spécification (transversal, construit EN PREMIER)
+## 1. North star (the 3 properties) — and how we hold them in Python
 
-C'est le cœur de la spec et ce qui manque le plus aujourd'hui. Tout le reste s'y accroche.
+The spec imposes three properties on **every** phase:
 
-### 2.1 Modèle d'artefact versionné & hashé (nouveau)
+- **Functional** — each phase produces an artifact consumable by the next one + a
+  concrete acceptance criterion.
+- **Auditable** — each transformation / suggestion / human decision is logged
+  (user, timestamp, rationale). **This is THE regulatory differentiator.** Built from
+  day 1.
+- **Reproducible** — reproducibility comes from **versioned + hashed artifacts**, never from
+  re-running a stochastic process. **The LLM is never on the critical path of a
+  scientific decision**: it drafts, retrieves, explains; deterministic rules
+  or logged human decisions are what decide.
 
-Nouvelle table `artifacts` (org-scopée, RLS) — source de vérité de tout objet
-reproductible (snapshot dataset, rapport QC, dictionnaire mappé, DAG, SAP, run) :
+> **Why Python breaks nothing.** The spec's reproducibility does NOT depend on R:
+> it comes from the **hashed artifacts + the run manifest + the pinned environment**. In
+> Python we hold exactly the same guarantee via `uv.lock` (frozen dependencies) + container
+> image digest + RNG seed + manifest. The R/Python choice is a choice of
+> *causal-inference libraries*, not a choice of rigor. See §5 (engine decision).
+
+---
+
+## 2. The backbone: audit/provenance + pre-specification lock (cross-cutting, built FIRST)
+
+This is the heart of the spec and what is most missing today. Everything else hangs off it.
+
+### 2.1 Versioned & hashed artifact model (new)
+
+New `artifacts` table (org-scoped, RLS) — source of truth for every
+reproducible object (dataset snapshot, QC report, mapped dictionary, DAG, SAP, run):
 
 ```
 artifacts(
@@ -48,238 +48,238 @@ artifacts(
   org_id uuid not null,                      -- RLS tenant
   study_id uuid references studies(id),
   kind text not null,                        -- 'dataset_snapshot'|'qc_report'|'mapping'|'dag'|'sap'|'run_manifest'
-  version int not null,                       -- v0 = machine-proposé, v1 = humain-approuvé…
-  sha256 text not null,                       -- hash du contenu canonique (JSON trié / texte)
-  content jsonb,                              -- corps inline (DAGitty, SAP YAML→json, edge list…)
-  storage_ref text,                           -- ou pointeur Supabase Storage si volumineux (CSV brut)
+  version int not null,                       -- v0 = machine-proposed, v1 = human-approved…
+  sha256 text not null,                       -- hash of the canonical content (sorted JSON / text)
+  content jsonb,                              -- inline body (DAGitty, SAP YAML→json, edge list…)
+  storage_ref text,                           -- or Supabase Storage pointer if large (raw CSV)
   provenance jsonb not null,                  -- {source:'llm'|'human'|'rule', prompt_hash, model_id, ts, parent_version, diff}
-  locked bool not null default false,         -- artefact figé (SAP/DAG approuvé)
+  locked bool not null default false,         -- frozen artifact (approved SAP/DAG)
   created_by uuid, created_at timestamptz,
   unique(study_id, kind, version)
 )
 ```
 
-- **Hash canonique** : `sha256(canonical_json(content))` — JSON à clés triées, ou texte
-  DAGitty normalisé. Déterministe, indépendant du moteur LLM.
-- **Lock** : `locked=true` + écriture du hash dans le SAP. Toute édition post-lock crée une
-  **nouvelle version** et force un amendement SAP (la garantie de pré-spécification).
+- **Canonical hash**: `sha256(canonical_json(content))` — JSON with sorted keys, or normalized
+  DAGitty text. Deterministic, independent of the LLM engine.
+- **Lock**: `locked=true` + writing the hash into the SAP. Any post-lock edit creates a
+  **new version** and forces a SAP amendment (the pre-specification guarantee).
 
-### 2.2 Log de provenance (réutilise l'existant)
+### 2.2 Provenance log (reuses the existing one)
 
-- `outbox_events` (déjà en base : `aggregate_type/aggregate_id/event_type/payload/created_at`)
-  → **event log d'audit**. Chaque transformation/décision émet un event
-  (`artifact.created`, `dag.edge.accepted`, `sap.locked`, `qc.fix.rejected`…) avec
-  user/ts/rationale dans `payload`. Aujourd'hui la table existe, le gate RLS « session
-  backend » est posé ; **il faut juste commencer à écrire dedans**.
-- `agent_runs` (déjà en base, inutilisé — cf. `log_agent_run`) → provenance LLM
-  (model, tokens, coût, durée). À câbler dans `run_structured_agent`.
-- `study_state` (déjà versionné) → reste l'état de workflow ; le **SAP lock** est un
-  artefact `kind='sap', locked=true` distinct.
+- `outbox_events` (already in the database: `aggregate_type/aggregate_id/event_type/payload/created_at`)
+  → **audit event log**. Each transformation/decision emits an event
+  (`artifact.created`, `dag.edge.accepted`, `sap.locked`, `qc.fix.rejected`…) with
+  user/ts/rationale in `payload`. Today the table exists, the "backend session" RLS gate
+  is in place; **we just need to start writing into it**.
+- `agent_runs` (already in the database, unused — cf. `log_agent_run`) → LLM provenance
+  (model, tokens, cost, duration). To be wired into `run_structured_agent`.
+- `study_state` (already versioned) → stays the workflow state; the **SAP lock** is a
+  distinct `kind='sap', locked=true` artifact.
 
-**Acceptation spine :** créer un dataset → un artefact `dataset_snapshot` hashé + un event
-`outbox` ; rejouer ⇒ même hash ; tout edit de DAG/SAP loggé avec rationale.
+**Spine acceptance:** create a dataset → a hashed `dataset_snapshot` artifact + an `outbox`
+event; replay ⇒ same hash; every DAG/SAP edit logged with rationale.
 
 ---
 
-## 3. Gap analysis (spec ↔ code actuel)
+## 3. Gap analysis (spec ↔ current code)
 
-| Spec | Aujourd'hui | État |
+| Spec | Today | State |
 |---|---|---|
-| **Audit/provenance** (transversal) | `usage_events`/`outbox_events`/`agent_runs` existent, ~inutilisés ; pas de hash d'artefact | ❌ à construire (§2) |
-| **Lock pré-spec (SAP)** | `study_state` versionné, sans hash ni lock | ❌ |
-| **P1 Ingestion** | module `datasets`, `ExcelUpload`, champ `storage_path` | 🟡 modèle oui ; upload réel + snapshot/hash + réconciliation lignes/cols non |
-| **P2 Cleaning/QC** | `DatasetVerification` + agent `variable-check` (profiling) | 🟡 pas de rapport QC en artefact, pas d'audit accept/reject |
-| **P3 Mapping/rôles** | `dataset_columns.proposed_role` + agent variable-check | 🟡 pas de CDM, pas de confiance/answer-key |
-| **P4 DAG** | `/agents/dag` (LLM→JSON) + éditeur `CausalModel` | 🟡→❌ aucune rigueur spec (contraintes, dagitty, hash, provenance, adjustment sets) |
-| **P5 Estimands/estimateurs** | configs estimateurs `SimulationEngine` | ❌ pas de tables de décision ICH E9(R1), pas de SAP stub |
-| **P6 Moteur** | `simulation/run_bootstrap.py` (Python) + `power.py` | 🟡 base Python ; pas de manifest, pas de diagnostics gatés, pas de Quarto/rapport |
-| **§3.4 DAG evidence-grounded (PubMed)** | **agent littérature PubMed** (commit 306fbdc) | 🟢 fondation posée ; manque requête par-edge + gel (query_string, retrieval_date) |
+| **Audit/provenance** (cross-cutting) | `usage_events`/`outbox_events`/`agent_runs` exist, ~unused; no artifact hash | ❌ to build (§2) |
+| **Pre-spec lock (SAP)** | `study_state` versioned, without hash or lock | ❌ |
+| **P1 Ingestion** | `datasets` module, `ExcelUpload`, `storage_path` field | 🟡 model yes; real upload + snapshot/hash + row/col reconciliation no |
+| **P2 Cleaning/QC** | `DatasetVerification` + `variable-check` agent (profiling) | 🟡 no QC report as artifact, no accept/reject audit |
+| **P3 Mapping/roles** | `dataset_columns.proposed_role` + variable-check agent | 🟡 no CDM, no confidence/answer-key |
+| **P4 DAG** | `/agents/dag` (LLM→JSON) + `CausalModel` editor | 🟡→❌ no spec rigor (constraints, dagitty, hash, provenance, adjustment sets) |
+| **P5 Estimands/estimators** | `SimulationEngine` estimator configs | ❌ no ICH E9(R1) decision tables, no SAP stub |
+| **P6 Engine** | `simulation/run_bootstrap.py` (Python) + `power.py` | 🟡 Python base; no manifest, no gated diagnostics, no Quarto/report |
+| **§3.4 evidence-grounded DAG (PubMed)** | **PubMed literature agent** (commit 306fbdc) | 🟢 foundation laid; missing per-edge query + freeze (query_string, retrieval_date) |
 
 ---
 
-## 4. Décisions tranchées
+## 4. Settled decisions
 
-1. **Moteur Phase 6 = Python** (cf. §5). Reproductibilité tenue par artefacts hashés +
-   manifest + env épinglé, pas par R.
-2. **DAG = code, pas dessin.** Canonique = **JSON edge list** (`{from,to,rationale,confidence,citation}`),
-   avec export **DAGitty** (texte) pour `dagitty`/R-free validation côté Python.
-3. **Artefacts hashés SHA-256**, versionnés, lockables (§2.1).
-4. **LLM hors chemin critique** partout : il propose (temp 0, prompt versionné, sortie JSON
-   structurée), des **règles déterministes** valident et **l'humain** approuve (loggé).
-5. **Candidate edges** (confiance basse) = tâche d'acceptation explicite, jamais auto-acceptée.
+1. **Phase 6 engine = Python** (cf. §5). Reproducibility held by hashed artifacts +
+   manifest + pinned env, not by R.
+2. **DAG = code, not drawing.** Canonical = **JSON edge list** (`{from,to,rationale,confidence,citation}`),
+   with **DAGitty** export (text) for `dagitty`/R-free validation on the Python side.
+3. **SHA-256 hashed artifacts**, versioned, lockable (§2.1).
+4. **LLM off the critical path** everywhere: it proposes (temp 0, versioned prompt, structured
+   JSON output), **deterministic rules** validate and **the human** approves (logged).
+5. **Candidate edges** (low confidence) = explicit acceptance task, never auto-accepted.
 
 ---
 
-## 5. Décision moteur : Python (avec garde-fous)
+## 5. Engine decision: Python (with guardrails)
 
-La spec nomme R (`tmle3`/`lmtp`/`WeightIt`/`survival`). On reste Python. Conséquences et
-mitigations :
+The spec names R (`tmle3`/`lmtp`/`WeightIt`/`survival`). We stay Python. Consequences and
+mitigations:
 
-**Reproductibilité (préservée intégralement) :** image conteneur à digest figé,
-`uv.lock` (dépendances épinglées), seed RNG, **run manifest** (hash dataset + SAP + DAG +
-digest image + seed + version code + user + ts). Identique à la garantie R de la spec.
+**Reproducibility (fully preserved):** container image with a frozen digest,
+`uv.lock` (pinned dependencies), RNG seed, **run manifest** (dataset hash + SAP + DAG +
+image digest + seed + code version + user + ts). Identical to the spec's R guarantee.
 
-**Cartographie des estimateurs R → Python :**
+**Mapping of R → Python estimators:**
 
-| Spec (R) | Équivalent Python | Maturité |
+| Spec (R) | Python equivalent | Maturity |
 |---|---|---|
-| IPTW / IPW | propensity `scikit-learn` + pondération (`statsmodels`) | ✅ solide |
-| g-computation | `statsmodels`/`sklearn` (outcome model + standardisation) | ✅ |
-| Cox pondéré / MSM | `lifelines` (CoxPHFitter weights) / `statsmodels` PHReg | ✅ |
+| IPTW / IPW | `scikit-learn` propensity + weighting (`statsmodels`) | ✅ solid |
+| g-computation | `statsmodels`/`sklearn` (outcome model + standardization) | ✅ |
+| Weighted Cox / MSM | `lifelines` (CoxPHFitter weights) / `statsmodels` PHReg | ✅ |
 | Mixed models (clustering) | `statsmodels` MixedLM | ✅ |
-| TMLE | `zepid` (TMLE) ou cross-fitting maison | 🟡 moins mature que `tmle3` |
-| LMTP (treatment policies longitudinales) | **pas d'équivalent direct** | 🔴 gap réel |
-| E-value (sensibilité) | trivial à implémenter | ✅ |
-| Diagnostics (positivité/balance/poids) | implémentables | ✅ |
+| TMLE | `zepid` (TMLE) or in-house cross-fitting | 🟡 less mature than `tmle3` |
+| LMTP (longitudinal treatment policies) | **no direct equivalent** | 🔴 real gap |
+| E-value (sensitivity) | trivial to implement | ✅ |
+| Diagnostics (positivity/balance/weights) | implementable | ✅ |
 
-**Trade-off honnête :** on perd l'argument « packages publiés/validés `tmle3`/`lmtp` » face
-au FDA, et **LMTP n'a pas d'équivalent Python** (les estimands longitudinaux time-varying
-seront limités ou custom en v1). **Mitigation :** (a) tests de caractérisation sur données
-simulées à réponse connue (= l'étape 5 « fake-data test » de la spec) ; (b) garder
-l'architecture **agnostique au langage** (SAP→code compile, digest conteneur dans le
-manifest) pour pouvoir ajouter **un sidecar R** dédié `tmle3`/`lmtp` plus tard si un sponsor
-l'exige, sans rien réécrire. Décision : **Python pour v1 ; porte ouverte au sidecar R en
-option premium.**
-
----
-
-## 6. Roadmap séquencée (milestones)
-
-Chaque milestone = artefact + critère d'acceptation (repris de la spec).
-
-**M0 — Spine audit/repro (transversal, prérequis).** Table `artifacts` + helper de
-hash canonique + écriture `outbox_events` + câblage `log_agent_run` dans
-`run_structured_agent`. *Accept :* créer un dataset/DAG ⇒ artefact hashé + event loggé ;
-re-hash identique.
-
-**M1 — Phase 1 ingestion réelle.** Upload → Supabase Storage, snapshot brut **verrouillé**,
-détection schéma (noms/types/missingness), **fingerprint du fichier** + réconciliation
-lignes/cols vs déclaré, dédup par hash. *Accept :* upload → inventaire de variables < 30 s ;
-échec si counts ≠ déclaré ou fichier déjà chargé.
-
-**M2 — Phase 2 cleaning/QC.** Rapport QC déterministe (missingness, outliers, valeurs
-impossibles, doublons, unités) en **artefact** ; fixes suggérés accept/reject **one-click,
-loggés** ; recette de cleaning idempotente. *Accept :* dataset nettoyé + rapport QC
-exportable ; échec si une valeur change sans rationale loggée.
-
-**M3 — Phase 4 DAG à la spec** (priorité haute, le plus différenciant ; détail §7). *Accept :*
-DAG validé `dagitty` → adjustment set minimal exporté ; artefact DAGitty hashé/versionné.
-
-**M4 — Phase 3 mapping durci.** Mapping vers CDM slim + rôles, confiance LLM, **answer-key**
-hand-checked + métrique d'accord. *Accept :* dataset analysis-ready labellisé ; échec si
-colonnes non labellisées ou désaccord answer-key.
-
-**M5 — Phase 5 estimands/estimateurs** (détail §8). Tables de décision versionnées
-(ICH E9(R1)) → estimand → estimateur + checklist d'hypothèses → **SAP stub** YAML signable
-et lockable. *Accept :* user choisit l'estimand → SAP stub auto-généré.
-
-**M6 — Phase 6 moteur Python + manifest** (détail §9). SAP→script via templates ;
-diagnostics **gatés** (positivité/balance/missingness) ; **run manifest** ; rapport
-(Quarto-like ; en Python : `quarto` avec noyau jupyter, ou un rapport HTML/PDF maison).
-*Accept :* run de bout en bout (upload→estimate) avec audit trail complet ; re-run du
-manifest ⇒ nombres identiques.
-
-> Ordre conseillé : **M0 → M3 (DAG) → M5 (estimands) → M6 (moteur)**, en intercalant
-> M1/M2/M4 (ingestion/QC/mapping) au fil de l'eau. Rationale : M3+M5+M6 forment la chaîne
-> différenciante (DAG hashé → SAP locké → run reproductible) ; M1/M2/M4 durcissent l'amont
-> déjà à moitié présent.
+**Honest trade-off:** we lose the "published/validated `tmle3`/`lmtp` packages" argument
+toward the FDA, and **LMTP has no Python equivalent** (longitudinal time-varying estimands
+will be limited or custom in v1). **Mitigation:** (a) characterization tests on simulated
+data with a known answer (= the spec's step 5 "fake-data test"); (b) keep the
+architecture **language-agnostic** (SAP→code compile, container digest in the
+manifest) so that a dedicated `tmle3`/`lmtp` **R sidecar** can be added later if a sponsor
+requires it, without rewriting anything. Decision: **Python for v1; door open to an R sidecar
+as a premium option.**
 
 ---
 
-## 7. Phase 4 — DAG reproductible (design détaillé)
+## 6. Sequenced roadmap (milestones)
 
-Adapte le §3 de la spec au code (`modules/agents` + `CausalModel.jsx`).
+Each milestone = artifact + acceptance criterion (taken from the spec).
 
-1. **Entrées déterministes** : uniquement le dictionnaire mappé Phase 3 (noms, labels,
-   rôles exposure/outcome/covariate/mediator-candidate, timing). Fichier structuré
-   versionné — pas de prompt libre.
-2. **Couche de contraintes (rule-based, AVANT le LLM)** : pas d'arête temps-postérieur →
-   temps-antérieur ; si randomisé, pas d'arête entrante sur l'exposition sauf
-   randomisation ; l'outcome n'a pas d'arête sortante. Déterministe + **tests unitaires**.
-   → nouveau `modules/agents/dag_constraints.py`.
-3. **Proposition LLM sous contrôle repro** : prompt template versionné, modèle épinglé,
-   **temp 0**, sortie JSON (1 arête = `{from,to,rationale,confidence,citation}`).
-   `prompt_hash`+`model_id`+`ts` dans la provenance de l'artefact. (Le `/agents/dag`
-   existant est le point de départ ; on durcit la sortie et on pin.)
-4. **Validation formelle** : pipe l'edge list dans une validation type `dagitty` —
-   acyclicité, nœuds orphelins, **dérivation de l'adjustment set minimal (backdoor)**,
-   colliders/médiateurs à NE PAS ajuster. En Python (pas de R) : implémenter le critère
-   backdoor sur le graphe (networkx) ou porter la logique `dagitty`. Échec ⇒ retour étape 3
-   avec la violation injectée.
-5. **Artefact = source de vérité** : DAGitty (texte) + edge-list JSON, **SHA-256**, v0 =
-   machine. Quiconque a le fichier reproduit le DAG et ses adjustment sets, à jamais.
-6. **Édition investigateur avec provenance** : éditeur visuel (`CausalModel.jsx`) ;
-   add/delete/reverse ⇒ rationale obligatoire + log (user, ts, before/after) ; chaque save =
-   nouvelle version ; à l'approbation **lock** + hash écrit dans le SAP.
-7. **Candidate edges** (confiance basse) = arêtes pointillées à accepter/rejeter
-   explicitement.
-8. **§3.4 evidence-grounding (optionnel, premium)** : pour chaque arête, requête PubMed
-   templatée via **l'agent littérature déjà construit** (E-utilities) → PMIDs supportant/
-   contredisant ; **gel** dans l'artefact (PMID, titre, `query_string`, `retrieval_date`).
-   Ship v1 sans ; ajout en « evidence-grounded DAG ».
+**M0 — Audit/repro spine (cross-cutting, prerequisite).** `artifacts` table + canonical-hash
+helper + `outbox_events` writes + wiring `log_agent_run` into
+`run_structured_agent`. *Accept:* create a dataset/DAG ⇒ hashed artifact + logged event;
+re-hash identical.
 
----
+**M1 — Phase 1 real ingestion.** Upload → Supabase Storage, **locked** raw snapshot,
+schema detection (names/types/missingness), **file fingerprint** + row/col reconciliation
+vs declared, dedup by hash. *Accept:* upload → variable inventory < 30 s;
+failure if counts ≠ declared or file already loaded.
 
-## 8. Phase 5 — Estimands & estimateurs (design détaillé)
+**M2 — Phase 2 cleaning/QC.** Deterministic QC report (missingness, outliers, impossible
+values, duplicates, units) as an **artifact**; suggested fixes accept/reject **one-click,
+logged**; idempotent cleaning recipe. *Accept:* cleaned dataset + exportable QC
+report; failure if a value changes without a logged rationale.
 
-Sélection **rule-based**, pas LLM (le LLM ne rédige que la justification en clair).
+**M3 — Phase 4 DAG to spec** (high priority, the most differentiating; detail §7). *Accept:*
+`dagitty`-validated DAG → minimal adjustment set exported; hashed/versioned DAGitty artifact.
 
-- **Entrées** : DAG locké v1 (par hash), métadonnées de design (randomisé/observationnel,
-  cluster, crossover), dictionnaire (type d'outcome, censure, traitement time-varying).
-- **Dérivation d'estimand** : table de décision déterministe design+DAG → estimands cadrés
-  ICH E9(R1) (population, contraste, endpoint, stratégie d'intercurrent-event, summary).
-  Confounding time-varying détecté dans le DAG ⇒ flag estimands longitudinaux (⚠ LMTP =
-  gap Python, cf. §5).
-- **Matching estimateur** : 2ᵉ table estimand+data → estimateur (parmi la cartographie
-  Python §5) + **checklist d'hypothèses** (positivité, échangeabilité vu l'adjustment set,
-  censure) + failure modes connus.
-- **Artefact SAP stub** (YAML/JSON) : estimand, adjustment set **hérité du DAG locké**,
-  estimateur primaire, analyses de sensibilité pré-spécifiées (E-value, estimateur alt, DAG
-  alt sur arêtes incertaines). Revue → édition loggée → signature → **lock + hash**.
-- Les **tables de décision sont versionnées** (on sait quelle règle a produit quelle
-  suggestion). → nouveau `modules/<estimands>/decision_tables/` (YAML versionnés).
+**M4 — Phase 3 hardened mapping.** Mapping to slim CDM + roles, LLM confidence, **answer-key**
+hand-checked + agreement metric. *Accept:* analysis-ready labeled dataset; failure if
+columns unlabeled or answer-key disagreement.
+
+**M5 — Phase 5 estimands/estimators** (detail §8). Versioned decision tables
+(ICH E9(R1)) → estimand → estimator + assumptions checklist → signable, lockable **SAP stub**
+YAML. *Accept:* user chooses the estimand → SAP stub auto-generated.
+
+**M6 — Phase 6 Python engine + manifest** (detail §9). SAP→script via templates;
+**gated** diagnostics (positivity/balance/missingness); **run manifest**; report
+(Quarto-like; in Python: `quarto` with a jupyter kernel, or an in-house HTML/PDF report).
+*Accept:* end-to-end run (upload→estimate) with a complete audit trail; re-run of the
+manifest ⇒ identical numbers.
+
+> Suggested order: **M0 → M3 (DAG) → M5 (estimands) → M6 (engine)**, interleaving
+> M1/M2/M4 (ingestion/QC/mapping) along the way. Rationale: M3+M5+M6 form the
+> differentiating chain (hashed DAG → locked SAP → reproducible run); M1/M2/M4 harden the
+> upstream that is already half present.
 
 ---
 
-## 9. Phase 6 — Moteur d'analyse Python (design détaillé)
+## 7. Phase 4 — Reproducible DAG (detailed design)
 
-- **Env épinglé** : image conteneur (Modal) à digest figé + `uv.lock` (numpy/scipy/
-  statsmodels/lifelines/scikit-learn/zepid + report). Le digest fait partie de chaque run.
-- **SAP → code** : le SAP YAML compile **déterministement** en script Python via templates ;
-  les rôles de variables du mapping remplissent les arguments. **Aucun code d'analyse écrit à
-  la main** ⇒ rien à dévier du SAP.
-- **Exécution gatée** : avant estimation, diagnostics qui **bloquent** — positivité
-  (overlap des propensities), balance des covariables, missingness réconciliée vs rapport
-  QC Phase 2. Violation ⇒ override investigateur loggé.
-- **Run manifest** (artefact `kind='run_manifest'`) : hash dataset + SAP + DAG + digest
-  conteneur + seed RNG + version code + user + ts. *La phrase repro au régulateur.*
-- **Sorties** : estimations + IC, plots de diagnostic (balance, positivité, poids), rapport
-  auto-généré (Quarto via noyau Python, ou rapport maison) dont la 1ʳᵉ page imprime le
-  manifest. Étend `simulation/run_bootstrap.py` (worker Modal, déjà prévu comme follow-up).
+Adapts §3 of the spec to the code (`modules/agents` + `CausalModel.jsx`).
+
+1. **Deterministic inputs**: only the Phase 3 mapped dictionary (names, labels,
+   exposure/outcome/covariate/mediator-candidate roles, timing). Structured versioned
+   file — no free prompt.
+2. **Constraint layer (rule-based, BEFORE the LLM)**: no edge from time-posterior →
+   time-prior; if randomized, no incoming edge on the exposure except
+   randomization; the outcome has no outgoing edge. Deterministic + **unit tests**.
+   → new `modules/agents/dag_constraints.py`.
+3. **LLM proposal under repro control**: versioned prompt template, pinned model,
+   **temp 0**, JSON output (1 edge = `{from,to,rationale,confidence,citation}`).
+   `prompt_hash`+`model_id`+`ts` in the artifact's provenance. (The existing `/agents/dag`
+   is the starting point; we harden the output and pin it.)
+4. **Formal validation**: pipe the edge list into a `dagitty`-type validation —
+   acyclicity, orphan nodes, **minimal (backdoor) adjustment set derivation**,
+   colliders/mediators NOT to adjust for. In Python (no R): implement the backdoor
+   criterion on the graph (networkx) or port the `dagitty` logic. Failure ⇒ back to step 3
+   with the violation injected.
+5. **Artifact = source of truth**: DAGitty (text) + JSON edge-list, **SHA-256**, v0 =
+   machine. Anyone with the file reproduces the DAG and its adjustment sets, forever.
+6. **Investigator editing with provenance**: visual editor (`CausalModel.jsx`);
+   add/delete/reverse ⇒ mandatory rationale + log (user, ts, before/after); each save =
+   new version; on approval **lock** + hash written into the SAP.
+7. **Candidate edges** (low confidence) = dashed edges to accept/reject
+   explicitly.
+8. **§3.4 evidence-grounding (optional, premium)**: for each edge, a templated PubMed query
+   via **the literature agent already built** (E-utilities) → supporting/
+   contradicting PMIDs; **freeze** into the artifact (PMID, title, `query_string`, `retrieval_date`).
+   Ship v1 without it; add as "evidence-grounded DAG".
 
 ---
 
-## 10. Risques & questions ouvertes
+## 8. Phase 5 — Estimands & estimators (detailed design)
 
-- **LMTP / estimands longitudinaux** : pas d'équivalent Python mûr → soit custom, soit hors
-  v1, soit sidecar R plus tard. À arbitrer quand un cas client le réclame.
-- **TMLE Python** (`zepid`) moins éprouvé que `tmle3` → valider par fake-data tests.
-- **Quarto** est R/Python-agnostique mais ajoute une dépendance ; alternative : rapport
-  HTML/PDF maison (WeasyPrint, déjà envisagé pour les documents générés).
-- **Storage Supabase** (uploads bruts, rapports) pas encore câblé — prérequis M1.
-- **Clés LLM** (`ANTHROPIC`/`OPENAI`) requises pour les couches LLM (DAG proposal,
-  justifications, embeddings) ; tout le rule-based + repro marche sans.
-- **CDM/OMOP** : la spec dit « OMOP plus tard » → v1 = CDM slim maison.
+**Rule-based** selection, not LLM (the LLM only drafts the plain-language justification).
+
+- **Inputs**: locked v1 DAG (by hash), design metadata (randomized/observational,
+  cluster, crossover), dictionary (outcome type, censoring, time-varying treatment).
+- **Estimand derivation**: deterministic design+DAG decision table → estimands framed
+  ICH E9(R1) (population, contrast, endpoint, intercurrent-event strategy, summary).
+  Time-varying confounding detected in the DAG ⇒ flag longitudinal estimands (⚠ LMTP =
+  Python gap, cf. §5).
+- **Estimator matching**: 2nd estimand+data table → estimator (among the Python
+  mapping §5) + **assumptions checklist** (positivity, exchangeability given the adjustment
+  set, censoring) + known failure modes.
+- **SAP stub artifact** (YAML/JSON): estimand, adjustment set **inherited from the locked DAG**,
+  primary estimator, pre-specified sensitivity analyses (E-value, alt estimator, alt DAG
+  on uncertain edges). Review → logged edit → signature → **lock + hash**.
+- The **decision tables are versioned** (we know which rule produced which
+  suggestion). → new `modules/<estimands>/decision_tables/` (versioned YAML).
 
 ---
 
-## 11. Prochaines étapes immédiates
+## 9. Phase 6 — Python analysis engine (detailed design)
 
-1. **M0 — spine** : table `artifacts` + migration + helper hash canonique + premiers events
-   `outbox` + câblage `log_agent_run`. (Petit, transversal, débloque tout.)
-2. **M3 — Phase 4 DAG à la spec** : `dag_constraints.py` (rule-based + tests) → durcir
-   `/agents/dag` (temp 0, prompt versionné, JSON+provenance) → validation backdoor
-   (networkx) → artefact DAGitty hashé → provenance d'édition dans `CausalModel.jsx`.
-3. Réutiliser l'**agent PubMed** pour le §3.4 (evidence-grounded) quand M3 est posé.
+- **Pinned env**: container image (Modal) with a frozen digest + `uv.lock` (numpy/scipy/
+  statsmodels/lifelines/scikit-learn/zepid + report). The digest is part of every run.
+- **SAP → code**: the SAP YAML compiles **deterministically** into a Python script via templates;
+  the mapping's variable roles fill the arguments. **No analysis code written by
+  hand** ⇒ nothing to deviate from the SAP.
+- **Gated execution**: before estimation, diagnostics that **block** — positivity
+  (propensity overlap), covariate balance, missingness reconciled vs the Phase 2 QC
+  report. Violation ⇒ logged investigator override.
+- **Run manifest** (artifact `kind='run_manifest'`): dataset hash + SAP + DAG + container
+  digest + RNG seed + code version + user + ts. *The repro sentence to the regulator.*
+- **Outputs**: estimates + CI, diagnostic plots (balance, positivity, weights), auto-generated
+  report (Quarto via Python kernel, or in-house report) whose first page prints the
+  manifest. Extends `simulation/run_bootstrap.py` (Modal worker, already planned as a follow-up).
 
-> À valider avec Quentin avant de coder M0/M3.
+---
+
+## 10. Risks & open questions
+
+- **LMTP / longitudinal estimands**: no mature Python equivalent → either custom, or out of
+  v1, or an R sidecar later. To be settled when a client case demands it.
+- **Python TMLE** (`zepid`) less battle-tested than `tmle3` → validate via fake-data tests.
+- **Quarto** is R/Python-agnostic but adds a dependency; alternative: in-house
+  HTML/PDF report (WeasyPrint, already considered for generated documents).
+- **Supabase Storage** (raw uploads, reports) not yet wired — M1 prerequisite.
+- **LLM keys** (`ANTHROPIC`/`OPENAI`) required for the LLM layers (DAG proposal,
+  justifications, embeddings); all the rule-based + repro works without them.
+- **CDM/OMOP**: the spec says "OMOP later" → v1 = in-house slim CDM.
+
+---
+
+## 11. Immediate next steps
+
+1. **M0 — spine**: `artifacts` table + migration + canonical-hash helper + first `outbox`
+   events + wiring `log_agent_run`. (Small, cross-cutting, unblocks everything.)
+2. **M3 — Phase 4 DAG to spec**: `dag_constraints.py` (rule-based + tests) → harden
+   `/agents/dag` (temp 0, versioned prompt, JSON+provenance) → backdoor validation
+   (networkx) → hashed DAGitty artifact → editing provenance in `CausalModel.jsx`.
+3. Reuse the **PubMed agent** for §3.4 (evidence-grounded) once M3 is in place.
+
+> To validate with Quentin before coding M0/M3.

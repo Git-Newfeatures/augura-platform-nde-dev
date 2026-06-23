@@ -1,4 +1,4 @@
-"""Logique métier du module studies. Le router et les jobs sont des adaptateurs fins."""
+"""Business logic for the studies module. The router and jobs are thin adapters."""
 
 from augura_api.core.errors import NotFoundError
 from augura_api.core.ids import StudyId
@@ -42,17 +42,17 @@ class StudyService:
     async def get_study(self, tenant: CurrentTenant, study_id: StudyId) -> schemas.StudyOut:
         study = await self.repo.get(tenant.tenant_id, study_id)
         if study is None:
-            raise NotFoundError("étude introuvable", study_id=str(study_id))
+            raise NotFoundError("study not found", study_id=str(study_id))
         return schemas.StudyOut.model_validate(study)
 
     async def update_study(
         self, tenant: CurrentTenant, study_id: StudyId, data: schemas.StudyUpdate
     ) -> schemas.StudyOut:
-        await self.get_study(tenant, study_id)  # 404 si pas d'accès tenant
+        await self.get_study(tenant, study_id)  # 404 if no tenant access
         fields = data.model_dump(exclude_unset=True, exclude_none=True)
         study = await self.repo.update(tenant.tenant_id, study_id, fields=fields)
         if study is None:
-            raise NotFoundError("étude introuvable", study_id=str(study_id))
+            raise NotFoundError("study not found", study_id=str(study_id))
         await analytics.log_usage(
             self.repo.session,
             tenant_id=tenant.tenant_id,
@@ -64,10 +64,10 @@ class StudyService:
         return schemas.StudyOut.model_validate(study)
 
     async def get_state(self, tenant: CurrentTenant, study_id: StudyId) -> schemas.StudyStateOut:
-        await self.get_study(tenant, study_id)  # 404 si pas d'accès tenant
+        await self.get_study(tenant, study_id)  # 404 if no tenant access
         state = await self.repo.latest_state(tenant.tenant_id, study_id)
         if state is None:
-            raise NotFoundError("aucun état pour cette étude", study_id=str(study_id))
+            raise NotFoundError("no state for this study", study_id=str(study_id))
         return schemas.StudyStateOut.model_validate(state)
 
     async def save_state(

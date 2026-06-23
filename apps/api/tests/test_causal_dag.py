@@ -1,7 +1,7 @@
-"""Tests du module causal — LLM mocké + repo factice (aucune clé, aucune base).
+"""Tests for the causal module — mocked LLM + fake repo (no key, no database).
 
-Couvre l'orchestration generate() de bout en bout (sous-graphe → LLM → graphe),
-l'ancrage ontologique (arêtes data-backed), et un cas de relation proposée par le LLM.
+Covers the end-to-end generate() orchestration (subgraph → LLM → graph),
+ontology grounding (data-backed edges), and a case of an LLM-proposed relation.
 """
 
 from typing import Any
@@ -93,7 +93,7 @@ class _FakeClient:
 
 
 def _settings() -> Settings:
-    return Settings(env="dev")  # pyright: ignore[reportCallIssue] -- champs via env
+    return Settings(env="dev")  # pyright: ignore[reportCallIssue] -- fields via env
 
 
 def _confounded_triangle() -> _FakeRepo:
@@ -142,10 +142,10 @@ async def test_generate_builds_ontology_grounded_dag() -> None:
 
     assert {n.id for n in out.nodes} == {"A", "Y", "W"}
     assert {(e.source, e.to) for e in out.edges} == {("W", "A"), ("W", "Y"), ("A", "Y")}
-    assert all(e.supported_by_data for e in out.edges)  # ancrage : concepts mappés
+    assert all(e.supported_by_data for e in out.edges)  # grounding: mapped concepts
     assert out.graph.exposure_ids == ["A"]
     assert out.graph.outcome_ids == ["Y"]
-    assert out.graph.adjusted_ids == ["W"]  # confounder observé → ajusté
+    assert out.graph.adjusted_ids == ["W"]  # observed confounder → adjusted
     assert out.quality.label == "High"
     assert client.messages.calls == 1
 
@@ -192,7 +192,7 @@ async def test_proposed_relation_adds_llm_node_and_edge() -> None:
 
     prop_node = next(n for n in out.nodes if n.id == "PROP_med")
     assert prop_node.source == "llm_proposed"
-    assert prop_node.label == "Medication"  # méta du concept proposé
+    assert prop_node.label == "Medication"  # metadata of the proposed concept
     prop_edge = next(e for e in out.edges if e.source == "PROP_med")
     assert prop_edge.direction == "inhibitory"  # polarity decreases
     assert prop_edge.supported_by_data is False

@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module semantic (DDL créé par le bundle)."""
+"""SQLAlchemy models of the semantic module (DDL created by the bundle)."""
 
 from sqlalchemy import Boolean, Integer, Numeric, SmallInteger, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -103,7 +103,7 @@ class DqConstraint(Base):
     version: Mapped[str] = mapped_column(Text)
 
 
-# ── Ontologie/causal (B1) — lecture seule (B2/B4 consomment) ────────────────
+# ── Ontology/causal (B1) — read-only (consumed by B2/B4) ────────────────────
 
 
 class TaxonomyStandardCode(Base):

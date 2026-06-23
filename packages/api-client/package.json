@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Client TypeScript généré depuis l'OpenAPI d'Augura — ne jamais éditer schema.d.ts à la main.",
+  "description": "TypeScript client generated from Augura's OpenAPI — never edit schema.d.ts by hand.",
   "main": "src/client.ts",
   "types": "src/client.ts",
   "scripts": {

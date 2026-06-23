@@ -1,4 +1,4 @@
-"""Appariement lexical colonne→concept (exact synonyme → fuzzy label/synonyme)."""
+"""Lexical column→concept matching (exact synonym → fuzzy label/synonym)."""
 
 from __future__ import annotations
 

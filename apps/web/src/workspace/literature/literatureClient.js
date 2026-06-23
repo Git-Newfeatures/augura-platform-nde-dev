@@ -1,19 +1,19 @@
 // apps/web/src/workspace/literature/literatureClient.js
 //
-// Client du workbench Littérature, branché sur le vrai backend FastAPI :
+// Literature workbench client, wired to the real FastAPI backend:
 //   - retrieve  → POST /corpus/literature/retrieve (stream NDJSON: meta|group|done)
 //   - sessions  → POST/GET /corpus/literature/sessions(+events)   (Recent queries + audit)
 //   - snapshots → POST/GET /corpus/literature/snapshots(/{id})    (Saved evidence)
 //   - ingest    → POST /corpus/literature/ingest                  (Add to corpus, PubMed)
-// Pas de mode démo, pas de localStorage : tout vient du backend (règle no-mock).
+// No demo mode, no localStorage: everything comes from the backend (no-mock rule).
 import { apiFetch, apiJson } from '@/api'
 
-// id stable d'un résultat across sources (pmid pour PubMed, nct_id pour CT.gov).
+// Stable id of a result across sources (pmid for PubMed, nct_id for CT.gov).
 export const resultId = (r) => r.pmid || r.nct_id || r.id || ''
 
-// Aplati un item backend (record imbriqué) → forme plate attendue par les cartes
-// (r.pmid, r.abstract…). Conserve source/id/query_string/retrieval_date/record pour
-// reconstruire un FrozenResult au moment du Save.
+// Flattens a backend item (nested record) → flat shape expected by the cards
+// (r.pmid, r.abstract…). Keeps source/id/query_string/retrieval_date/record to
+// rebuild a FrozenResult at Save time.
 export function flattenItem(item) {
   const rec = item.record || {}
   return {
@@ -30,7 +30,7 @@ export function flattenItem(item) {
   }
 }
 
-// Stream NDJSON du retrieve. onEvent reçoit {type:'meta'|'group'|'done'|'error', ...}.
+// NDJSON stream of the retrieve. onEvent receives {type:'meta'|'group'|'done'|'error', ...}.
 export async function streamRetrieve({ query, sources, dateRange, studyTypes, maxResults = 10, signal, onEvent }) {
   const body = JSON.stringify({
     query,
@@ -55,7 +55,7 @@ export async function streamRetrieve({ query, sources, dateRange, studyTypes, ma
   const reader = res.body.getReader()
   const dec = new TextDecoder()
   let buf = ''
-  const emit = (raw) => { try { onEvent(JSON.parse(raw)) } catch { /* ligne partielle */ } }
+  const emit = (raw) => { try { onEvent(JSON.parse(raw)) } catch { /* partial line */ } }
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -71,7 +71,7 @@ export async function streamRetrieve({ query, sources, dateRange, studyTypes, ma
   }
 }
 
-// ── Sessions (Recent queries) — historique serveur ───────────────────────────
+// ── Sessions (Recent queries) — server-side history ──────────────────────────
 export const createSession = (query, studyId = null) =>
   apiJson('/corpus/literature/sessions', {
     method: 'POST',
@@ -80,13 +80,13 @@ export const createSession = (query, studyId = null) =>
 
 export const listSessions = () => apiJson('/corpus/literature/sessions')
 
-// Suppression d'historique (Recent queries). Best-effort : renvoie un booléen ok.
+// History deletion (Recent queries). Best-effort: returns an ok boolean.
 export const deleteSession = (id) =>
   apiFetch(`/corpus/literature/sessions/${id}`, { method: 'DELETE' }).then((r) => r.ok).catch(() => false)
 export const clearSessions = () =>
   apiFetch('/corpus/literature/sessions', { method: 'DELETE' }).then((r) => r.ok).catch(() => false)
 
-// Best-effort : ne jette jamais (l'audit ne doit pas casser le flux).
+// Best-effort: never throws (the audit must not break the flow).
 export const logEvent = (sessionId, eventType, payload = {}) =>
   apiFetch(`/corpus/literature/sessions/${sessionId}/events`, {
     method: 'POST',
@@ -121,8 +121,8 @@ export function saveSnapshot({ query, sources, studyId = null, items, modelVersi
   })
 }
 
-// studyId optionnel : filtre les snapshots gelés rattachés à une étude (vue
-// « Saved evidence » scopée étude). Sans argument → tous les snapshots du tenant.
+// studyId optional: filters the frozen snapshots linked to a study (study-scoped
+// "Saved evidence" view). Without an argument → all snapshots of the tenant.
 export const listSnapshots = (studyId = null) =>
   apiJson('/corpus/literature/snapshots' + (studyId ? `?study_id=${encodeURIComponent(studyId)}` : ''))
 export const getSnapshot = (id) => apiJson(`/corpus/literature/snapshots/${id}`)

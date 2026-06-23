@@ -1,10 +1,10 @@
 # apps/api/src/augura_api/modules/corpus/filters.py
-"""Filtres de recherche live (date + type d'étude) — mapping PUR, source-spécifique.
+"""Live search filters (date + study type) — PURE mapping, source-specific.
 
-Aucune I/O ⇒ testable sans réseau. Le routeur construit `SearchFilters` depuis la
-requête ; le retriever le passe aux clients PubMed/CT.gov, qui appliquent ces
-mappers. Un filtre vide (date_range='any', study_types=()) est un no-op : la requête
-part inchangée — préserve le comportement existant.
+No I/O ⇒ testable without network. The router builds `SearchFilters` from the
+request; the retriever passes it to the PubMed/CT.gov clients, which apply these
+mappers. An empty filter (date_range='any', study_types=()) is a no-op: the query
+goes out unchanged — preserves existing behavior.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from datetime import date
 VALID_DATE_RANGES = ("any", "1y", "5y", "10y")
 _YEARS_BACK = {"1y": 1, "5y": 5, "10y": 10}
 
-# study_type Augura → terme PubMed Publication Type ([pt]).
+# Augura study_type → PubMed Publication Type term ([pt]).
 _PUBMED_PT = {
     "rct": "Randomized Controlled Trial[pt]",
     "observational": "Observational Study[pt]",
@@ -24,8 +24,8 @@ _PUBMED_PT = {
 }
 VALID_STUDY_TYPES = tuple(_PUBMED_PT.keys())
 
-# study_type Augura → studyType CT.gov (aggFilters). Revues/méta-analyses ne sont
-# pas des types d'essai CT.gov → ignorées côté CT.gov.
+# Augura study_type → CT.gov studyType (aggFilters). Reviews/meta-analyses are
+# not CT.gov trial types → ignored on the CT.gov side.
 _CTGOV_STUDY_TYPE = {"rct": "int", "observational": "obs"}
 
 
@@ -41,7 +41,7 @@ def _from_year(date_range: str, today: date) -> int | None:
 
 
 def build_pubmed_term(query: str, filters: SearchFilters | None) -> str:
-    """Terme esearch : `(query) AND (pt OR pt)`. Sans study_types → `query` inchangée."""
+    """esearch term: `(query) AND (pt OR pt)`. Without study_types → `query` unchanged."""
     if not filters or not filters.study_types:
         return query
     pts = [_PUBMED_PT[t] for t in filters.study_types if t in _PUBMED_PT]
@@ -51,7 +51,7 @@ def build_pubmed_term(query: str, filters: SearchFilters | None) -> str:
 
 
 def pubmed_date_params(filters: SearchFilters | None, today: date) -> dict[str, str]:
-    """Params esearch de date (granularité année). Vide si date_range='any'."""
+    """esearch date params (year granularity). Empty if date_range='any'."""
     if not filters:
         return {}
     year = _from_year(filters.date_range, today)
@@ -61,8 +61,8 @@ def pubmed_date_params(filters: SearchFilters | None, today: date) -> dict[str, 
 
 
 def ctgov_filter_params(filters: SearchFilters | None, today: date) -> dict[str, str]:
-    """Params CT.gov v2 : aggFilters studyType (1 seul type mappable) + range de date.
-    Deux types int+obs sélectionnés, ou type non mappable seul → pas de studyType."""
+    """CT.gov v2 params: aggFilters studyType (only 1 mappable type) + date range.
+    Two types int+obs selected, or only a non-mappable type → no studyType."""
     if not filters:
         return {}
     params: dict[str, str] = {}

@@ -1,4 +1,4 @@
-"""Accès base du module dq."""
+"""Database access for the dq module."""
 
 from typing import Any
 from uuid import UUID

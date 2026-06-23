@@ -1,12 +1,12 @@
-"""Exécuteur de jobs in-process (équivalent local du worker Modal).
+"""In-process job runner (local equivalent of the Modal worker).
 
-`enqueue_job` planifie l'exécution après la réponse HTTP (FastAPI BackgroundTasks) ;
-`execute_job` ouvre une transaction scopée tenant (RLS), marque le job `running`,
-dispatche sur un handler par type, persiste le résultat, puis marque `succeeded`/`failed`.
+`enqueue_job` schedules execution after the HTTP response (FastAPI BackgroundTasks);
+`execute_job` opens a tenant-scoped transaction (RLS), marks the job `running`,
+dispatches to a per-type handler, persists the result, then marks `succeeded`/`failed`.
 
-Le calcul lourd (numpy) tourne dans un thread (`anyio.to_thread`) pour ne pas bloquer
-la boucle. En prod, `enqueue_job` peut basculer sur `modal.Function.spawn(job_id)` sans
-changer ni les handlers ni les appelants — c'est le point de bascule unique.
+Heavy computation (numpy) runs in a thread (`anyio.to_thread`) so as not to block
+the loop. In prod, `enqueue_job` can switch to `modal.Function.spawn(job_id)` without
+changing either the handlers or the callers — this is the single switch point.
 """
 
 from __future__ import annotations
@@ -39,13 +39,13 @@ class JobContext:
     job: Job
 
 
-# Un handler reçoit le contexte (session déjà scopée tenant) et renvoie un result_ref
-# optionnel (ex. storage_path du dossier généré). Toute exception ⇒ job `failed`.
+# A handler receives the context (session already tenant-scoped) and returns an optional
+# result_ref (e.g. storage_path of the generated document). Any exception ⇒ job `failed`.
 JobHandler = Callable[[JobContext], Awaitable[str | None]]
 
 
 def _handlers() -> dict[str, JobHandler]:
-    # Import paresseux : évite tout cycle au chargement (les modules importent jobs).
+    # Lazy import: avoids any load-time cycle (the modules import jobs).
     from augura_api.jobs.handlers import build_handlers
 
     return build_handlers()
@@ -54,11 +54,11 @@ def _handlers() -> dict[str, JobHandler]:
 async def execute_job(
     settings: Settings, tenant_id: TenantId, user_id: UserId, job_id: UUID
 ) -> None:
-    """Exécute un job de bout en bout. Robuste : toute erreur est capturée et écrite
-    dans job.error (le polling front voit `failed` au lieu de rester bloqué)."""
+    """Executes a job end to end. Robust: any error is caught and written
+    to job.error (the front-end polling sees `failed` instead of staying stuck)."""
     sessionmaker = get_sessionmaker(settings)
 
-    # 1) Transaction courte : job → running (visible immédiatement par le polling).
+    # 1) Short transaction: job → running (immediately visible to polling).
     async with sessionmaker() as session, session.begin():
         await session.execute(set_user_stmt(user_id))
         await session.execute(set_tenant_stmt(tenant_id))
@@ -67,7 +67,7 @@ async def execute_job(
             log.warning("job.missing", job_id=str(job_id))
             return
         if job.status in ("succeeded", "running"):
-            return  # idempotence : ne pas ré-exécuter un job déjà traité/en cours
+            return  # idempotence: don't re-run a job already processed/in progress
         await jobs_iface.mark_running(session, tenant_id, job_id)
         job_type = job.type
 
@@ -77,11 +77,11 @@ async def execute_job(
             await session.execute(set_user_stmt(user_id))
             await session.execute(set_tenant_stmt(tenant_id))
             await jobs_iface.mark_failed(
-                session, tenant_id, job_id, error=f"aucun handler pour le type '{job_type}'"
+                session, tenant_id, job_id, error=f"no handler for type '{job_type}'"
             )
         return
 
-    # 2) Transaction de travail : handler + finalisation.
+    # 2) Work transaction: handler + finalization.
     try:
         async with sessionmaker() as session, session.begin():
             await session.execute(set_user_stmt(user_id))
@@ -98,7 +98,7 @@ async def execute_job(
             result_ref = await handler(ctx)
             await jobs_iface.mark_succeeded(session, tenant_id, job_id, result_ref=result_ref)
         log.info("job.succeeded", job_id=str(job_id), type=job_type)
-    except Exception as exc:  # noqa: BLE001 — on veut TOUT capturer pour ne pas bloquer le job
+    except Exception as exc:  # noqa: BLE001 — catch EVERYTHING so the job never stays stuck
         log.exception("job.failed", job_id=str(job_id), type=job_type)
         async with sessionmaker() as session, session.begin():
             await session.execute(set_user_stmt(user_id))
@@ -115,15 +115,15 @@ def enqueue_job(
     *,
     settings: Settings | None = None,
 ) -> None:
-    """Planifie l'exécution d'un job hors du cycle requête/réponse.
+    """Schedules a job's execution outside the request/response cycle.
 
-    Deux exécuteurs, choisis par environnement — point de bascule UNIQUE :
-    - Sur Modal (conteneur distant) : `modal.Function.spawn` lance le worker dédié
-      `run_job` dans un autre conteneur. Indispensable car les `BackgroundTasks`
-      Starlette ne s'exécutent PAS de façon fiable sur Modal (le conteneur peut être
-      gelé dès la réponse HTTP renvoyée → le job resterait bloqué en `queued`).
-    - En local (`modal.is_local()`) : `BackgroundTasks` exécute le job in-process
-      après la réponse, sans dépendance Modal.
+    Two runners, chosen by environment — SINGLE switch point:
+    - On Modal (remote container): `modal.Function.spawn` launches the dedicated
+      `run_job` worker in another container. Indispensable because Starlette
+      `BackgroundTasks` do NOT run reliably on Modal (the container can be frozen
+      as soon as the HTTP response is returned → the job would stay stuck in `queued`).
+    - Locally (`modal.is_local()`): `BackgroundTasks` runs the job in-process
+      after the response, with no Modal dependency.
     """
     cfg = settings or get_settings()
 
@@ -131,7 +131,7 @@ def enqueue_job(
         import modal
 
         on_modal = not modal.is_local()
-    except Exception:  # noqa: BLE001 — modal absent/non initialisé ⇒ chemin local
+    except Exception:  # noqa: BLE001 — modal absent/uninitialized ⇒ local path
         on_modal = False
 
     if on_modal:
@@ -143,6 +143,6 @@ def enqueue_job(
     background_tasks.add_task(execute_job, cfg, tenant.tenant_id, tenant.user_id, job_id)
 
 
-# Petit utilitaire de calcul lourd hors-boucle, pour les handlers.
+# Small utility for off-loop heavy computation, for the handlers.
 async def run_in_thread[T](fn: Callable[[], T]) -> T:
     return await run_sync(fn)

@@ -1,9 +1,9 @@
-"""Agent E1 (profiling) — boucle tool-use multi-tour, streamée en NDJSON.
+"""E1 agent (profiling) — multi-turn tool-use loop, streamed as NDJSON.
 
-Port de lucis-dashboard/api/trace.js, mais la boucle tourne côté serveur :
-l'outil de retrieval appelle l'interface publique de `corpus` (spec §8), au lieu
-de faire un aller-retour client. Émet des événements NDJSON (log/tool_use/done/
-error). LLM et retriever sont injectés ⇒ testable sans clé ni base.
+Port of lucis-dashboard/api/trace.js, but the loop runs server-side:
+the retrieval tool calls the public interface of `corpus` (spec §8), instead
+of making a client round-trip. Emits NDJSON events (log/tool_use/done/
+error). LLM and retriever are injected ⇒ testable without a key or database.
 """
 
 import json
@@ -15,7 +15,7 @@ import anthropic
 
 from augura_api.core.llm.runtime import LLMClient
 
-# (tool_name, query) → lignes de corpus (dicts façon match_chunks)
+# (tool_name, query) → corpus rows (match_chunks-style dicts)
 Retriever = Callable[[str, str], Awaitable[list[dict[str, Any]]]]
 
 TOOL_LABELS = {

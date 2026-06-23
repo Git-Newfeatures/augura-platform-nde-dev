@@ -400,7 +400,7 @@ export default function SimulationEngine({
   const [inp,         setInp]         = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
-  // ── Backend: live bootstrap results (read-model, scopé tenant) ────────────────
+  // ── Backend: live bootstrap results (read-model, tenant-scoped) ───────────────
   useEffect(() => {
     let alive = true;
     fetchSimulationResults(selectedCohort).then((rows) => {
@@ -485,7 +485,7 @@ export default function SimulationEngine({
     setChatLoading(true);
     const cur2 = result?.all?.[estimator];
     try {
-      // Passerelle backend FastAPI → POST /agents/chat (Bearer JWT) → {text}.
+      // FastAPI backend gateway → POST /agents/chat (Bearer JWT) → {text}.
       const d = await apiJson("/agents/chat", {
         method: "POST",
         body: JSON.stringify({

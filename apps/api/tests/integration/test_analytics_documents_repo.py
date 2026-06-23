@@ -1,6 +1,6 @@
-"""Tests d'intégration analytics + documents — usage/admin-stats et génération.
+"""Integration tests analytics + documents — usage/admin-stats and generation.
 
-Sous le rôle augura_app (RLS active).
+Under the augura_app role (RLS active).
 """
 
 import os
@@ -31,7 +31,7 @@ TENANT = CurrentTenant(tenant_id=LUCIS, user_id=USER, role="owner")
 async def session() -> AsyncIterator[AsyncSession]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as s, s.begin():
@@ -63,12 +63,12 @@ async def test_document_generate_creates_job_and_row(session: AsyncSession) -> N
 
 
 async def test_document_content_round_trips_through_db(session: AsyncSession) -> None:
-    """Les octets du dossier vivent EN BASE (generated_documents.content) : ce que le
-    worker écrit, l'ASGI le relit — cohérent cross-conteneur, contrairement au disque."""
+    """The document bytes live IN THE DATABASE (generated_documents.content): what the
+    worker writes, the ASGI process reads back — consistent cross-container, unlike disk."""
     created = await DocumentService(session).generate(
         TENANT, doc_schemas.GenerateRequest(type="report")
     )
-    html = b"<html><body>dossier de test</body></html>"
+    html = b"<html><body>test document</body></html>"
     await DocumentRepo(session).set_status(
         LUCIS, created.document_id, status="ready", storage_path="logical/ref", content=html
     )

@@ -1,4 +1,4 @@
-"""Modèle SQLAlchemy du module dq."""
+"""SQLAlchemy model for the dq module."""
 
 from datetime import datetime
 from typing import Any

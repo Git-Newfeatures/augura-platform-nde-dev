@@ -1,14 +1,14 @@
-"""Client ClinicalTrials.gov via l'API officielle v2 (REST/JSON).
+"""ClinicalTrials.gov client via the official v2 API (REST/JSON).
 
-Frère de `pubmed.py`, mêmes conventions : `CTGovClient` est un Protocol injectable
-(les tests fournissent un faux client sans réseau), l'implémentation réelle tape
-l'API publique `https://clinicaltrials.gov/api/v2/studies` via l'`httpx.AsyncClient`
-injecté. Champs confirmés par sonde sur l'API v2 (cf. protocolSection.*Module) :
+Sibling of `pubmed.py`, same conventions: `CTGovClient` is an injectable Protocol
+(tests provide a fake client with no network), the real implementation hits the
+public API `https://clinicaltrials.gov/api/v2/studies` via the injected
+`httpx.AsyncClient`. Fields confirmed by probing the v2 API (cf. protocolSection.*Module):
 
   - search  : GET /studies?query.term=…  → { studies: [ { protocolSection } ], … }
-  - by-NCT  : GET /studies/{nct}          → { protocolSection, … }  (404 si inconnu)
+  - by-NCT  : GET /studies/{nct}          → { protocolSection, … }  (404 if unknown)
 
-Le 404 d'un NCT inconnu = miss known-item → None (pas de repli topique).
+A 404 for an unknown NCT = known-item miss → None (no topical fallback).
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def _study_url(nct_id: str) -> str:
 
 
 def _parse_study(protocol_section: dict[str, Any]) -> CTGovStudy | None:
-    """Parse un `protocolSection` (commun à la recherche et au fetch par id)."""
+    """Parse a `protocolSection` (shared by search and fetch-by-id)."""
     ident = _as_dict(protocol_section.get("identificationModule"))
     nct_id = str(ident.get("nctId") or "").strip()
     title = str(ident.get("briefTitle") or ident.get("officialTitle") or "").strip()
@@ -90,11 +90,11 @@ class CTGovClient(Protocol):
 
 
 class CTGovApiClient:
-    """Implémentation réelle : API v2 ClinicalTrials.gov (aucune clé requise).
+    """Real implementation: ClinicalTrials.gov v2 API (no key required).
 
-    `base_url` permet de pointer vers un relais (fonction Vercel) qui réémet vers
-    CT.gov depuis un egress non bloqué — le WAF de CT.gov renvoie 403 aux IP datacenter
-    de Modal. Absent ⇒ appel direct à l'API publique."""
+    `base_url` can point to a relay (Vercel function) that re-issues to CT.gov
+    from a non-blocked egress — the CT.gov WAF returns 403 to Modal datacenter
+    IPs. Absent ⇒ direct call to the public API."""
 
     def __init__(self, http: httpx.AsyncClient, *, base_url: str | None = None) -> None:
         self._http = http
@@ -119,7 +119,7 @@ class CTGovApiClient:
         return [s for s in parsed if s is not None]
 
     async def fetch_by_nct(self, nct_id: str) -> CTGovStudy | None:
-        """Known-item NCT : fetch direct par id. 404 → None (miss honnête)."""
+        """Known-item NCT: direct fetch by id. 404 → None (honest miss)."""
         nct = nct_id.strip().upper()
         if not nct:
             return None

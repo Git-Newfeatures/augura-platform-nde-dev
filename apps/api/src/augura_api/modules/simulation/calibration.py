@@ -1,20 +1,20 @@
-"""Constantes cliniques de calibration (port de lucis-dashboard/src/config.js).
+"""Clinical calibration constants (port of lucis-dashboard/src/config.js).
 
-⚠️ Ne pas modifier sans sign-off — partagées entre le power analytique (LIVE) et
-le bootstrap (run_bootstrap.py). Source : cohorte synthétique Lucis (N=824)."""
+⚠️ Do not modify without sign-off — shared between the analytical power (LIVE) and
+the bootstrap (run_bootstrap.py). Source: Lucis synthetic cohort (N=824)."""
 
 COHORT_N = 824
-TREAT_PROP = 0.231  # HIGH engagers = quartile haut (split binaire HIGH vs REST, D1)
-TRUE_EFFECT = -0.206  # ATT observé : réduction HbA1c HIGH vs REST
+TREAT_PROP = 0.231  # HIGH engagers = top quartile (binary HIGH vs REST split, D1)
+TRUE_EFFECT = -0.206  # observed ATT: HbA1c reduction HIGH vs REST
 
-POWER_THRESHOLD = 80.0  # power minimale pour soumission réglementaire
-POWER_MARGINAL_FLOOR = 70.0  # en-dessous → redesign, pas de soumission
+POWER_THRESHOLD = 80.0  # minimum power for regulatory submission
+POWER_MARGINAL_FLOOR = 70.0  # below → redesign, no submission
 
-# σ calibré pour que la formule analytique colle au bootstrap au baseline.
+# σ calibrated so the analytical formula matches the bootstrap at the baseline.
 SIGMA_NOISE = {"low": 0.82, "medium": 1.05, "high": 1.38}
 
-# Fix T4 — calibration σ PAR OUTCOME (défaut = medium ; valeurs réelles à affiner
-# sur les cohortes partenaires, données non disponibles ici).
+# Fix T4 — PER-OUTCOME σ calibration (default = medium; real values to be refined
+# on partner cohorts, data not available here).
 OUTCOME_SIGMA = {
     "hba1c": 1.05,
     "hba1c_12m": 1.05,
@@ -46,7 +46,7 @@ ESTIMATORS = ["lme", "ols", "ipw", "mediation", "tmle", "did"]
 
 
 def sigma_for(*, sigma: float | None, outcome: str | None) -> float:
-    """Résout le σ : explicite > calibration par outcome (T4) > medium par défaut."""
+    """Resolve σ: explicit > per-outcome calibration (T4) > medium by default."""
     if sigma is not None:
         return sigma
     if outcome and outcome in OUTCOME_SIGMA:

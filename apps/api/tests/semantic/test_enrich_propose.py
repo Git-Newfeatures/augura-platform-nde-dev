@@ -1,8 +1,8 @@
-"""Tests de l'orchestration LLM enrich_propose — LLM mocké, sans DB ni réseau.
+"""Tests for the enrich_propose LLM orchestration — LLM mocked, no DB or network.
 
-Couvre :
-- Le flux complet (questions → couverture → batches → préchecks → résultat).
-- Le raccourci selectedConcepts (pas de couverture, 1 seul appel LLM).
+Covers:
+- The full flow (questions → coverage → batches → prechecks → result).
+- The selectedConcepts shortcut (no coverage, a single LLM call).
 """
 
 from typing import Any
@@ -14,7 +14,7 @@ from augura_api.modules.semantic.enrich_propose import propose
 
 
 def _empty_batch_msg() -> Message:
-    """Message LLM de réponse vide (tous les tableaux à zéro)."""
+    """Empty LLM response message (all arrays at zero)."""
     block = ToolUseBlock(
         type="tool_use",
         id="tu",
@@ -41,7 +41,7 @@ def _empty_batch_msg() -> Message:
 
 
 class _Msgs:
-    """Messages LLM fictifs — retourne toujours un batch vide."""
+    """Fake LLM messages — always returns an empty batch."""
 
     def __init__(self) -> None:
         self.calls = 0
@@ -56,12 +56,12 @@ class _Client:
         self.messages = _Msgs()
 
 
-# ── Test 1 : flux complet avec questions PICOT ────────────────────────────────
+# ── Test 1: full flow with PICOT questions ────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_propose_aggregates_and_reports_progress() -> None:
-    """Le flux complet renvoie la structure attendue et émet au moins un progrès."""
+    """The full flow returns the expected structure and emits at least one progress event."""
     progress: list[tuple[float, str]] = []
 
     async def on_progress(frac: float, msg: str) -> None:
@@ -90,7 +90,7 @@ async def test_propose_aggregates_and_reports_progress() -> None:
         on_progress=on_progress,
     )
 
-    # Structure des proposals
+    # Proposals structure
     assert "taxonomy_concepts" in result["proposals"]
     assert "taxonomy_synonyms" in result["proposals"]
     assert "taxonomy_standard_codes" in result["proposals"]
@@ -98,25 +98,25 @@ async def test_propose_aggregates_and_reports_progress() -> None:
     assert "ontology_relation_evidence" in result["proposals"]
     assert "ontology_relation_qualifiers" in result["proposals"]
 
-    # Clés de retour obligatoires
+    # Mandatory return keys
     assert "coverage_summary" in result
     assert "summary" in result
     assert "precheck_log" in result
 
-    # Au moins une émission de progrès
-    assert progress, "aucun progrès émis"
+    # At least one progress event emitted
+    assert progress, "no progress emitted"
 
-    # Les fractions sont dans [0, 1]
+    # Fractions are in [0, 1]
     for frac, _ in progress:
-        assert 0.0 <= frac <= 1.0, f"fraction hors plage : {frac}"
+        assert 0.0 <= frac <= 1.0, f"fraction out of range: {frac}"
 
 
-# ── Test 2 : raccourci selectedConcepts ───────────────────────────────────────
+# ── Test 2: selectedConcepts shortcut ───────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_propose_selected_concepts_shortcut() -> None:
-    """Le raccourci selectedConcepts saute la couverture et renvoie un résultat valide."""
+    """The selectedConcepts shortcut skips coverage and returns a valid result."""
     progress: list[tuple[float, str]] = []
 
     async def on_progress(frac: float, msg: str) -> None:
@@ -137,15 +137,15 @@ async def test_propose_selected_concepts_shortcut() -> None:
         on_progress=on_progress,
     )
 
-    # Structure des proposals présente
+    # Proposals structure present
     assert isinstance(result["proposals"], dict)
     assert "taxonomy_concepts" in result["proposals"]
     assert "ontology_relations" in result["proposals"]
 
-    # Le raccourci ne produit pas de coverage_summary (ou le retourne vide/None)
-    # — la spec dit : "empty/absent for the selected_concepts shortcut path"
+    # The shortcut produces no coverage_summary (or returns it empty/None)
+    # — the spec says: "empty/absent for the selected_concepts shortcut path"
     summary = result.get("coverage_summary")
     assert summary is None or summary == {}
 
-    # Au moins un progrès émis
+    # At least one progress event emitted
     assert progress

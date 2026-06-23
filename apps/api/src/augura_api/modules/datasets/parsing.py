@@ -1,7 +1,7 @@
-"""Parsing serveur des fichiers de données (CSV via stdlib, XLSX via openpyxl).
+"""Server-side parsing of data files (CSV via stdlib, XLSX via openpyxl).
 
-Renvoie une liste de feuilles {name, headers, rows} — données brutes en str
-(le profilage et la DQ s'appliquent ensuite). Pas de .xls binaire (415).
+Returns a list of sheets {name, headers, rows} — raw data as str
+(profiling and DQ are applied afterwards). No binary .xls (415).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def _decode(data: bytes) -> str:
             return data.decode(enc)
         except UnicodeDecodeError:
             continue
-    raise BadRequestError("fichier illisible (encodage non supporté)")
+    raise BadRequestError("unreadable file (unsupported encoding)")
 
 
 def _parse_csv(data: bytes) -> Sheet:
@@ -46,7 +46,7 @@ def _parse_csv(data: bytes) -> Sheet:
     reader = csv.reader(io.StringIO(text), dialect)
     rows = [[(c or "").strip() for c in row] for row in reader if any(c.strip() for c in row)]
     if not rows:
-        raise BadRequestError("CSV vide")
+        raise BadRequestError("empty CSV")
     headers = rows[0]
     return Sheet(name="data", headers=headers, rows=rows[1:])
 
@@ -66,18 +66,16 @@ def _parse_xlsx(data: bytes) -> list[Sheet]:
         sheets.append(Sheet(name=ws.title, headers=all_rows[0], rows=all_rows[1:]))
     wb.close()
     if not sheets:
-        raise BadRequestError("classeur XLSX vide")
+        raise BadRequestError("empty XLSX workbook")
     return sheets
 
 
 def parse_upload(filename: str, data: bytes) -> list[Sheet]:
     if len(data) > MAX_UPLOAD_BYTES:
-        raise PayloadTooLargeError(
-            "fichier trop volumineux", max_bytes=MAX_UPLOAD_BYTES, size=len(data)
-        )
+        raise PayloadTooLargeError("file too large", max_bytes=MAX_UPLOAD_BYTES, size=len(data))
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     if ext == "csv":
         return [_parse_csv(data)]
     if ext == "xlsx":
         return _parse_xlsx(data)
-    raise UnsupportedMediaTypeError("format non supporté (utiliser .csv ou .xlsx)", ext=ext)
+    raise UnsupportedMediaTypeError("unsupported format (use .csv or .xlsx)", ext=ext)

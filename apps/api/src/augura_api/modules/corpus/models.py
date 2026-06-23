@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module corpus. org_id NULL ⇒ document/chunk global."""
+"""SQLAlchemy models for the corpus module. org_id NULL ⇒ global document/chunk."""
 
 from datetime import date, datetime
 from typing import Any
@@ -50,8 +50,8 @@ class Chunk(Base):
     token_count: Mapped[int | None] = mapped_column(Integer)
 
 
-# ── Recherche live (retrieve-and-freeze) ──────────────────────────────────────
-# Refs externes (org_id/study_id/created_by) = UUID nus, comme Document.org_id.
+# ── Live search (retrieve-and-freeze) ─────────────────────────────────────────
+# External refs (org_id/study_id/created_by) = bare UUIDs, like Document.org_id.
 
 
 class LiteratureSnapshot(Base):
@@ -63,7 +63,7 @@ class LiteratureSnapshot(Base):
     org_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True))
     study_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True))
     created_by: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True))
-    # Artefact canonique exact qui a été haché (autorité du content_hash).
+    # Exact canonical artifact that was hashed (authority of the content_hash).
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     content_hash: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(

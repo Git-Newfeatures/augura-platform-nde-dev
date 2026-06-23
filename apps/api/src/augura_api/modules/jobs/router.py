@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module jobs — suivi par polling (spec §8)."""
+"""HTTP adapter for the jobs module — tracking via polling (spec §8)."""
 
 from uuid import UUID
 
@@ -18,5 +18,5 @@ async def get_job_status(
 ) -> schemas.JobOut:
     job = await get_job(session, tenant.tenant_id, job_id)
     if job is None:
-        raise NotFoundError("job introuvable", job_id=str(job_id))
+        raise NotFoundError("job not found", job_id=str(job_id))
     return schemas.JobOut.model_validate(job)

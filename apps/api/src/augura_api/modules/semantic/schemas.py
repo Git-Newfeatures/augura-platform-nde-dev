@@ -1,4 +1,4 @@
-"""Schémas Pydantic — contrat public du module semantic."""
+"""Pydantic schemas — public contract of the semantic module."""
 
 from typing import Any
 
@@ -22,7 +22,7 @@ class ConceptOut(BaseModel):
 
 
 class RelationOut(BaseModel):
-    """Relation causale de l'ontologie (B1) — sortie de GET /semantic/relations."""
+    """Causal relation of the ontology (B1) — output of GET /semantic/relations."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,11 +37,11 @@ class RelationOut(BaseModel):
 
 
 class SemanticBundle(BaseModel):
-    """Réponse de GET /semantic/bundle — la couche sémantique gouvernée en bloc.
+    """Response of GET /semantic/bundle — the governed semantic layer as a single block.
 
-    14 tables, lignes laissées en `dict` brut : le front les indexe lui-même
-    (semantic-store → taxonomy/ontology loaders). Typer chaque table n'apporterait
-    rien au contrat de lecture. Les 14 champs sont toujours présents (coalesce à []).
+    14 tables, rows left as raw `dict`: the frontend indexes them itself
+    (semantic-store → taxonomy/ontology loaders). Typing each table would add
+    nothing to the read contract. All 14 fields are always present (coalesce to []).
     """
 
     taxonomy_concepts: list[dict[str, Any]]
@@ -61,7 +61,7 @@ class SemanticBundle(BaseModel):
 
 
 class ReleaseStatus(BaseModel):
-    """Réponse de GET /semantic/release — release courante + compte par table."""
+    """Response of GET /semantic/release — current release + per-table count."""
 
     release: dict[str, Any] | None = None
     counts: dict[str, int]

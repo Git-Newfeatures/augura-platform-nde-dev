@@ -41,8 +41,8 @@ export function NewStudyPage() {
     setBusy(true)
     setError(null)
     try {
-      // Persiste réellement l'étude côté backend ; on navigue vers l'UUID renvoyé
-      // (et non un slug local) pour que la page workflow retrouve l'étude.
+      // Actually persists the study on the backend; we navigate to the returned UUID
+      // (not a local slug) so the workflow page can find the study.
       const study = await apiJson('/studies', {
         method: 'POST',
         body: JSON.stringify({

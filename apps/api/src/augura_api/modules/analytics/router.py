@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module analytics."""
+"""HTTP adapter of the analytics module."""
 
 from typing import Annotated
 
@@ -11,8 +11,8 @@ from augura_api.modules.analytics.service import AnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
-# `/admin` expose des stats à l'échelle de l'org (ids d'autres utilisateurs inclus) :
-# réservé au rôle `owner` (un `viewer`/`member` reçoit 403).
+# `/admin` exposes org-wide stats (including other users' ids):
+# restricted to the `owner` role (a `viewer`/`member` gets 403).
 OwnerTenantDep = Annotated[CurrentTenant, Depends(require_role("owner"))]
 
 
@@ -28,8 +28,8 @@ async def activity(
     limit: int = 30,
     study_id: str | None = None,
 ) -> list[schemas.ActivityEvent]:
-    """Fil d'activité du tenant (audit trail) — accessible à tout membre, filtrable
-    par étude. Alimente l'onglet History et les notifications du front."""
+    """Tenant activity feed (audit trail) — accessible to any member, filterable
+    by study. Feeds the History tab and the frontend notifications."""
     return await AnalyticsService(session).activity(tenant, limit=limit, study_id=study_id)
 
 
@@ -40,6 +40,6 @@ async def artifacts(
     limit: int = 50,
     study_id: str | None = None,
 ) -> list[schemas.ArtifactOut]:
-    """Artefacts versionnés & hashés du tenant (provenance/reproductibilité) —
-    alimente l'onglet Lineage."""
+    """Tenant's versioned & hashed artifacts (provenance/reproducibility) —
+    feeds the Lineage tab."""
     return await AnalyticsService(session).artifacts(tenant, limit=limit, study_id=study_id)

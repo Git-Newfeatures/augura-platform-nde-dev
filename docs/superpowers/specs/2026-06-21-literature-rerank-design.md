@@ -1,180 +1,181 @@
-# Chantier A — Curation par abstract sur `/corpus/literature/retrieve`
+# Workstream A — Abstract-based curation on `/corpus/literature/retrieve`
 
-**Date :** 2026-06-21
-**Statut :** design validé (en attente de relecture spec)
-**Périmètre :** backend (module `corpus`) + petite touche front (afficher le rationale, stamper la provenance au freeze)
+**Date:** 2026-06-21
+**Status:** design validated (pending spec review)
+**Scope:** backend (`corpus` module) + a small frontend touch (show the rationale, stamp the provenance at freeze time)
 
-## Contexte & objectif
+## Context & objective
 
-`POST /corpus/literature/retrieve` fan-out PubMed + CT.gov en direct, groupé par
-source, streamé en NDJSON (`meta` → `group`/source → `done`). Aujourd'hui la
-récupération est « dumb » : PubMed `esearch` avec `sort=relevance` → `efetch` des
-top-N verbatim ; CT.gov via l'ordre de pertinence natif de l'API v2. **Aucune
-relecture d'abstract, aucune priorisation par niveau de preuve, aucun rationale.**
+`POST /corpus/literature/retrieve` fans out PubMed + CT.gov live, grouped by
+source, streamed in NDJSON (`meta` → `group`/source → `done`). Today the
+retrieval is "dumb": PubMed `esearch` with `sort=relevance` → `efetch` of the
+top-N verbatim; CT.gov via the API v2's native relevance order. **No
+abstract reading, no prioritization by evidence level, no rationale.**
 
-C'est la seule régression de *qualité de récupération* encore réelle vs l'ancienne
-branche `augura/corpus-live` (dont l'agent lisait les abstracts et renvoyait « les N
-plus pertinents / au plus haut niveau de preuve » avec un rationale).
+This is the only *retrieval-quality* regression still real vs the old
+`augura/corpus-live` branch (whose agent read the abstracts and returned "the N
+most relevant / highest evidence level" with a rationale).
 
-**Objectif :** restaurer ce comportement de **curation** sur le chemin topique du
-`retrieve`, de façon typée, bornée, reproductible et bon marché.
+**Objective:** restore this **curation** behavior on the topical path of
+`retrieve`, in a typed, bounded, reproducible and cheap way.
 
-## Décisions (issues du brainstorming)
+## Decisions (from the brainstorming)
 
-1. **Comportement = curation parité.** Sur-récupérer un pool large, le LLM lit les
-   candidats, renvoie les N meilleurs classés par pertinence + force de preuve, avec
-   un rationale par item. **La curation peut écarter les résultats faibles.**
-2. **Deux sources.** PubMed curé par abstract ; CT.gov curé par ses champs
-   structurés (titre / conditions / interventions / phase / statut).
-3. **Streaming = groupe curé d'un coup.** Le `group` d'une source n'est émis qu'une
-   fois la curation finie. Le contrat NDJSON `meta|group|done` est **conservé** ; le
-   front affiche juste un état « curation… ». Changement front minimal.
-4. **Toujours active, dégradation gracieuse.** Curation par défaut sur chaque
-   `retrieve`. Pas de clé Anthropic / panne LLM → repli silencieux sur l'ordre
-   relevance top-N actuel (comme `expand_pubmed_query` dégrade). Pas de flag opt-in.
-5. **Approche = agent structuré, un appel par source.** Réutilise
-   `run_structured_agent` (outil forcé + validation Pydantic + 1 retry réparation) et
-   `settings.agent_model_fast`. Le LLM ne renvoie **que des ids ordonnés + rationale**.
+1. **Behavior = curation parity.** Over-fetch a large pool, the LLM reads the
+   candidates, returns the best N ranked by relevance + evidence strength, with
+   one rationale per item. **Curation may drop weak results.**
+2. **Two sources.** PubMed curated by abstract; CT.gov curated by its
+   structured fields (title / conditions / interventions / phase / status).
+3. **Streaming = group curated at once.** A source's `group` is only emitted once
+   curation is finished. The NDJSON `meta|group|done` contract is **kept**; the
+   frontend just shows a "curating…" state. Minimal frontend change.
+4. **Always active, graceful degradation.** Curation by default on every
+   `retrieve`. No Anthropic key / LLM failure → silent fall back to the current
+   relevance top-N order (the same way `expand_pubmed_query` degrades). No opt-in flag.
+5. **Approach = structured agent, one call per source.** Reuses
+   `run_structured_agent` (forced tool + Pydantic validation + 1 repair retry) and
+   `settings.agent_model_fast`. The LLM returns **only ordered ids + rationale**.
 
-## Non-objectifs (YAGNI)
+## Non-goals (YAGNI)
 
-- Pas de boucle agentique tool-use (approche 3) — c'est le terrain de la « grosse
-  feature » B (workbench mots-clés), pas de A.
-- Pas de scoring numérique par item (approche 2).
-- Pas de `evidence_tier` produit par le LLM : on garde l'`evidence_type` déterministe
-  déjà dérivé dans `pubmed.py`. Le LLM est *instruit* de pondérer la force de preuve
-  dans son classement, mais ne fabrique aucun champ de preuve.
-- Pas de cache de résultats (item C séparé).
-- Pas de re-validation de mots-clés / MeSH-UID / openFDA (feature B).
+- No agentic tool-use loop (approach 3) — that is the territory of the "big
+  feature" B (keyword workbench), not A.
+- No numeric per-item scoring (approach 2).
+- No `evidence_tier` produced by the LLM: we keep the deterministic `evidence_type`
+  already derived in `pubmed.py`. The LLM is *instructed* to weigh evidence strength
+  in its ranking, but fabricates no evidence field.
+- No result cache (separate item C).
+- No keyword / MeSH-UID / openFDA re-validation (feature B).
 
 ## Architecture
 
-Nouveau fichier `apps/api/src/augura_api/modules/corpus/curation.py`, frère de
-`pubmed.py` / `ctgov.py`, qui isole toute la logique LLM :
+New file `apps/api/src/augura_api/modules/corpus/curation.py`, sibling of
+`pubmed.py` / `ctgov.py`, isolating all the LLM logic:
 
-- **`Curator` Protocol** — injectable (les tests fournissent un faux curator sans
-  réseau) :
+- **`Curator` Protocol** — injectable (tests provide a fake curator without
+  network):
   ```
   async def curate(query, source, candidates: list[CurationCandidate]) -> list[CuratedRef]
   ```
-- **`CurationCandidate`** (dataclass) : `id`, `title`, `text` — `text` = abstract
-  (PubMed) ou résumé des champs structurés (CT.gov), tronqué (~1200 c) pour borner les
+- **`CurationCandidate`** (dataclass): `id`, `title`, `text` — `text` = abstract
+  (PubMed) or a summary of the structured fields (CT.gov), truncated (~1200 chars) to bound the
   tokens.
-- **`CuratedRef`** (sortie) : `id`, `rationale`. L'**ordre de la liste** porte le
-  classement.
-- **`LLMCurator`** : implémentation réelle. Outil forcé renvoyant
+- **`CuratedRef`** (output): `id`, `rationale`. The **order of the list** carries the
+  ranking.
+- **`LLMCurator`**: the real implementation. Forced tool returning
   `{ "selected": [ { "id": str, "rationale": str }, ... ] }` (≤ `max_results`).
-  Système : « documentaliste biomédical·e ; classe par pertinence à la question, en
-  remontant les preuves plus fortes (méta-analyses / revues systématiques / RCT >
-  observationnel > autre) ; rationale court par item ; n'invente aucun id ».
-- **Constante** `CURATION_PROMPT_VERSION = "curate-v1"` exportée pour la provenance.
+  System: "biomedical librarian; rank by relevance to the question,
+  bringing up stronger evidence (meta-analyses / systematic reviews / RCT >
+  observational > other); short rationale per item; never invent an id".
+- **Constant** `CURATION_PROMPT_VERSION = "curate-v1"` exported for provenance.
 
-`retrieval.py` importe le **`Curator` Protocol** (pas le client Anthropic) →
-couches propres. `curation.py` importe `core.llm.runtime` ; `corpus` peut importer
-`core.llm` (contrat `lint-imports` respecté).
+`retrieval.py` imports the **`Curator` Protocol** (not the Anthropic client) →
+clean layers. `curation.py` imports `core.llm.runtime`; `corpus` may import
+`core.llm` (`lint-imports` contract respected).
 
-## Flux de données
+## Data flow
 
-Chemin **topique uniquement**. Le known-item (PMID/DOI/titre/NCT) reste un lookup
-exact à 1 résultat — **jamais curé**.
+**Topical path only.** The known-item (PMID/DOI/title/NCT) stays an exact lookup
+with 1 result — **never curated**.
 
 ```
 _topical(query, srcs, max_results, day, filters)
-  pour chaque source demandée (en parallèle, via le gather existant) :
-    1. sur-récupérer un pool : POOL = min(50, max(25, max_results * 2))
-       (borné par retmax ≤ 50 côté PubMed ; CT.gov pageSize équivalent)
-    2. si curator présent :
-         rendre les candidats (id + titre + texte tronqué)
-         → curator.curate(query, source, candidates) → [CuratedRef] ordonné
-         → mapper ids → enregistrements DÉJÀ récupérés (le LLM n'émet que des ids
-           → zéro fabrication de contenu), réordonner, garder max_results,
-           attacher rationale.
-    3. si curator absent : trim relevance top-N (= comportement actuel).
+  for each requested source (in parallel, via the existing gather):
+    1. over-fetch a pool: POOL = min(50, max(25, max_results * 2))
+       (bounded by retmax ≤ 50 on the PubMed side; CT.gov pageSize equivalent)
+    2. if curator present:
+         render the candidates (id + title + truncated text)
+         → curator.curate(query, source, candidates) → ordered [CuratedRef]
+         → map ids → ALREADY-fetched records (the LLM only emits ids
+           → zero content fabrication), reorder, keep max_results,
+           attach rationale.
+    3. if curator absent: trim relevance top-N (= current behavior).
   → SourceGroup(source, query_string, items[, note])
 ```
 
-POOL par défaut = 25 (`max_results` défaut 10 → pool 25, borné à 50).
+Default POOL = 25 (`max_results` default 10 → pool 25, bounded to 50).
 
-**Garde-fous déterministes** (dans `retrieval.py`, hors LLM) :
-- ids hors pool (hallucinés) → ignorés ;
-- doublons d'id → dédupliqués (premier gardé) ;
-- **sortie vide / tout filtré alors qu'il y avait des candidats → repli relevance
-  top-N** (jamais de groupe vide par faute de curation).
+**Deterministic guardrails** (in `retrieval.py`, outside the LLM):
+- ids outside the pool (hallucinated) → ignored;
+- duplicate ids → deduplicated (first kept);
+- **empty output / everything filtered while there were candidates → fall back to relevance
+  top-N** (never an empty group due to a curation fault).
 
-## Changements de contrat (⇒ regen OpenAPI + client, drift-check CI)
+## Contract changes (⇒ regen OpenAPI + client, CI drift-check)
 
-- `RetrievedItem` (dataclass `retrieval.py`) : nouveau champ `rationale: str | None = None`.
-- `schemas.RetrievedItemOut` : `rationale: str | None = None`.
-- `schemas.FrozenResult` : `rationale: str | None = None` (persistance snapshot).
-- Event **`meta`** du stream enrichi : `curated: bool`, `model_version: str | None`,
-  `prompt_version: str | None` (= `CURATION_PROMPT_VERSION`). Fournit au front la
-  provenance pour *geler* un snapshot reproductible (les champs `model_version` /
-  `prompt_version` du snapshot existent déjà, en attente de ça).
-- `snapshot_service.to_retrieve_response` : passe `rationale=i.rationale`.
-- `snapshot_service._build_payload` : ajoute `"rationale": r.rationale` aux results.
+- `RetrievedItem` (`retrieval.py` dataclass): new field `rationale: str | None = None`.
+- `schemas.RetrievedItemOut`: `rationale: str | None = None`.
+- `schemas.FrozenResult`: `rationale: str | None = None` (snapshot persistence).
+- Stream **`meta`** event enriched: `curated: bool`, `model_version: str | None`,
+  `prompt_version: str | None` (= `CURATION_PROMPT_VERSION`). Gives the frontend the
+  provenance to *freeze* a reproducible snapshot (the snapshot's `model_version` /
+  `prompt_version` fields already exist, waiting for this).
+- `snapshot_service.to_retrieve_response`: passes `rationale=i.rationale`.
+- `snapshot_service._build_payload`: adds `"rationale": r.rationale` to the results.
 
-**Compat snapshots** : `rationale` optionnel. Les anciens snapshots (payload sans la
-clé) se relisent sans casse — `FrozenResult(**r)` tolère l'absence (défaut `None`), et
-`verify_content_hash` recalcule sur le payload **stocké tel quel** → hash inchangé.
-Les nouveaux snapshots incluent `rationale` dans le hash.
+**Snapshot compat**: `rationale` optional. Old snapshots (payload without the
+key) re-read without breakage — `FrozenResult(**r)` tolerates the absence (default `None`), and
+`verify_content_hash` recomputes on the **as-stored** payload → unchanged hash.
+New snapshots include `rationale` in the hash.
 
-Après contrat : `uv run python apps/api/scripts/dump_openapi.py` puis
+After the contract: `uv run python apps/api/scripts/dump_openapi.py` then
 `npm --prefix packages/api-client run generate`.
 
-## Gestion d'erreur / dégradation
+## Error handling / degradation
 
-- L'appel curation est enveloppé : `AgentUpstreamError` / `AgentInvalidOutput` → log
-  `warning` + repli relevance top-N **sans rationale** ; jamais d'exception remontée.
-- Combiné au `_safe_group` existant : une source qui tombe (403 CT.gov, panne LLM) ne
-  casse ni le fan-out ni le stream — l'autre source remonte normalement.
-- Pas de clé Anthropic → `curator=None` (le routeur l'attrape comme pour l'embedder) →
-  `retrieve` se comporte exactement comme aujourd'hui. **Zéro régression possible.**
+- The curation call is wrapped: `AgentUpstreamError` / `AgentInvalidOutput` → `warning`
+  log + fall back to relevance top-N **without rationale**; no exception ever propagated.
+- Combined with the existing `_safe_group`: a source that fails (403 CT.gov, LLM failure) breaks
+  neither the fan-out nor the stream — the other source comes back normally.
+- No Anthropic key → `curator=None` (the router catches it as for the embedder) →
+  `retrieve` behaves exactly as today. **Zero regression possible.**
 
-## Câblage routeur
+## Router wiring
 
-Dans `literature_retrieve` :
-- construire le curator depuis `get_anthropic_client(settings)` ; sur
-  `AgentUpstreamError` → `curator=None` (même pattern que l'embedder dans `/literature`).
-- passer `curator` + `settings.agent_model_fast` à `LiteratureRetriever`.
-- l'`AsyncClient` LLM n'est pas un HTTP request-scoped : `LLMCurator` détient le
-  client Anthropic injecté ; le `gen()` NDJSON reste inchangé (le `group` arrive déjà
-  curé). Le `meta` event porte désormais `curated` / `model_version` / `prompt_version`.
+In `literature_retrieve`:
+- build the curator from `get_anthropic_client(settings)`; on
+  `AgentUpstreamError` → `curator=None` (same pattern as the embedder in `/literature`).
+- pass `curator` + `settings.agent_model_fast` to `LiteratureRetriever`.
+- the LLM `AsyncClient` is not an HTTP request-scoped one: `LLMCurator` holds the
+  injected Anthropic client; the NDJSON `gen()` stays unchanged (the `group` arrives already
+  curated). The `meta` event now carries `curated` / `model_version` / `prompt_version`.
 
-## Tests (CI : ruff · pyright strict · lint-imports · pytest · drift-check OpenAPI)
+## Tests (CI: ruff · strict pyright · lint-imports · pytest · OpenAPI drift-check)
 
-- **`curation.py`** (LLM mocké via le `LLMClient` Protocol) : réordonne selon la
-  sortie ; écarte les non-sélectionnés ; ignore les ids hallucinés ; déduplique ;
-  tronque le texte ; sortie outil invalide → `AgentInvalidOutput` (testé au niveau
-  `run_structured_agent` déjà couvert, ici on teste le mapping).
-- **`retrieval.py`** (curator stub) : sur-récup → cure → trim à `max_results` ;
-  known-item **non curé** ; `curator=None` → top-N relevance inchangé ; curator qui
-  lève → repli gracieux + stream intact ; sortie vide → repli relevance top-N.
-- **régression** : les tests existants du `retrieve` passent (ajouter `curator=None`
-  ou un stub selon le cas).
+- **`curation.py`** (LLM mocked via the `LLMClient` Protocol): reorders according to the
+  output; drops the non-selected ones; ignores hallucinated ids; deduplicates;
+  truncates the text; invalid tool output → `AgentInvalidOutput` (tested at the
+  `run_structured_agent` level, already covered; here we test the mapping).
+- **`retrieval.py`** (curator stub): over-fetch → curate → trim to `max_results`;
+  known-item **not curated**; `curator=None` → relevance top-N unchanged; curator that
+  raises → graceful fallback + stream intact; empty output → fall back to relevance top-N.
+- **regression**: the existing `retrieve` tests pass (add `curator=None`
+  or a stub depending on the case).
 
-## Fichiers touchés
+## Files touched
 
-| Fichier | Changement |
+| File | Change |
 |---|---|
-| `corpus/curation.py` | **NEW** — `Curator` Protocol, `LLMCurator`, candidats, outil + sortie, `CURATION_PROMPT_VERSION` |
-| `corpus/retrieval.py` | sur-récup + curation dans `_topical` ; champ `rationale` ; garde-fous |
-| `corpus/router.py` | build curator ; passe au retriever ; `meta` enrichi |
-| `corpus/schemas.py` | `rationale` sur `RetrievedItemOut` + `FrozenResult` |
-| `corpus/snapshot_service.py` | passe `rationale` (response + payload) |
-| `apps/web/src/workspace/literature/literatureClient.js` + UI | afficher rationale ; stamper model/prompt au freeze |
-| tests backend | `curation.py` + `retrieval.py` |
+| `corpus/curation.py` | **NEW** — `Curator` Protocol, `LLMCurator`, candidates, tool + output, `CURATION_PROMPT_VERSION` |
+| `corpus/retrieval.py` | over-fetch + curation in `_topical`; `rationale` field; guardrails |
+| `corpus/router.py` | build curator; pass to the retriever; enriched `meta` |
+| `corpus/schemas.py` | `rationale` on `RetrievedItemOut` + `FrozenResult` |
+| `corpus/snapshot_service.py` | pass `rationale` (response + payload) |
+| `apps/web/src/workspace/literature/literatureClient.js` + UI | show rationale; stamp model/prompt at freeze |
+| backend tests | `curation.py` + `retrieval.py` |
 | `packages/api-client` | regen OpenAPI + client |
 
-## Risques / points ouverts
+## Risks / open points
 
-- **Latence** : +1 appel LLM par source (≈2–5 s) avant l'émission du groupe. Atténué
-  par le modèle `agent_model_fast` et le pool borné (25). Accepté (décision streaming).
-- **Troncature d'abstract** : 1200 c peut couper un abstract long ; suffisant pour
-  juger la pertinence. Paramétrable si besoin.
-- **Coût tokens** : ~25 candidats × ~1200 c ≈ ~10–15k tokens d'entrée par source.
-  Borné, sur modèle fast.
+- **Latency**: +1 LLM call per source (≈2–5 s) before emitting the group. Mitigated
+  by the `agent_model_fast` model and the bounded pool (25). Accepted (streaming decision).
+- **Abstract truncation**: 1200 chars may cut a long abstract; enough to
+  judge relevance. Configurable if needed.
+- **Token cost**: ~25 candidates × ~1200 chars ≈ ~10–15k input tokens per source.
+  Bounded, on a fast model.
 
-## Politique de commit
+## Commit policy
 
-`CLAUDE.md` : « ne commit/push/déploie que sur demande explicite ». La spec est
-**écrite mais non committée** ; commit sur demande.
+`CLAUDE.md`: "only commit/push/deploy on explicit request". The spec is
+**written but not committed**; commit on request.
+```

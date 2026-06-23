@@ -1,4 +1,4 @@
-"""Logique du module agents. Sorties validées Pydantic + 1 retry réparation (runtime)."""
+"""Agents module logic. Pydantic-validated outputs + 1 repair retry (runtime)."""
 
 from augura_api.core.config import Settings
 from augura_api.core.errors import BadRequestError
@@ -35,15 +35,15 @@ class AgentService:
         self.settings = settings
 
     _DEFAULT_CHAT_SYSTEM = (
-        "Tu es l'assistant scientifique d'Augura, plateforme de preuve clinique "
-        "(études RWE, DiGA, design causal). Réponds de façon concise, rigoureuse et "
-        "actionnable, en t'appuyant sur le contexte fourni. Si une information manque, "
-        "dis-le explicitement plutôt que d'inventer."
+        "You are Augura's scientific assistant, a clinical-evidence platform "
+        "(RWE studies, DiGA, causal design). Respond concisely, rigorously, and "
+        "actionably, drawing on the provided context. If information is missing, "
+        "say so explicitly rather than inventing it."
     )
 
     async def chat(self, req: schemas.ChatRequest) -> schemas.ChatResponse:
         if not req.messages:
-            raise BadRequestError("messages est requis et non vide")
+            raise BadRequestError("messages is required and must not be empty")
         result = await run_chat(
             self.client,
             model=req.model or self.settings.agent_model_dag,
@@ -55,7 +55,7 @@ class AgentService:
 
     async def build_dag(self, req: schemas.DagRequest) -> schemas.DagResponse:
         if not req.intervention or not req.outcome:
-            raise BadRequestError("intervention et outcome sont requis")
+            raise BadRequestError("intervention and outcome are required")
         result: AgentResult[schemas.DagResponse] = await run_structured_agent(
             self.client,
             model=self.settings.agent_model_dag,
@@ -69,7 +69,7 @@ class AgentService:
 
     async def detect_gaps(self, req: schemas.GapRequest) -> schemas.GapResponse:
         if not req.intervention or not req.outcome:
-            raise BadRequestError("intervention et outcome sont requis")
+            raise BadRequestError("intervention and outcome are required")
         user = build_gap_user_message(
             intervention=req.intervention,
             outcome=req.outcome,
@@ -88,8 +88,8 @@ class AgentService:
                 max_tokens=1500,
             )
         except _AGENT_FAILURES:
-            # Parité avec api/gap-detection.js : on dégrade à vide pour ne pas
-            # bloquer le flux DAG en aval.
+            # Parity with api/gap-detection.js: degrade to empty so as not to
+            # block the downstream DAG flow.
             return schemas.GapResponse(missing_variables=[])
         return result.output
 
@@ -97,7 +97,7 @@ class AgentService:
         self, req: schemas.VariableCheckRequest
     ) -> schemas.VariableCheckResponse:
         if not req.sheets:
-            raise BadRequestError("sheets est requis et non vide")
+            raise BadRequestError("sheets is required and must not be empty")
         sheets = [s.model_dump() for s in req.sheets]
         classify: AgentResult[schemas.ClassifyColumnsResponse] = await run_structured_agent(
             self.client,
@@ -117,7 +117,7 @@ class AgentService:
         )
         matches = classify.output.columns
 
-        # Questions dataset = best-effort : toute défaillance dégrade à None.
+        # Dataset questions = best-effort: any failure degrades to None.
         questions: list[schemas.DatasetQuestion] | None = None
         try:
             dq = await run_structured_agent(

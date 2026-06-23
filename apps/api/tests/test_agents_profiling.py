@@ -1,7 +1,7 @@
-"""Tests locaux de l'agent E1 (profiling SSE) — LLM + retriever mockés.
+"""Local tests for the E1 agent (profiling SSE) — mocked LLM + retriever.
 
-Vérifie la boucle multi-tour (tool_use → retrieval serveur → synthèse), le
-parsing du profil final, et les chemins d'erreur (parse / max_tokens).
+Checks the multi-turn loop (tool_use → server retrieval → synthesis), parsing
+of the final profile, and the error paths (parse / max_tokens).
 """
 
 import json
@@ -34,7 +34,7 @@ def _text_msg(text: str, stop_reason: str = "end_turn") -> Message:
         content=content,
         model="claude-opus-4-8",
         role="assistant",
-        stop_reason=stop_reason,  # type: ignore[arg-type] -- littéral validé par le SDK
+        stop_reason=stop_reason,  # type: ignore[arg-type] -- literal validated by the SDK
         type="message",
         usage=Usage(input_tokens=5, output_tokens=3),
     )

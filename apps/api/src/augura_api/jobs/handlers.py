@@ -1,9 +1,9 @@
-"""Handlers de jobs : le travail réel exécuté par le runner, par type de job.
+"""Job handlers: the actual work executed by the runner, by job type.
 
-Couche d'orchestration (comme `modules.agents`) : c'est le SEUL endroit qui croise
-plusieurs modules de données (simulation, documents, studies, corpus) + la spine
-analytics/provenance. Chaque handler persiste son résultat, émet un event de provenance
-(`create_artifact` → outbox_events) et journalise l'usage (`log_usage`).
+Orchestration layer (like `modules.agents`): this is the ONLY place that crosses
+several data modules (simulation, documents, studies, corpus) + the
+analytics/provenance spine. Each handler persists its result, emits a provenance event
+(`create_artifact` → outbox_events) and logs usage (`log_usage`).
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ log = structlog.get_logger(__name__)
 
 
 async def handle_bootstrap(ctx: JobContext) -> str | None:
-    """Bootstrap Monte-Carlo : calcule, finalise le run, projette le read-model
-    simulation_results, archive l'artefact + provenance, journalise l'usage."""
+    """Monte-Carlo bootstrap: computes, finalizes the run, projects the
+    simulation_results read-model, archives the artifact + provenance, logs usage."""
     from augura_api.jobs.runner import run_in_thread
 
     repo = SimulationRepo(ctx.session)
@@ -69,12 +69,12 @@ async def handle_bootstrap(ctx: JobContext) -> str | None:
 
 
 async def handle_document(ctx: JobContext) -> str | None:
-    """Génère le dossier (HTML print-friendly), le stocke, marque le document `ready`,
-    archive l'artefact + provenance, journalise l'usage."""
+    """Generates the document (print-friendly HTML), stores it, marks the document `ready`,
+    archives the artifact + provenance, logs usage."""
     payload = dict(ctx.job.payload or {})
     document_id = UUID(str(payload["document_id"]))
     study_id_raw = payload.get("study_id")
-    doc_type = ctx.job.type.replace("generate_", "")  # generate_protocol → protocol
+    doc_type = ctx.job.type.replace("generate_", "")  # generate_protocol -> protocol
 
     study_dict = None
     state_dict = None
@@ -120,10 +120,10 @@ async def handle_document(ctx: JobContext) -> str | None:
         sources=sources,
         generated_at=datetime.now(UTC),
     )
-    # Octets stockés EN BASE (generated_documents.content), pas sur le disque local du
-    # conteneur : sur Modal le worker `run_job` et l'ASGI sont des conteneurs distincts au
-    # FS éphémère, donc un fichier disque serait introuvable au download (404). `storage_path`
-    # reste un identifiant logique stable (provenance), découplé du disque.
+    # Bytes stored IN THE DATABASE (generated_documents.content), not on the container's
+    # local disk: on Modal the `run_job` worker and the ASGI app are distinct containers with
+    # an ephemeral FS, so a disk file would be unreachable on download (404). `storage_path`
+    # remains a stable logical identifier (provenance), decoupled from the disk.
     data = html.encode("utf-8")
     ref = storage.build_ref(str(ctx.tenant_id), f"{document_id}.html")
     await DocumentRepo(ctx.session).set_status(
@@ -151,10 +151,10 @@ async def handle_document(ctx: JobContext) -> str | None:
 
 
 async def handle_enrich_propose(ctx: JobContext) -> str | None:
-    """Pipeline de proposition d'enrichissement (B4) : lit le bundle, exécute les
-    batchs LLM, persiste le batch de propositions EN BASE (jobs.result_json). Le
-    résultat n'est PAS écrit sur disque : sur Modal le FS est éphémère et propre au
-    conteneur, donc un artefact fichier ne serait pas relisible par le conteneur ASGI."""
+    """Enrichment proposal pipeline (B4): reads the bundle, runs the LLM
+    batches, persists the proposal batch IN THE DATABASE (jobs.result_json). The
+    result is NOT written to disk: on Modal the FS is ephemeral and container-local,
+    so a file artifact would not be readable back by the ASGI container."""
     from augura_api.core.db import get_sessionmaker, set_tenant_stmt, set_user_stmt
     from augura_api.core.llm.runtime import get_anthropic_client
     from augura_api.modules import jobs as jobs_iface
@@ -168,10 +168,10 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
     last_pct = -1
 
     async def on_progress(frac: float, _message: str) -> None:
-        # La transaction de travail du runner ne committe qu'à la fin : une progression
-        # écrite dessus resterait invisible au polling. On la committe dans une
-        # transaction courte DÉDIÉE (throttlée au point de pourcentage) pour qu'elle remonte.
-        # Best-effort : la progression ne doit jamais faire échouer le job lui-même.
+        # The runner's work transaction only commits at the end: progress written on it
+        # would stay invisible to polling. We commit it in a DEDICATED short
+        # transaction (throttled per percentage point) so it surfaces.
+        # Best-effort: progress must never make the job itself fail.
         nonlocal last_pct
         pct = round(max(0.0, min(1.0, frac)) * 100)
         if pct == last_pct and frac < 1.0:
@@ -182,7 +182,7 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
                 await s.execute(set_user_stmt(ctx.user_id))
                 await s.execute(set_tenant_stmt(ctx.tenant_id))
                 await jobs_iface.set_progress(s, ctx.tenant_id, ctx.job.id, frac)
-        except Exception:  # noqa: BLE001 — progression best-effort
+        except Exception:  # noqa: BLE001 — best-effort progress
             log.warning("enrich.progress.skipped", job_id=str(ctx.job.id), frac=frac)
 
     result = await propose(

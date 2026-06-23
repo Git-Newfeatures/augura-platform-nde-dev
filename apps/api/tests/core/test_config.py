@@ -6,7 +6,7 @@ from augura_api.core.config import Settings, get_settings
 
 def test_settings_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUGURA_ENV", "dev")
-    s = Settings()  # pyright: ignore[reportCallIssue] -- champs injectés par l'environnement
+    s = Settings()  # pyright: ignore[reportCallIssue] -- fields injected from the environment
     assert s.env == "dev"
     assert s.app_name == "augura-api"
     assert s.version == "0.1.0"
@@ -15,7 +15,7 @@ def test_settings_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_settings_fails_fast_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AUGURA_ENV", raising=False)
     with pytest.raises(ValidationError):
-        Settings()  # pyright: ignore[reportCallIssue] -- l'absence d'env doit lever
+        Settings()  # pyright: ignore[reportCallIssue] -- a missing env must raise
 
 
 def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -25,8 +25,8 @@ def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_llm_keys_load_from_unprefixed_names(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Le .env pose ANTHROPIC_API_KEY / OPENAI_API_KEY / NCBI_API_KEY sans préfixe :
-    l'alias doit les charger malgré env_prefix=AUGURA_ (sinon les clés sont ignorées)."""
+    """The .env sets ANTHROPIC_API_KEY / OPENAI_API_KEY / NCBI_API_KEY without a prefix:
+    the alias must load them despite env_prefix=AUGURA_ (otherwise the keys are ignored)."""
     monkeypatch.setenv("AUGURA_ENV", "dev")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-unprefixed")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-unprefixed")
@@ -38,7 +38,7 @@ def test_llm_keys_load_from_unprefixed_names(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_llm_keys_prefer_prefixed_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Le nom préfixé AUGURA_* reste accepté et prioritaire."""
+    """The prefixed AUGURA_* name stays accepted and takes priority."""
     monkeypatch.setenv("AUGURA_ENV", "dev")
     monkeypatch.setenv("AUGURA_ANTHROPIC_API_KEY", "sk-ant-prefixed")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-unprefixed")
@@ -47,8 +47,8 @@ def test_llm_keys_prefer_prefixed_name(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_blank_llm_key_normalised_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Une clé vide/whitespace (`ANTHROPIC_API_KEY=`) doit valoir None — sinon les
-    constructeurs LLM bâtissent un client à clé vide au lieu de lever 503 (bug wiring)."""
+    """An empty/whitespace key (`ANTHROPIC_API_KEY=`) must be None — otherwise the LLM
+    constructors build a client with an empty key instead of raising 503 (wiring bug)."""
     monkeypatch.setenv("AUGURA_ENV", "dev")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("OPENAI_API_KEY", "   ")
@@ -58,8 +58,8 @@ def test_blank_llm_key_normalised_to_none(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_ctgov_proxy_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AUGURA_CTGOV_PROXY_URL : absent ⇒ None (appel direct) ; posé ⇒ chargé ;
-    vide ⇒ None (le validateur blank→None couvre aussi ce champ)."""
+    """AUGURA_CTGOV_PROXY_URL: not set ⇒ None (direct call); set ⇒ loaded;
+    empty ⇒ None (the blank→None validator covers this field too)."""
     monkeypatch.setenv("AUGURA_ENV", "dev")
     monkeypatch.delenv("AUGURA_CTGOV_PROXY_URL", raising=False)
     assert Settings().ctgov_proxy_url is None  # pyright: ignore[reportCallIssue]
@@ -72,8 +72,8 @@ def test_ctgov_proxy_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_ctgov_relay_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AUGURA_CTGOV_RELAY_URL : absent ⇒ None (appel direct) ; posé ⇒ chargé ;
-    vide ⇒ None (couvert par le validateur blank→None)."""
+    """AUGURA_CTGOV_RELAY_URL: not set ⇒ None (direct call); set ⇒ loaded;
+    empty ⇒ None (covered by the blank→None validator)."""
     monkeypatch.setenv("AUGURA_ENV", "dev")
     monkeypatch.delenv("AUGURA_CTGOV_RELAY_URL", raising=False)
     assert Settings().ctgov_relay_url is None  # pyright: ignore[reportCallIssue]

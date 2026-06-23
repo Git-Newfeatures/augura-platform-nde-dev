@@ -1,4 +1,4 @@
-"""Tests unitaires du service reference — mapping ORM→schéma sans base (faux repo)."""
+"""Unit tests for the reference service — ORM→schema mapping without a database (fake repo)."""
 
 from uuid import UUID
 

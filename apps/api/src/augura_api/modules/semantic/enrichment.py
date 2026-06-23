@@ -1,14 +1,14 @@
 """
-Logique pure d'enrichissement sémantique (sans I/O, sans LLM, sans DB).
+Pure semantic enrichment logic (no I/O, no LLM, no DB).
 
-Port fidèle de :
+Faithful port of:
   - lucis-dashboard/api/enrich-propose.js  (buildSemanticData, matchTokens,
     directedBFS, analyzeCoverage, groupMissingConcepts, applyPreChecks,
     reassignIds, stampRows, mergeInto)
   - lucis-dashboard/src/semantic/lexical-normalizer.js  (normalize)
 
-Les seuils numériques et les conditions de branchement sont reproduits à
-l'identique depuis la source JS.
+The numeric thresholds and branching conditions are reproduced identically
+from the JS source.
 """
 
 from __future__ import annotations
@@ -18,27 +18,27 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-# ── Constante globale ──────────────────────────────────────────────────────────
+# ── Global constant ────────────────────────────────────────────────────────────
 
 HOP_LIMIT = 3
 
-# ── Normalisation lexicale ─────────────────────────────────────────────────────
-# Port de lexical-normalizer.js → fonction `normalize`.
+# ── Lexical normalization ──────────────────────────────────────────────────────
+# Port of lexical-normalizer.js → `normalize` function.
 #
-# Étapes (identiques au JS) :
-#   1. Minuscules
-#   2. Suppression des artefacts d'encodage ".."
-#   3. Suppression des suffixes de timepoint (.BL, .3M, .6M, …)
-#   4. Remplacement des séparateurs (_, . : - / \ |) par des espaces
-#   5. Suppression des caractères non-alphanumériques (hors espace)
-#   6. Tokenisation
-#   7. Expansion des abréviations médicales connues
-#   8. Suppression des tokens purement numériques et des tokens bruit
-#   9. Jointure + trim
+# Steps (identical to the JS):
+#   1. Lowercase
+#   2. Removal of ".." encoding artifacts
+#   3. Removal of timepoint suffixes (.BL, .3M, .6M, …)
+#   4. Replacement of separators (_, . : - / \ |) with spaces
+#   5. Removal of non-alphanumeric characters (excluding space)
+#   6. Tokenization
+#   7. Expansion of known medical abbreviations
+#   8. Removal of purely numeric tokens and noise tokens
+#   9. Join + trim
 
-# Carte d'expansion des abréviations (port exact du JS)
+# Abbreviation expansion map (exact port of the JS)
 _ABBREV_MAP: dict[str, str] = {
-    # Mesures cliniques
+    # Clinical measurements
     "hba1c": "hemoglobin a1c",
     "a1c": "hemoglobin a1c",
     "hgba1c": "hemoglobin a1c",
@@ -70,7 +70,7 @@ _ABBREV_MAP: dict[str, str] = {
     "ctcae": "toxicity grade",
     "vas": "pain analog scale",
     "nrs": "pain rating scale",
-    # Dispositifs / procédures
+    # Devices / procedures
     "tka": "total knee arthroplasty",
     "tkr": "total knee replacement",
     "rygb": "gastric bypass",
@@ -90,7 +90,7 @@ _ABBREV_MAP: dict[str, str] = {
     "t2dm": "type 2 diabetes",
     "dm": "diabetes",
     "icm": "cardiac monitor",
-    # NOTE: "cgm" intentionnellement NON expansé (idem JS)
+    # NOTE: "cgm" intentionally NOT expanded (same as JS)
     "hcl": "closed loop",
     "mdi": "daily injection",
     "ics": "inhaled corticosteroid",
@@ -102,7 +102,7 @@ _ABBREV_MAP: dict[str, str] = {
     "qol": "quality of life",
     "pro": "patient reported outcome",
     "rpm": "remote monitoring",
-    # Formes courtes communes
+    # Common short forms
     "bl": "baseline",
     "pt": "patient",
     "wt": "weight",
@@ -117,7 +117,7 @@ _ABBREV_MAP: dict[str, str] = {
     "kgm2": "kg m2",
 }
 
-# Tokens bruit à supprimer (port exact du JS)
+# Noise tokens to remove (exact port of the JS)
 _NOISE_TOKENS: frozenset[str] = frozenset(
     {
         "value",
@@ -162,46 +162,46 @@ _NOISE_TOKENS: frozenset[str] = frozenset(
     }
 )
 
-# Pattern des suffixes de timepoint (port du regex JS)
+# Timepoint suffix pattern (port of the JS regex)
 _TIMEPOINT_RE = re.compile(
     r"\.(bl|baseline|3m|6m|12m|24m|36m|w0|w2|w4|w8|w12|pre|post|fu)\b",
     re.IGNORECASE,
 )
-# Séparateurs → espace
+# Separators → space
 _SEPARATOR_RE = re.compile(r"[_.:\-\/\\|]")
-# Caractères non-alphanumériques hors espace
+# Non-alphanumeric characters excluding space
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9 ]")
-# Token purement numérique
+# Purely numeric token
 _DIGITS_RE = re.compile(r"^\d+$")
 
 
 def normalize(text: str | None) -> str:
-    """Normalise un texte brut pour la correspondance lexicale.
+    """Normalizes raw text for lexical matching.
 
-    Port exact de ``lexical-normalizer.js → normalize()``.
-    Retourne une chaîne vide si l'entrée est None ou chaîne vide.
+    Exact port of ``lexical-normalizer.js → normalize()``.
+    Returns an empty string if the input is None or an empty string.
     """
     if not text:
         return ""
 
     s = text.lower()
 
-    # Suppression des artefacts d'encodage (..)
+    # Removal of encoding artifacts (..)
     s = s.replace("..", " ")
 
-    # Suppression des suffixes de timepoint
+    # Removal of timepoint suffixes
     s = _TIMEPOINT_RE.sub("", s)
 
-    # Remplacement des séparateurs par des espaces
+    # Replacement of separators with spaces
     s = _SEPARATOR_RE.sub(" ", s)
 
-    # Suppression des caractères non-sémantiques
+    # Removal of non-semantic characters
     s = _NON_ALNUM_RE.sub("", s)
 
-    # Tokenisation
+    # Tokenization
     tokens: list[str] = [t for t in s.split() if t]
 
-    # Expansion des abréviations
+    # Abbreviation expansion
     expanded: list[str] = []
     for tok in tokens:
         if tok in _ABBREV_MAP:
@@ -209,7 +209,7 @@ def normalize(text: str | None) -> str:
         else:
             expanded.append(tok)
 
-    # Suppression des tokens numériques et des tokens bruit
+    # Removal of numeric tokens and noise tokens
     filtered = [
         tok for tok in expanded if tok and tok not in _NOISE_TOKENS and not _DIGITS_RE.match(tok)
     ]
@@ -217,12 +217,12 @@ def normalize(text: str | None) -> str:
     return " ".join(filtered).strip()
 
 
-# ── Structures de données ──────────────────────────────────────────────────────
+# ── Data structures ────────────────────────────────────────────────────────────
 
 
 @dataclass
 class _Ontology:
-    """Index en mémoire de l'ontologie causale."""
+    """In-memory index of the causal ontology."""
 
     relations: list[dict[str, Any]]
     by_subject: dict[str, list[dict[str, Any]]]
@@ -232,7 +232,7 @@ class _Ontology:
 
 @dataclass
 class SemanticIndex:
-    """Résultat de ``build_semantic_data`` : index complet pour l'analyse."""
+    """Result of ``build_semantic_data``: full index for the analysis."""
 
     concept_index: list[dict[str, Any]]
     syn_lookup: dict[str, list[str]]
@@ -241,42 +241,42 @@ class SemanticIndex:
 
 @dataclass
 class BfsResult:
-    """Résultat d'un parcours BFS directionnel."""
+    """Result of a directed BFS traversal."""
 
     found: bool
     nearest_forward_hop: dict[str, Any] | None = None
 
 
-# ── Construction des index ─────────────────────────────────────────────────────
+# ── Index construction ───────────────────────────────────────────────────────
 
 
 def _parse_boolean(v: Any) -> bool:
-    """Convertit une valeur potentiellement sérialisée en booléen.
+    """Converts a potentially serialized value to a boolean.
 
-    Reproduit le comportement JS : ``v === true || v === 'true' || v === 1``.
+    Reproduces the JS behavior: ``v === true || v === 'true' || v === 1``.
     """
     return v is True or v == "true" or v == 1
 
 
 def build_semantic_data(raw_data: dict[str, Any]) -> SemanticIndex:
-    """Construit les index sémantiques en mémoire depuis les données brutes.
+    """Builds the in-memory semantic indexes from the raw data.
 
-    Port de ``buildSemanticData()`` dans enrich-propose.js.
+    Port of ``buildSemanticData()`` in enrich-propose.js.
 
     Args:
-        raw_data: dict avec clés ``taxonomy_concepts``, ``taxonomy_synonyms``,
-            ``ontology_relations``, ``causal_predicates`` (chacune liste ou
-            liste vide par défaut).
+        raw_data: dict with keys ``taxonomy_concepts``, ``taxonomy_synonyms``,
+            ``ontology_relations``, ``causal_predicates`` (each a list or an
+            empty list by default).
 
     Returns:
-        :class:`SemanticIndex` avec concept_index, syn_lookup, ontology.
+        :class:`SemanticIndex` with concept_index, syn_lookup, ontology.
     """
     taxonomy_concepts: list[dict[str, Any]] = raw_data.get("taxonomy_concepts", [])
     taxonomy_synonyms: list[dict[str, Any]] = raw_data.get("taxonomy_synonyms", [])
     ontology_relations: list[dict[str, Any]] = raw_data.get("ontology_relations", [])
     causal_predicates: list[dict[str, Any]] = raw_data.get("causal_predicates", [])
 
-    # Regroupement des synonymes par concept
+    # Grouping of synonyms by concept
     synonyms_by_concept_id: dict[str, list[str]] = {}
     for s in taxonomy_synonyms:
         if not s.get("synonym"):
@@ -284,7 +284,7 @@ def build_semantic_data(raw_data: dict[str, Any]) -> SemanticIndex:
         cid: str = s["local_concept_id"]
         synonyms_by_concept_id.setdefault(cid, []).append(s["synonym"])
 
-    # Construction du concept index (uniquement les concepts actifs)
+    # Building the concept index (active concepts only)
     concept_index: list[dict[str, Any]] = []
     for row in taxonomy_concepts:
         if not _parse_boolean(row.get("active")):
@@ -303,7 +303,7 @@ def build_semantic_data(raw_data: dict[str, Any]) -> SemanticIndex:
             }
         )
 
-    # Construction du syn_lookup : texte normalisé → liste de concept IDs
+    # Building the syn_lookup: normalized text → list of concept IDs
     syn_lookup: dict[str, list[str]] = {}
 
     def _add_to_lookup(norm_text: str, concept_id: str) -> None:
@@ -318,7 +318,7 @@ def build_semantic_data(raw_data: dict[str, Any]) -> SemanticIndex:
         for norm_syn in concept["_norm_synonyms"]:
             _add_to_lookup(norm_syn, concept["id"])
 
-    # Construction de l'ontologie avec maps directionnelles
+    # Building the ontology with directional maps
     active_relations = [r for r in ontology_relations if _parse_boolean(r.get("active"))]
     by_subject: dict[str, list[dict[str, Any]]] = {}
     by_object: dict[str, list[dict[str, Any]]] = {}
@@ -342,7 +342,7 @@ def build_semantic_data(raw_data: dict[str, Any]) -> SemanticIndex:
     )
 
 
-# ── Analyse de couverture (Phase 2) ───────────────────────────────────────────
+# ── Coverage analysis (Phase 2) ────────────────────────────────────────────────
 
 
 def match_tokens(
@@ -350,23 +350,23 @@ def match_tokens(
     syn_lookup: dict[str, list[str]],
     concept_index: list[dict[str, Any]],
 ) -> tuple[dict[str, list[str]], set[str]]:
-    """Associe des phrases PICOT à des concepts du taxonomy.
+    """Maps PICOT phrases to taxonomy concepts.
 
-    Port de ``matchTokens()`` dans enrich-propose.js.
+    Port of ``matchTokens()`` in enrich-propose.js.
 
-    Règles (fidèles au JS) :
-    - Correspondance exacte via syn_lookup → priorité absolue.
-    - Sinon, parcours du concept_index :
-      - Le label normalisé du concept doit être contenu dans la phrase normalisée
-        ET faire au moins 4 caractères.
-      - Si le label ne passe pas, on teste les synonymes normalisés (même
-        contrainte de longueur ≥ 4).
-      - La règle de couverture de mots : on accepte si la phrase est courte
-        (≤ 3 mots) OU si le ratio mots_label / mots_phrase ≥ 0.5.
+    Rules (faithful to the JS):
+    - Exact match via syn_lookup → highest priority.
+    - Otherwise, scan of the concept_index:
+      - The normalized concept label must be contained in the normalized phrase
+        AND be at least 4 characters long.
+      - If the label does not pass, the normalized synonyms are tested (same
+        length constraint ≥ 4).
+      - The word-coverage rule: accepted if the phrase is short
+        (≤ 3 words) OR if the ratio label_words / phrase_words ≥ 0.5.
 
     Returns:
-        Tuple (matched, unmatched) où matched est un dict phrase→liste_concept_ids
-        et unmatched est un set des phrases sans correspondance.
+        Tuple (matched, unmatched) where matched is a dict phrase→list_of_concept_ids
+        and unmatched is a set of phrases without a match.
     """
     matched: dict[str, list[str]] = {}
     unmatched: set[str] = set()
@@ -378,7 +378,7 @@ def match_tokens(
         if not norm_phrase:
             continue
 
-        # Correspondance exacte via le syn_lookup — confiance maximale
+        # Exact match via the syn_lookup — maximum confidence
         if norm_phrase in syn_lookup:
             matched[phrase] = list(syn_lookup[norm_phrase])
             continue
@@ -389,31 +389,31 @@ def match_tokens(
         for c in concept_index:
             norm_label: str = c["_norm_label"]
 
-            # Port exact du if/else JS (enrich-propose.js ~lignes 233-253) :
+            # Exact port of the JS if/else (enrich-propose.js ~lines 233-253):
             #   if (!normPhrase.includes(c._normLabel) || c._normLabel.length < 4)
-            #     → essayer les synonymes
+            #     → try the synonyms
             #   else
-            #     → le label est présent ET ≥ 4 chars : UNIQUEMENT vérification
-            #       de couverture du label, les synonymes ne sont JAMAIS tentés.
+            #     → the label is present AND ≥ 4 chars: label-coverage check
+            #       ONLY, the synonyms are NEVER tried.
             if norm_phrase and (norm_label not in norm_phrase or len(norm_label) < 4):
-                # Label absent ou trop court → on tente les synonymes normalisés
+                # Label absent or too short → try the normalized synonyms
                 for syn in c["_norm_synonyms"]:
                     if not syn or len(syn) < 4 or syn not in norm_phrase:
                         continue
                     syn_words = len([w for w in syn.split() if w])
-                    # Accepté si phrase courte (≤3 mots) ou synonyme couvre ≥50% des mots
+                    # Accepted if phrase is short (≤3 words) or synonym covers ≥50% of words
                     if phrase_words <= 3 or syn_words / phrase_words >= 0.5:
                         found.append(c["id"])
                         break
             else:
-                # Label présent ET ≥ 4 chars → vérification de couverture uniquement
-                # (les synonymes ne sont JAMAIS essayés dans cette branche)
+                # Label present AND ≥ 4 chars → coverage check only
+                # (the synonyms are NEVER tried in this branch)
                 label_words = len([w for w in norm_label.split() if w])
                 if phrase_words <= 3 or label_words / phrase_words >= 0.5:
                     found.append(c["id"])
 
         if found:
-            # Déduplication (comme JS : [...new Set(found)])
+            # Deduplication (like JS: [...new Set(found)])
             seen: set[str] = set()
             deduped = [x for x in found if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
             matched[phrase] = deduped
@@ -429,19 +429,19 @@ def directed_bfs(
     to_ids: list[str],
     max_hops: int = HOP_LIMIT,
 ) -> BfsResult:
-    """Parcours en largeur directionnel dans l'ontologie causale.
+    """Directed breadth-first traversal of the causal ontology.
 
-    Port de ``directedBFS()`` dans enrich-propose.js.
+    Port of ``directedBFS()`` in enrich-propose.js.
 
-    Retourne :class:`BfsResult` avec ``found=True`` si un chemin direct existe,
-    sinon ``found=False`` avec éventuellement ``nearest_forward_hop`` indiquant
-    le concept le plus proche des cibles vu depuis la frontière visitée.
+    Returns :class:`BfsResult` with ``found=True`` if a direct path exists,
+    otherwise ``found=False`` with an optional ``nearest_forward_hop`` indicating
+    the concept closest to the targets seen from the visited frontier.
     """
     to_set: set[str] = set(to_ids)
-    # visited est un dict[str, None] ordonné par insertion pour reproduire le
-    # comportement du JS qui utilise un Set ES6 (insertion-ordered).
-    # list(visited) reflète ainsi l'ordre d'insertion, comme [...visited] en JS,
-    # ce qui rend hops_from_intervention déterministe.
+    # visited is an insertion-ordered dict[str, None] to reproduce the
+    # JS behavior which uses an ES6 Set (insertion-ordered).
+    # list(visited) thus reflects the insertion order, like [...visited] in JS,
+    # which makes hops_from_intervention deterministic.
     visited: dict[str, None] = {nid: None for nid in from_ids}
     frontier: set[str] = set(from_ids)
 
@@ -459,7 +459,7 @@ def directed_bfs(
             break
         frontier = next_frontier
 
-    # Recherche du voisin le plus proche des cibles parmi les nœuds visités
+    # Search for the neighbor closest to the targets among the visited nodes
     target_neighbors: set[str] = set()
     for tid in to_ids:
         for rel in ontology.by_object.get(tid, []):
@@ -486,12 +486,12 @@ def analyze_coverage(
     syn_lookup: dict[str, list[str]],
     ontology: _Ontology,
 ) -> dict[str, Any]:
-    """Analyse la couverture de l'ontologie vis-à-vis des questions PICOT.
+    """Analyzes the ontology coverage against the PICOT questions.
 
-    Port de ``analyzeCoverage()`` dans enrich-propose.js.
+    Port of ``analyzeCoverage()`` in enrich-propose.js.
 
     Returns:
-        dict avec clés ``summary``, ``missing_concepts``, ``path_gaps``.
+        dict with keys ``summary``, ``missing_concepts``, ``path_gaps``.
     """
     missing_concept_map: dict[str, dict[str, Any]] = {}
     path_gaps: list[dict[str, Any]] = []
@@ -533,7 +533,7 @@ def analyze_coverage(
                 }
             missing_concept_map[key]["appeared_in"].append(q["id"])
 
-        # Aplatissement et déduplication des concept IDs matchés
+        # Flattening and deduplication of the matched concept IDs
         iv_concept_ids: list[str] = list(
             dict.fromkeys(cid for ids in iv_matched.values() for cid in ids)
         )
@@ -593,16 +593,16 @@ def analyze_coverage(
     }
 
 
-# ── Groupement des concepts manquants ─────────────────────────────────────────
+# ── Grouping of missing concepts ───────────────────────────────────────────────
 
 
 def group_missing_concepts(
     missing: list[dict[str, Any]],
 ) -> list[list[dict[str, Any]]]:
-    """Regroupe les tokens manquants par similarité lexicale.
+    """Groups the missing tokens by lexical similarity.
 
-    Port de ``groupMissingConcepts()`` dans enrich-propose.js.
-    Seuil de Jaccard sur les mots : > 0.4 (identique au JS).
+    Port of ``groupMissingConcepts()`` in enrich-propose.js.
+    Jaccard threshold on words: > 0.4 (identical to the JS).
     """
     groups: list[list[dict[str, Any]]] = []
     assigned: set[int] = set()
@@ -627,14 +627,14 @@ def group_missing_concepts(
     return groups
 
 
-# ── Helpers de consolidation des proposals ────────────────────────────────────
+# ── Proposal consolidation helpers ─────────────────────────────────────────────
 
 
 def make_id(prefix: str, counter: int, today: str) -> str:
-    """Génère un identifiant structuré type ``ENRC_20260619_001``.
+    """Generates a structured identifier of the form ``ENRC_20260619_001``.
 
-    Port de ``makeId()`` dans scripts/lib/bootstrap.mjs.
-    Le paramètre ``today`` est au format YYYYMMDD (déjà calculé par l'appelant).
+    Port of ``makeId()`` in scripts/lib/bootstrap.mjs.
+    The ``today`` parameter is in YYYYMMDD format (already computed by the caller).
     """
     return f"{prefix}_{today}_{str(counter).zfill(3)}"
 
@@ -644,10 +644,10 @@ def reassign_ids(
     counters: dict[str, int],
     today: str,
 ) -> None:
-    """Réassigne des identifiants séquentiels aux entités du batch.
+    """Reassigns sequential identifiers to the batch entities.
 
-    Port de ``reassignIds()`` dans enrich-propose.js (mutation in-place).
-    ``today`` doit être au format YYYYMMDD (e.g. ``"20260619"``).
+    Port of ``reassignIds()`` in enrich-propose.js (in-place mutation).
+    ``today`` must be in YYYYMMDD format (e.g. ``"20260619"``).
     """
     concept_id_map: dict[str, str] = {}
     relation_id_map: dict[str, str] = {}
@@ -690,9 +690,9 @@ def reassign_ids(
 
 
 def merge_into(target: dict[str, Any], source: dict[str, Any]) -> None:
-    """Fusionne les listes de ``source`` dans ``target`` (mutation in-place).
+    """Merges the lists of ``source`` into ``target`` (in-place mutation).
 
-    Port de ``mergeInto()`` dans enrich-propose.js.
+    Port of ``mergeInto()`` in enrich-propose.js.
     """
     for key in target:
         if isinstance(source.get(key), list):
@@ -700,9 +700,9 @@ def merge_into(target: dict[str, Any], source: dict[str, Any]) -> None:
 
 
 def stamp_rows(proposals: dict[str, Any], version: str) -> None:
-    """Ajoute les métadonnées de revue sur toutes les entités du batch.
+    """Adds the review metadata on all the batch entities.
 
-    Port de ``stampRows()`` dans enrich-propose.js (mutation in-place).
+    Port of ``stampRows()`` in enrich-propose.js (in-place mutation).
     """
 
     def _stamp(row: dict[str, Any]) -> dict[str, Any]:
@@ -727,7 +727,7 @@ def stamp_rows(proposals: dict[str, Any], version: str) -> None:
     ]
 
 
-# ── Pré-vérifications (pre-checks) ────────────────────────────────────────────
+# ── Pre-checks ─────────────────────────────────────────────────────────────────
 
 
 def apply_prechecks(
@@ -740,40 +740,40 @@ def apply_prechecks(
     id_counters: dict[str, int],
     today: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Applique les règles de validation et de dédoublonnage sur un batch.
+    """Applies the validation and deduplication rules on a batch.
 
-    Port de ``applyPreChecks()`` dans enrich-propose.js.
+    Port of ``applyPreChecks()`` in enrich-propose.js.
 
-    Règles de rejet (fidèles au JS) :
-    - Self-loop : subject == object
-    - Doublon de relation : clé ``subject|predicate|object|polarity`` déjà vue
-    - Sujet orphelin : subject_concept_id inconnu du batch + existants
-    - Objet orphelin : idem pour object
-    - Prédicat inconnu : predicate non dans valid_predicate_ids
-    - Concept L1 sans code standard
+    Rejection rules (faithful to the JS):
+    - Self-loop: subject == object
+    - Duplicate relation: key ``subject|predicate|object|polarity`` already seen
+    - Orphan subject: subject_concept_id unknown to the batch + existing
+    - Orphan object: same for object
+    - Unknown predicate: predicate not in valid_predicate_ids
+    - L1 concept without a standard code
 
-    Effets secondaires :
-    - Détection et retour des conflits de polarité opposée
-    - Auto-stub d'evidence pour les relations sans evidence
+    Side effects:
+    - Detection and return of opposite-polarity conflicts
+    - Auto-stub of evidence for relations without evidence
 
     Args:
-        today: date au format YYYYMMDD pour les IDs auto-stubs. Si None,
-            utilise la date du jour.
+        today: date in YYYYMMDD format for the auto-stub IDs. If None,
+            uses the current date.
 
     Returns:
-        Liste des conflits de polarité détectés (chaque élément contient
-        ``proposed`` et ``opposite_key``).
+        List of detected polarity conflicts (each element contains
+        ``proposed`` and ``opposite_key``).
     """
     _today = today or date.today().strftime("%Y%m%d")
 
-    # Ensemble de tous les concept IDs connus à l'entrée du batch
+    # Set of all concept IDs known at the batch's entry
     batch_concept_ids: set[str] = existing_concept_ids | {
         c["local_concept_id"] for c in batch.get("taxonomy_concepts", [])
     }
     batch_relation_keys: set[str] = set(existing_relation_keys)
     conflicts: list[dict[str, Any]] = []
 
-    # ── Filtrage des relations ─────────────────────────────────────────────────
+    # ── Relation filtering ─────────────────────────────────────────────────────
     kept_relations: list[dict[str, Any]] = []
     for rel in batch.get("ontology_relations", []):
         subj: str = rel.get("subject_concept_id", "")
@@ -786,28 +786,28 @@ def apply_prechecks(
             log.append(f"  REJECT self-loop: {rel.get('relation_id')} ({subj})")
             continue
 
-        # Doublon par clé composite
+        # Duplicate by composite key
         key = f"{subj}|{pred}|{obj}|{pol}"
         if key in batch_relation_keys:
             log.append(f"  REJECT duplicate: {rel.get('relation_id')} ({key})")
             continue
 
-        # Sujet orphelin
+        # Orphan subject
         if subj not in batch_concept_ids:
             log.append(f"  REJECT orphan subject: {rel.get('relation_id')} → {subj}")
             continue
 
-        # Objet orphelin
+        # Orphan object
         if obj not in batch_concept_ids:
             log.append(f"  REJECT orphan object: {rel.get('relation_id')} → {obj}")
             continue
 
-        # Prédicat inconnu
+        # Unknown predicate
         if pred not in valid_predicate_ids:
             log.append(f"  REJECT unknown predicate: {rel.get('relation_id')} → {pred}")
             continue
 
-        # Détection de conflit de polarité opposée
+        # Opposite-polarity conflict detection
         opposite_polarity: str | None
         if pol == "increases":
             opposite_polarity = "decreases"
@@ -826,7 +826,7 @@ def apply_prechecks(
 
     batch["ontology_relations"] = kept_relations
 
-    # ── Dédoublonnage des concepts ─────────────────────────────────────────────
+    # ── Concept deduplication ──────────────────────────────────────────────────
     seen_concept_ids: set[str] = set(existing_concept_ids)
     kept_concepts: list[dict[str, Any]] = []
     for c in batch.get("taxonomy_concepts", []):
@@ -838,7 +838,7 @@ def apply_prechecks(
         kept_concepts.append(c)
     batch["taxonomy_concepts"] = kept_concepts
 
-    # ── Rejet L1 sans code standard ───────────────────────────────────────────
+    # ── Reject L1 without a standard code ──────────────────────────────────────
     batch_code_ids: set[str] = {
         s["local_concept_id"] for s in batch.get("taxonomy_standard_codes", [])
     }
@@ -853,9 +853,9 @@ def apply_prechecks(
         kept_concepts_final.append(c)
     batch["taxonomy_concepts"] = kept_concepts_final
 
-    # ── Re-filtrage des relations après rejet de concepts ─────────────────────
-    # Un concept accepté au filtrage des orphelins peut avoir été rejeté
-    # ensuite (doublon, L1-sans-code). On nettoie les relations correspondantes.
+    # ── Re-filtering relations after concept rejection ─────────────────────────
+    # A concept accepted at the orphan-filtering stage may have been rejected
+    # afterwards (duplicate, L1-without-code). We clean up the corresponding relations.
     final_concept_ids: set[str] = existing_concept_ids | {
         c["local_concept_id"] for c in batch["taxonomy_concepts"]
     }
@@ -878,7 +878,7 @@ def apply_prechecks(
 
     final_rel_ids: set[str] = {r["relation_id"] for r in batch["ontology_relations"]}
 
-    # ── Nettoyage des synonymes et codes pour concepts rejetés ────────────────
+    # ── Cleanup of synonyms and codes for rejected concepts ────────────────────
     accepted_concept_ids: set[str] = {c["local_concept_id"] for c in batch["taxonomy_concepts"]}
     batch["taxonomy_synonyms"] = [
         s
@@ -893,7 +893,7 @@ def apply_prechecks(
         or s.get("local_concept_id") in existing_concept_ids
     ]
 
-    # ── Filtrage de l'evidence pour les relations rejetées ────────────────────
+    # ── Filtering of evidence for rejected relations ───────────────────────────
     kept_evidence: list[dict[str, Any]] = []
     for e in batch.get("ontology_relation_evidence", []):
         if e.get("relation_id") not in final_rel_ids:
@@ -902,7 +902,7 @@ def apply_prechecks(
         kept_evidence.append(e)
     batch["ontology_relation_evidence"] = kept_evidence
 
-    # ── Auto-stub d'evidence manquante ────────────────────────────────────────
+    # ── Auto-stub of missing evidence ──────────────────────────────────────────
     existing_evidence_rel_ids: set[str] = {
         e["relation_id"] for e in batch["ontology_relation_evidence"]
     }

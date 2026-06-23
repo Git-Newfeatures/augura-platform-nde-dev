@@ -24,8 +24,8 @@ jobs:
       - run: uv run pytest -q
 
   db-bundle:
-    # Applique le bundle Supabase sur un vrai Postgres + pgvector et prouve
-    # que le schéma se crée, que le seed entre, et que l'isolation RLS tient.
+    # Applies the Supabase bundle on a real Postgres + pgvector and proves
+    # that the schema is created, that the seed loads, and that RLS isolation holds.
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -59,11 +59,11 @@ jobs:
       - run: uv sync --dev
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
-      - name: Migrate (schéma trigger par le backend — alembic upgrade head)
+      - name: Migrate (schema triggered by the backend — alembic upgrade head)
         run: uv run alembic upgrade head
-      - name: Seed (donnée, hors migration)
+      - name: Seed (data, outside migrations)
         run: psql -v ON_ERROR_STOP=1 -f supabase/seed.sql
-      - name: Tests d'intégration (repos + RLS sous le rôle augura_app)
+      - name: Integration tests (repos + RLS under the augura_app role)
         run: uv run pytest -m integration -q
       - name: Smoke — seed counts
         run: |
@@ -75,7 +75,7 @@ jobs:
             if (select count(*) from cohort_biomarkers)  <> 12 then raise exception 'cohort_biomarkers != 12'; end if;
           end $$;
           SQL
-      - name: Smoke — RLS isolation (rôle non exempt)
+      - name: Smoke — RLS isolation (non-exempt role)
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 <<'SQL'
@@ -83,16 +83,16 @@ jobs:
           set app.tenant_id = '33cb3ba0-00fe-420b-a8c7-70736aaacc44';
           do $$ begin
             if (select count(*) from cohort_members) <> 6 then
-              raise exception 'tenant courant : attendu 6 membres, vu %', (select count(*) from cohort_members);
+              raise exception 'current tenant: expected 6 members, saw %', (select count(*) from cohort_members);
             end if;
           end $$;
           set app.tenant_id = '00000000-0000-0000-0000-000000000000';
           do $$ begin
             if (select count(*) from cohort_members) <> 0 then
-              raise exception 'isolation RLS rompue : un autre tenant voit % lignes', (select count(*) from cohort_members);
+              raise exception 'RLS isolation broken: another tenant sees % rows', (select count(*) from cohort_members);
             end if;
           end $$;
-          -- corpus global (org_id NULL) reste visible quel que soit le tenant
+          -- global corpus (org_id NULL) stays visible regardless of tenant
           do $$ begin
             if (select count(*) from documents) <> 8 then
               raise exception 'corpus global invisible sous RLS';
@@ -101,7 +101,7 @@ jobs:
           SQL
 
   client-drift:
-    # Le client TS commité doit correspondre au contrat OpenAPI du backend.
+    # The committed TS client must match the backend OpenAPI contract.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
         working-directory: apps/api
       - run: npm install --no-audit --no-fund
         working-directory: packages/api-client
-      - name: Régénérer le contrat + le client
+      - name: Regenerate the contract + the client
         env:
           AUGURA_ENV: dev
         run: |
@@ -123,7 +123,7 @@ jobs:
           uv run --directory apps/api python scripts/dump_openapi.py \
             > packages/api-client/openapi.json
           ( cd packages/api-client && npm run generate )
-      - name: Vérifier l'absence de drift
+      - name: Verify there is no drift
         run: git diff --exit-code packages/api-client/openapi.json packages/api-client/src/schema.d.ts
       - name: Typecheck du client
         run: npx tsc --noEmit

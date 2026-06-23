@@ -1,4 +1,4 @@
-"""Logique métier du module semantic. Le router est un adaptateur fin."""
+"""Business logic of the semantic module. The router is a thin adapter."""
 
 from typing import Any, Protocol
 
@@ -41,9 +41,9 @@ class SemanticService:
         return [schemas.RelationOut.model_validate(r) for r in rows]
 
     async def bundle(self) -> schemas.SemanticBundle:
-        """Couche sémantique gouvernée en bloc (14 tables) — GET /semantic/bundle."""
+        """Governed semantic layer as a single block (14 tables) — GET /semantic/bundle."""
         return schemas.SemanticBundle.model_validate(await self.repo.read_bundle())
 
     async def release(self) -> schemas.ReleaseStatus:
-        """Release courante + compte par table — GET /semantic/release."""
+        """Current release + per-table count — GET /semantic/release."""
         return schemas.ReleaseStatus.model_validate(await self.repo.release_status())

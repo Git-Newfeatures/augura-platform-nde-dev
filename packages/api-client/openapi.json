@@ -2,7 +2,7 @@
   "components": {
     "schemas": {
       "ActivityEvent": {
-        "description": "Élément du fil d'activité (audit trail), accessible à tout membre du tenant.",
+        "description": "Activity-feed item (audit trail), accessible to any tenant member.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -128,7 +128,7 @@
         "type": "object"
       },
       "ArtifactOut": {
-        "description": "Artefact versionné & hashé (colonne vertébrale reproductibilité) — alimente\nl'onglet Lineage. `content` est volontairement exclu (peut être volumineux).",
+        "description": "Versioned & hashed artifact (reproducibility backbone) — feeds the\nLineage tab. `content` is intentionally excluded (can be large).",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -726,7 +726,7 @@
         "type": "object"
       },
       "CohortImportRequest": {
-        "description": "Ingestion d'une cohorte longitudinale (members + biomarkers). Remplace toute\ncohorte existante de même nom pour le tenant. C'est la voie d'écriture qui manquait\naux tables cohort_members / cohort_biomarkers (lues par OutcomeSelection/Simulation).",
+        "description": "Ingestion of a longitudinal cohort (members + biomarkers). Replaces any\nexisting cohort with the same name for the tenant. This is the write path that was\nmissing for the cohort_members / cohort_biomarkers tables (read by\nOutcomeSelection/Simulation).",
         "properties": {
           "biomarkers": {
             "default": [],
@@ -2084,7 +2084,7 @@
         "type": "object"
       },
       "DirectRelationIn": {
-        "description": "Relation légère proposée par le DAG (sans id pré-assigné).",
+        "description": "Lightweight relation proposed by the DAG (no pre-assigned id).",
         "properties": {
           "default_strength": {
             "default": "moderate",
@@ -2246,7 +2246,7 @@
         "type": "object"
       },
       "EnrichApplyRequest": {
-        "description": "Corps de POST /semantic/enrich/apply — un seul chemin renseigné à la fois.",
+        "description": "Body of POST /semantic/enrich/apply — only one path provided at a time.",
         "properties": {
           "add_qualifier": {
             "anyOf": [
@@ -2746,7 +2746,7 @@
         "type": "object"
       },
       "FrozenResult": {
-        "description": "Par citation : la source, l'id, le query_string EXACT (pas la question\nutilisateur), la date de récupération, l'enregistrement gelé et l'annotation.",
+        "description": "Per citation: the source, the id, the EXACT query_string (not the user\nquestion), the retrieval date, the frozen record and the annotation.",
         "properties": {
           "annotation": {
             "anyOf": [
@@ -3309,7 +3309,7 @@
         "type": "object"
       },
       "LiteratureSnapshot": {
-        "description": "Par artefact : métadonnées de provenance + résultats gelés + content_hash.\n`verified` est posé à la lecture après recalcul du hash.",
+        "description": "Per artifact: provenance metadata + frozen results + content_hash.\n`verified` is set on read after recomputing the hash.",
         "properties": {
           "content_hash": {
             "title": "Content Hash",
@@ -3432,7 +3432,7 @@
         "type": "object"
       },
       "MappedConcept": {
-        "description": "Un concept issu du mapping (POST /datasets/{id}/map) présent dans la donnée.",
+        "description": "A concept from the mapping (POST /datasets/{id}/map) present in the data.",
         "properties": {
           "concept_domain": {
             "default": "unknown",
@@ -4032,7 +4032,7 @@
         "type": "object"
       },
       "RelationOut": {
-        "description": "Relation causale de l'ontologie (B1) — sortie de GET /semantic/relations.",
+        "description": "Causal relation of the ontology (B1) — output of GET /semantic/relations.",
         "properties": {
           "active": {
             "title": "Active",
@@ -4081,7 +4081,7 @@
         "type": "object"
       },
       "ReleaseStatus": {
-        "description": "Réponse de GET /semantic/release — release courante + compte par table.",
+        "description": "Response of GET /semantic/release — current release + per-table count.",
         "properties": {
           "counts": {
             "additionalProperties": {
@@ -4268,7 +4268,7 @@
         "type": "object"
       },
       "SemanticBundle": {
-        "description": "Réponse de GET /semantic/bundle — la couche sémantique gouvernée en bloc.\n\n14 tables, lignes laissées en `dict` brut : le front les indexe lui-même\n(semantic-store → taxonomy/ontology loaders). Typer chaque table n'apporterait\nrien au contrat de lecture. Les 14 champs sont toujours présents (coalesce à []).",
+        "description": "Response of GET /semantic/bundle — the governed semantic layer as a single block.\n\n14 tables, rows left as raw `dict`: the frontend indexes them itself\n(semantic-store → taxonomy/ontology loaders). Typing each table would add\nnothing to the read contract. All 14 fields are always present (coalesce to []).",
         "properties": {
           "causal_predicates": {
             "items": {
@@ -4675,7 +4675,7 @@
         "type": "object"
       },
       "SimulationRunOut": {
-        "description": "Élément de la liste des runs (alimente la page Runs du front).",
+        "description": "Item of the runs list (feeds the frontend Runs page).",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -4737,7 +4737,7 @@
         "type": "object"
       },
       "SnapshotSummary": {
-        "description": "Vue légère pour la liste « Saved evidence » : pas de results ni de hash.",
+        "description": "Lightweight view for the \"Saved evidence\" list: no results, no hash.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -5194,7 +5194,7 @@
         "type": "object"
       },
       "StudyUpdate": {
-        "description": "Mise à jour partielle d'une étude (cycle de vie + métadonnées).\nSeuls les champs explicitement fournis sont écrits (model_dump exclude_unset).",
+        "description": "Partial update of a study (lifecycle + metadata).\nOnly explicitly provided fields are written (model_dump exclude_unset).",
         "properties": {
           "category": {
             "anyOf": [
@@ -5871,7 +5871,7 @@
   "paths": {
     "/agents/chat": {
       "post": {
-        "description": "Assistant inline : passerelle Messages Anthropic. 503 explicite si pas de clé.",
+        "description": "Inline assistant: Anthropic Messages gateway. Explicit 503 if no key.",
         "operationId": "chat_agents_chat_post",
         "requestBody": {
           "content": {
@@ -6075,7 +6075,7 @@
     },
     "/analytics/activity": {
       "get": {
-        "description": "Fil d'activité du tenant (audit trail) — accessible à tout membre, filtrable\npar étude. Alimente l'onglet History et les notifications du front.",
+        "description": "Tenant activity feed (audit trail) — accessible to any member, filterable\nby study. Feeds the History tab and the frontend notifications.",
         "operationId": "activity_analytics_activity_get",
         "parameters": [
           {
@@ -6160,7 +6160,7 @@
     },
     "/analytics/artifacts": {
       "get": {
-        "description": "Artefacts versionnés & hashés du tenant (provenance/reproductibilité) —\nalimente l'onglet Lineage.",
+        "description": "Tenant's versioned & hashed artifacts (provenance/reproducibility) —\nfeeds the Lineage tab.",
         "operationId": "artifacts_analytics_artifacts_get",
         "parameters": [
           {
@@ -6224,7 +6224,7 @@
     },
     "/causal/dag": {
       "post": {
-        "description": "DAG causal ancré dans l'ontologie B1, contextualisé par LLM (port de Nico).",
+        "description": "Causal DAG anchored in the B1 ontology, contextualized by the LLM (port of Nico).",
         "operationId": "dag_causal_dag_post",
         "requestBody": {
           "content": {
@@ -6404,7 +6404,7 @@
     },
     "/corpus/literature": {
       "post": {
-        "description": "Agent de recherche de littérature : cherche sur PubMed (E-utilities NCBI) et\ningère les articles dans le corpus du tenant (Document + Chunk). Embedder/LLM\noptionnels (sans clé : ingestion sans vecteur, requête non élargie).",
+        "description": "Literature search agent: searches PubMed (NCBI E-utilities) and\ningests the articles into the tenant's corpus (Document + Chunk). Embedder/LLM\noptional (without a key: ingestion without a vector, query not expanded).",
         "operationId": "literature_corpus_literature_post",
         "requestBody": {
           "content": {
@@ -6446,7 +6446,7 @@
     },
     "/corpus/literature/ingest": {
       "post": {
-        "description": "Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.\nSert « Add to corpus » sur des résultats de retrieve gardés (PubMed only).",
+        "description": "Ingests specific PubMed records (by PMID) into the tenant's corpus.\nServes \"Add to corpus\" on kept retrieve results (PubMed only).",
         "operationId": "literature_ingest_corpus_literature_ingest_post",
         "requestBody": {
           "content": {
@@ -6488,7 +6488,7 @@
     },
     "/corpus/literature/retrieve": {
       "post": {
-        "description": "Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.\nNe touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique\n⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel.",
+        "description": "Retrieves live (PubMed + CT.gov), grouped by source, streamed as NDJSON.\nDoes NOT touch the corpus (no ingestion). known-item ⇒ single source; topical\n⇒ parallel fan-out. The exact query_string per result is carried for the freeze.",
         "operationId": "literature_retrieve_corpus_literature_retrieve_post",
         "requestBody": {
           "content": {
@@ -6528,7 +6528,7 @@
     },
     "/corpus/literature/sessions": {
       "delete": {
-        "description": "Vide l'historique « Recent queries » du tenant (nettoyage en un clic).",
+        "description": "Clears the tenant's \"Recent queries\" history (one-click cleanup).",
         "operationId": "clear_sessions_corpus_literature_sessions_delete",
         "responses": {
           "204": {
@@ -6633,7 +6633,7 @@
     },
     "/corpus/literature/sessions/{session_id}": {
       "delete": {
-        "description": "Supprime une entrée de l'historique « Recent queries » (suppression unitaire).",
+        "description": "Deletes a single entry from the \"Recent queries\" history (single deletion).",
         "operationId": "delete_session_corpus_literature_sessions__session_id__delete",
         "parameters": [
           {
@@ -6764,7 +6764,7 @@
     },
     "/corpus/literature/snapshots": {
       "get": {
-        "description": "Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash).",
+        "description": "Lists the tenant's frozen evidence (lightweight view, no results, no hash recompute).",
         "operationId": "list_snapshots_corpus_literature_snapshots_get",
         "parameters": [
           {
@@ -6817,7 +6817,7 @@
         ]
       },
       "post": {
-        "description": "Gèle le jeu de résultats + annotations : calcule le content_hash, épingle\nmodel/prompt version, persiste. La réponse porte le hash (auto-vérifiable).",
+        "description": "Freezes the result set + annotations: computes the content_hash, pins the\nmodel/prompt version, persists. The response carries the hash (self-verifiable).",
         "operationId": "create_snapshot_corpus_literature_snapshots_post",
         "requestBody": {
           "content": {
@@ -6859,7 +6859,7 @@
     },
     "/corpus/literature/snapshots/{snapshot_id}": {
       "get": {
-        "description": "Relit un snapshot et VÉRIFIE le content_hash (erreur dure si divergence).\nLecture base pure : zéro appel PubMed/CT.gov (rejeu reproductible).",
+        "description": "Re-reads a snapshot and VERIFIES the content_hash (hard error on divergence).\nPure DB read: zero PubMed/CT.gov calls (reproducible replay).",
         "operationId": "read_snapshot_corpus_literature_snapshots__snapshot_id__get",
         "parameters": [
           {
@@ -7079,7 +7079,7 @@
     },
     "/datasets/cohorts/import": {
       "post": {
-        "description": "Ingère une cohorte longitudinale (members + biomarkers) — la voie d'écriture\ndes tables cohort_*, lues par OutcomeSelection/SimulationEngine.",
+        "description": "Ingests a longitudinal cohort (members + biomarkers) — the write path\nfor the cohort_* tables, read by OutcomeSelection/SimulationEngine.",
         "operationId": "import_cohort_datasets_cohorts_import_post",
         "requestBody": {
           "content": {
@@ -7633,7 +7633,7 @@
     },
     "/documents/{document_id}/download": {
       "get": {
-        "description": "Sert les octets du dossier généré (scopé tenant). 404 tant que non `ready`.",
+        "description": "Serves the bytes of the generated document (tenant-scoped), read FROM THE DATABASE\n(generated_documents.content) — consistent cross-container on Modal, unlike the\nephemeral local disk. 404 until the document is `ready`.",
         "operationId": "download_document_documents__document_id__download_get",
         "parameters": [
           {
@@ -8053,7 +8053,7 @@
     },
     "/semantic/bundle": {
       "get": {
-        "description": "Couche sémantique gouvernée (14 tables) en un bloc — hydrate le store front.",
+        "description": "Governed semantic layer (14 tables) as a single block — hydrates the frontend store.",
         "operationId": "bundle_semantic_bundle_get",
         "responses": {
           "200": {
@@ -8138,7 +8138,7 @@
     },
     "/semantic/enrich/apply": {
       "post": {
-        "description": "Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version.",
+        "description": "Persists an enrichment into the GLOBAL ontology (owner-gated). Version bump.",
         "operationId": "enrich_apply_semantic_enrich_apply_post",
         "requestBody": {
           "content": {
@@ -8180,7 +8180,7 @@
     },
     "/semantic/enrich/proposals/{job_id}": {
       "get": {
-        "description": "Sert les propositions d'un job réussi (scopé tenant). Lues EN BASE\n(jobs.result_json), pas sur disque — relisibles depuis n'importe quel conteneur Modal.",
+        "description": "Serves the proposals of a successful job (tenant-scoped). Read FROM THE DB\n(jobs.result_json), not from disk — re-readable from any Modal container.",
         "operationId": "enrich_proposals_semantic_enrich_proposals__job_id__get",
         "parameters": [
           {
@@ -8222,7 +8222,7 @@
     },
     "/semantic/enrich/propose": {
       "post": {
-        "description": "Lance l'analyse de couverture + proposition LLM en job background (suivi par polling).",
+        "description": "Runs coverage analysis + LLM proposal as a background job (tracked via polling).",
         "operationId": "enrich_propose_semantic_enrich_propose_post",
         "requestBody": {
           "content": {
@@ -8264,7 +8264,7 @@
     },
     "/semantic/relations": {
       "get": {
-        "description": "Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id).",
+        "description": "Causal ontology (B1). `?concept_id=` → subgraph (subject or object = id).",
         "operationId": "relations_semantic_relations_get",
         "parameters": [
           {
@@ -8318,7 +8318,7 @@
     },
     "/semantic/release": {
       "get": {
-        "description": "Release sémantique courante + compte par table (onglet Versions).",
+        "description": "Current semantic release + per-table count (Versions tab).",
         "operationId": "release_semantic_release_get",
         "responses": {
           "200": {

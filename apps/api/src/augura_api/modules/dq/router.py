@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module dq."""
+"""HTTP adapter for the dq module."""
 
 from uuid import UUID
 

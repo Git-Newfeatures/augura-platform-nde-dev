@@ -1,4 +1,4 @@
-"""Contrat public du module documents."""
+"""Public contract of the documents module."""
 
 from datetime import datetime
 from typing import Literal

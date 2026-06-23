@@ -1,4 +1,4 @@
-"""Fabrique de findings DQ (forme exacte, traçabilité)."""
+"""DQ finding factory (exact shape, traceability)."""
 
 from __future__ import annotations
 

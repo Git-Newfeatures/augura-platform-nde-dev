@@ -76,7 +76,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 `apps/api/tests/test_dataset_profiling.py`:
 ```python
-"""Tests du profiler de colonnes (datasets)."""
+"""Tests for the column profiler (datasets)."""
 
 from augura_api.modules.datasets.profiling import profile_column
 
@@ -118,10 +118,10 @@ def test_all_missing() -> None:
 
 `apps/api/src/augura_api/modules/datasets/profiling.py`:
 ```python
-"""Profilage de colonnes — porté/condensé de l'MVP profiler.js.
+"""Column profiling — ported/condensed from the MVP profiler.js.
 
-Produit exactement les champs persistés dans dataset_columns. Le profiler DQ
-complet (quartiles, sentinelles, outliers) est porté en A3.
+Produces exactly the fields persisted in dataset_columns. The full DQ profiler
+(quartiles, sentinels, outliers) is ported in A3.
 """
 
 from __future__ import annotations
@@ -228,7 +228,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 `apps/api/tests/test_dataset_parsing.py`:
 ```python
-"""Tests du parseur de fichiers (CSV/XLSX)."""
+"""Tests for the file parser (CSV/XLSX)."""
 
 import io
 
@@ -277,10 +277,10 @@ def test_oversize() -> None:
 
 `apps/api/src/augura_api/modules/datasets/parsing.py`:
 ```python
-"""Parsing serveur des fichiers de données (CSV via stdlib, XLSX via openpyxl).
+"""Server-side parsing of data files (CSV via stdlib, XLSX via openpyxl).
 
-Renvoie une liste de feuilles {name, headers, rows} — données brutes en str
-(le profilage et la DQ s'appliquent ensuite). Pas de .xls binaire (415).
+Returns a list of sheets {name, headers, rows} — raw data as str
+(profiling and DQ are applied afterwards). No binary .xls (415).
 """
 
 from __future__ import annotations
@@ -313,7 +313,7 @@ def _decode(data: bytes) -> str:
             return data.decode(enc)
         except UnicodeDecodeError:
             continue
-    raise BadRequestError("fichier illisible (encodage non supporté)")
+    raise BadRequestError("unreadable file (unsupported encoding)")
 
 
 def _parse_csv(data: bytes) -> Sheet:
@@ -325,7 +325,7 @@ def _parse_csv(data: bytes) -> Sheet:
     reader = csv.reader(io.StringIO(text), dialect)
     rows = [[(c or "").strip() for c in row] for row in reader if any(c.strip() for c in row)]
     if not rows:
-        raise BadRequestError("CSV vide")
+        raise BadRequestError("empty CSV")
     headers = rows[0]
     return Sheet(name="data", headers=headers, rows=rows[1:])
 
@@ -345,21 +345,21 @@ def _parse_xlsx(data: bytes) -> list[Sheet]:
         sheets.append(Sheet(name=ws.title, headers=all_rows[0], rows=all_rows[1:]))
     wb.close()
     if not sheets:
-        raise BadRequestError("classeur XLSX vide")
+        raise BadRequestError("empty XLSX workbook")
     return sheets
 
 
 def parse_upload(filename: str, data: bytes) -> list[Sheet]:
     if len(data) > MAX_UPLOAD_BYTES:
         raise PayloadTooLargeError(
-            "fichier trop volumineux", max_bytes=MAX_UPLOAD_BYTES, size=len(data)
+            "file too large", max_bytes=MAX_UPLOAD_BYTES, size=len(data)
         )
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     if ext == "csv":
         return [_parse_csv(data)]
     if ext == "xlsx":
         return _parse_xlsx(data)
-    raise UnsupportedMediaTypeError("format non supporté (utiliser .csv ou .xlsx)", ext=ext)
+    raise UnsupportedMediaTypeError("unsupported format (use .csv or .xlsx)", ext=ext)
 ```
 
 - [ ] **Step 4: Run — PASS.** `cd apps/api && uv run pytest tests/test_dataset_parsing.py -q`; `uv run ruff check ... && uv run pyright src/augura_api/modules/datasets/parsing.py`.
@@ -487,7 +487,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 `apps/api/tests/integration/test_datasets_upload.py`:
 ```python
-"""Intégration : upload dataset → parse → profile → persistance (+ RLS)."""
+"""Integration: dataset upload → parse → profile → persistence (+ RLS)."""
 
 import os
 from collections.abc import AsyncIterator
@@ -513,7 +513,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def sm() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL absent — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)

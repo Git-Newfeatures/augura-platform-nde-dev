@@ -1,13 +1,13 @@
-"""Vérifie de bout en bout les endpoints /reference/* (catalogues real-only).
+"""End-to-end check of the /reference/* endpoints (real-only catalogs).
 
-Démarre la vraie app FastAPI contre une base déjà amorcée (bundle + seed),
-forge un JWT HS256 pour un utilisateur ayant une appartenance, et assure que
-chaque endpoint catalogue renvoie la donnée seedée par HTTP. À lancer derrière
-`scripts/verify_reference_live.sh` (qui provisionne une base jetable) ou contre
-une base existante avec les AUGURA_* dans l'env (rôle augura_api, RLS active).
+Starts the real FastAPI app against an already-bootstrapped database (bundle +
+seed), mints an HS256 JWT for a user that has a membership, and ensures that
+each catalog endpoint returns the seeded data over HTTP. Run it behind
+`scripts/verify_reference_live.sh` (which provisions a throwaway database) or
+against an existing database with the AUGURA_* in the env (role augura_api, RLS active).
 
-Usage : AUGURA_DATABASE_URL + AUGURA_SUPABASE_JWT_SECRET + AUGURA_ENV=dev,
-        puis `uv run python scripts/verify_reference.py`.
+Usage: AUGURA_DATABASE_URL + AUGURA_SUPABASE_JWT_SECRET + AUGURA_ENV=dev,
+        then `uv run python scripts/verify_reference.py`.
 """
 
 import asyncio
@@ -20,7 +20,7 @@ from httpx import ASGITransport, AsyncClient
 from augura_api.main import create_app
 
 SECRET = os.environ["AUGURA_SUPABASE_JWT_SECRET"]
-USER = "11111111-1111-4111-8111-111111111111"  # doit avoir une ligne memberships
+USER = "11111111-1111-4111-8111-111111111111"  # must have a memberships row
 
 ENDPOINTS = [
     "/reference/outcomes",
@@ -63,7 +63,7 @@ async def main() -> int:
     ok = True
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
         ok &= check(
-            "requête non authentifiée rejetée (401)",
+            "unauthenticated request rejected (401)",
             (await c.get("/reference/outcomes")).status_code == 401,
         )
         data = {}
@@ -74,19 +74,19 @@ async def main() -> int:
 
     out = data.get("/reference/outcomes") or []
     by = {o.get("code"): o for o in out} if isinstance(out, list) else {}
-    ok &= check("outcomes: 8 lignes", len(out) == 8, f"n={len(out)}")
+    ok &= check("outcomes: 8 rows", len(out) == 8, f"n={len(out)}")
     ok &= check(
         "outcomes: hba1c_pct + regulatory_tags",
         "hba1c_pct" in by and bool(by["hba1c_pct"].get("regulatory_tags")),
     )
     ok &= check(
-        "outcomes: pas de tag 'In dataset' seedé (dérivé de la cohorte)",
+        "outcomes: no 'In dataset' tag seeded (derived from the cohort)",
         all("In dataset" not in str(o.get("regulatory_tags")) for o in out),
     )
 
     est = data.get("/reference/estimators") or []
     eby = {e.get("key"): e for e in est} if isinstance(est, list) else {}
-    ok &= check("estimators: 6 lignes", len(est) == 6, f"n={len(est)}")
+    ok &= check("estimators: 6 rows", len(est) == 6, f"n={len(est)}")
     ok &= check(
         "estimators: lme eligible_study_types == [retro,prosp]",
         eby.get("lme", {}).get("eligible_study_types") == ["retro", "prosp"],
@@ -99,7 +99,7 @@ async def main() -> int:
     src = data.get("/reference/cesl-sources") or []
     sby = {s.get("code"): s for s in src} if isinstance(src, list) else {}
     ok &= check(
-        "cesl-sources: default_evidence_type exposé",
+        "cesl-sources: default_evidence_type exposed",
         sby.get("pubmed", {}).get("default_evidence_type") == "rwe_study",
         f"pubmed={sby.get('pubmed', {}).get('default_evidence_type')!r}",
     )
@@ -113,7 +113,7 @@ async def main() -> int:
 
     vr = data.get("/reference/variable-roles") or {}
     ok &= check(
-        "variable-roles: groupes + alias (environment->engagement)",
+        "variable-roles: groups + alias (environment->engagement)",
         any(g.get("code") == "outcomes" for g in vr.get("groups", []))
         and (vr.get("group_aliases") or {}).get("environment") == "engagement",
     )
@@ -127,7 +127,7 @@ async def main() -> int:
         ("/reference/literature-study-designs", 13),
     ]:
         rows = data.get(p) or []
-        ok &= check(f"{p}: {n} lignes", len(rows) == n, f"n={len(rows)}")
+        ok &= check(f"{p}: {n} rows", len(rows) == n, f"n={len(rows)}")
 
     print("\nRESULT:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")
     return 0 if ok else 1

@@ -1,9 +1,9 @@
-"""Rendu de dossiers (protocole d'étude / rapport de preuve) en HTML autonome.
+"""Rendering of dossiers (study protocol / evidence report) into standalone HTML.
 
-Fonction PURE (pas d'I/O, pas de base) → testable. Produit un document print-friendly
-(CSS @media print → « Imprimer en PDF » dans le navigateur donne un PDF propre). Le worker
-documents l'appelle puis stocke les octets via core.storage. Un backend PDF natif
-(reportlab/WeasyPrint) pourra remplacer ce rendu derrière la même signature.
+PURE function (no I/O, no database) → testable. Produces a print-friendly document
+(CSS @media print → "Print to PDF" in the browser yields a clean PDF). The documents
+worker calls it then stores the bytes via core.storage. A native PDF backend
+(reportlab/WeasyPrint) may replace this rendering behind the same signature.
 """
 
 from __future__ import annotations

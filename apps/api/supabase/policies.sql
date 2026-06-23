@@ -1,19 +1,19 @@
--- Augura Platform — Row-Level Security (défense en profondeur)
--- À appliquer APRÈS schema.sql. Réf : spec §7.
+-- Augura Platform — Row-Level Security (defense in depth)
+-- To apply AFTER schema.sql. Ref: spec §7.
 --
--- Modèle : le backend FastAPI ouvre chaque transaction avec
+-- Model: the FastAPI backend opens each transaction with
 --   SET LOCAL app.tenant_id = '<uuid>';
--- et se connecte avec un rôle Postgres NON exempt de RLS (pas service_role).
--- Les policies lisent current_setting('app.tenant_id').
+-- and connects with a Postgres role NOT exempt from RLS (not service_role).
+-- The policies read current_setting('app.tenant_id').
 --
--- Tables d'infrastructure NON tenant-scopées : agent_cache (cache déterministe
--- partagé) et outbox_events (audit système) — RLS activée avec un gate « session
--- backend » (refus PostgREST anon, accès backend) au lieu d'un scoping tenant.
+-- Infrastructure tables NOT tenant-scoped: agent_cache (shared deterministic
+-- cache) and outbox_events (system audit) — RLS enabled with a "backend session"
+-- gate (deny PostgREST anon, allow backend) instead of tenant scoping.
 
 begin;
 
--- Rôle de connexion applicatif (non superuser, non BYPASSRLS).
--- Sur Supabase, mapper le user de connexion de l'API sur ce rôle.
+-- Application connection role (non superuser, non BYPASSRLS).
+-- On Supabase, map the API's connection user onto this role.
 do $$
 begin
     if not exists (select 1 from pg_roles where rolname = 'augura_app') then
@@ -28,10 +28,10 @@ alter default privileges in schema public
     grant select, insert, update, delete on tables to augura_app;
 grant execute on all functions in schema public to augura_app;
 
--- Rôle de connexion (LOGIN) que porte l'API (AUGURA_DATABASE_URL = augura_api…).
--- Hérite de augura_app ; NON superuser / NON BYPASSRLS ⇒ la RLS s'applique.
--- Le mot de passe est posé hors-bundle (Supabase). Ce grant rend le bundle
--- autonome : sans lui, un projet reconstruit n'aurait AUCUN privilège de table.
+-- Connection role (LOGIN) carried by the API (AUGURA_DATABASE_URL = augura_api…).
+-- Inherits augura_app; NON superuser / NON BYPASSRLS ⇒ RLS applies.
+-- The password is set out-of-bundle (Supabase). This grant makes the bundle
+-- self-contained: without it, a rebuilt project would have NO table privilege.
 do $$
 begin
     if not exists (select 1 from pg_roles where rolname = 'augura_api') then
@@ -41,13 +41,13 @@ end
 $$;
 grant augura_app to augura_api;
 
--- Verrouillage des grants Supabase par défaut (PostgREST). Tout l'accès données
--- passe par le backend (rôle augura_app) ; anon/authenticated ne doivent pas
--- lire/écrire les tables directement. On retire les privilèges par défaut puis on
--- re-grante l'unique écriture directe légitime : l'INSERT des events de login par
--- le front (App.jsx) en rôle authenticated.
--- Gardé par existence : anon/authenticated sont propres à Supabase ; sur un Postgres
--- nu (CI pgvector, alembic upgrade head) ces rôles n'existent pas → no-op.
+-- Lockdown of the default Supabase grants (PostgREST). All data access
+-- goes through the backend (role augura_app); anon/authenticated must not
+-- read/write the tables directly. We strip the default privileges then
+-- re-grant the only legitimate direct write: the INSERT of login events by
+-- the front (App.jsx) in the authenticated role.
+-- Guarded by existence: anon/authenticated are specific to Supabase; on a bare
+-- Postgres (CI pgvector, alembic upgrade head) these roles do not exist → no-op.
 do $$
 begin
     if exists (select 1 from pg_roles where rolname = 'anon') then
@@ -64,15 +64,15 @@ begin
     end if;
 end
 $$;
--- NOTE: authenticated conserve SELECT pour l'instant — quelques vues cockpit lisent
--- encore via PostgREST direct (migration backend = P7). À révoquer une fois ces vues
--- branchées sur le backend, pour que TOUT l'accès données passe par augura_app.
+-- NOTE: authenticated keeps SELECT for now — a few cockpit views still read
+-- via direct PostgREST (backend migration = P7). To revoke once these views
+-- are wired to the backend, so that ALL data access goes through augura_app.
 
--- Helper : expression du tenant courant (NULL si non posé).
--- (inline dans les policies ci-dessous ; gardé ici pour référence)
+-- Helper: expression of the current tenant (NULL if not set).
+-- (inlined in the policies below; kept here for reference)
 --   nullif(current_setting('app.tenant_id', true), '')::uuid
 
--- ── Tables avec org_id direct ────────────────────────────────────────────
+-- ── Tables with direct org_id ─────────────────────────────────────────────
 do $$
 declare
     t text;
@@ -94,22 +94,22 @@ begin
 end
 $$;
 
--- ── orgs : le tenant ne voit que sa propre ligne ─────────────────────────
+-- ── orgs: the tenant only sees its own row ───────────────────────────────
 alter table orgs enable row level security;
 alter table orgs force row level security;
 create policy tenant_self on orgs
     using (id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 
--- ── memberships : un utilisateur ne voit que SES appartenances ───────────
--- (scopé sur app.user_id, pas app.tenant_id : c'est le bootstrap qui résout
--- justement le tenant à partir de l'utilisateur — cf. core/deps.py)
+-- ── memberships: a user only sees THEIR OWN memberships ──────────────────
+-- (scoped on app.user_id, not app.tenant_id: it is the bootstrap that resolves
+-- precisely the tenant from the user — cf. core/deps.py)
 alter table memberships enable row level security;
 alter table memberships force row level security;
 create policy member_self on memberships
     using (user_id = nullif(current_setting('app.user_id', true), '')::uuid)
     with check (user_id = nullif(current_setting('app.user_id', true), '')::uuid);
 
--- ── Tables enfant scopées via leur parent ────────────────────────────────
+-- ── Child tables scoped via their parent ──────────────────────────────────
 alter table study_members enable row level security;
 alter table study_members force row level security;
 create policy tenant_via_study on study_members
@@ -147,7 +147,7 @@ create policy tenant_via_dataset on dataset_columns
           and d.org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     ));
 
--- ── Corpus : org_id NULL ⇒ global lisible par tous ───────────────────────
+-- ── Corpus: org_id NULL ⇒ global, readable by all ────────────────────────
 alter table documents enable row level security;
 alter table documents force row level security;
 create policy tenant_or_global on documents
@@ -155,9 +155,9 @@ create policy tenant_or_global on documents
         org_id is null
         or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     )
-    -- Lecture : global OU tenant. Écriture : strictement tenant courant — les lignes
-    -- globales (org_id NULL, visibles de tous) ne s'ingèrent que via un rôle privilégié
-    -- (seed/worker BYPASSRLS), jamais depuis une session tenant.
+    -- Read: global OR tenant. Write: strictly the current tenant — the global
+    -- rows (org_id NULL, visible to all) are only ingested via a privileged role
+    -- (seed/worker BYPASSRLS), never from a tenant session.
     with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 
 alter table chunks enable row level security;
@@ -169,7 +169,7 @@ create policy tenant_or_global on chunks
     )
     with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 
--- ── usage_events : ligne tenant ou système (org_id NULL) ─────────────────
+-- ── usage_events: tenant or system row (org_id NULL) ─────────────────────
 alter table usage_events enable row level security;
 alter table usage_events force row level security;
 create policy tenant_or_system on usage_events
@@ -182,11 +182,11 @@ create policy tenant_or_system on usage_events
         or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     );
 
--- ── Tables infra (non tenant) : RLS « gate session backend » ─────────────
--- agent_cache (cache déterministe partagé) et outbox_events (audit système) ne
--- sont pas scopés tenant, mais ne doivent JAMAIS être atteignables via PostgREST
--- (anon/authenticated, sans app.tenant_id). RLS activée + gate sur la présence
--- du contexte backend : anon refusé, backend (contexte posé) autorisé.
+-- ── Infra tables (non tenant): RLS "backend session gate" ────────────────
+-- agent_cache (shared deterministic cache) and outbox_events (system audit) are
+-- not tenant-scoped, but must NEVER be reachable via PostgREST
+-- (anon/authenticated, without app.tenant_id). RLS enabled + gate on the presence
+-- of the backend context: anon denied, backend (context set) allowed.
 do $$
 declare
     t text;
@@ -204,11 +204,11 @@ begin
 end
 $$;
 
--- ── Catalogues de référence (cesl_sources, cesl_study_designs) ────────────
--- Globaux, lecture seule pour les sessions tenant. RLS activée + gate « session
--- backend » en LECTURE uniquement (FOR SELECT) : anon/PostgREST refusé, backend
--- (app.tenant_id posé) autorisé en lecture. Aucune policy d'écriture ⇒ INSERT/
--- UPDATE/DELETE refusés pour augura_app ; le seed entre via le rôle privilégié.
+-- ── Reference catalogs (cesl_sources, cesl_study_designs) ─────────────────
+-- Global, read-only for tenant sessions. RLS enabled + "backend session"
+-- gate on READ only (FOR SELECT): anon/PostgREST denied, backend
+-- (app.tenant_id set) allowed to read. No write policy ⇒ INSERT/
+-- UPDATE/DELETE denied for augura_app; the seed loads via the privileged role.
 alter table cesl_sources enable row level security;
 alter table cesl_sources force row level security;
 create policy backend_read on cesl_sources
@@ -221,7 +221,7 @@ create policy backend_read on cesl_study_designs
     for select
     using (nullif(current_setting('app.tenant_id', true), '') is not null);
 
--- ── Reference catalogs (frontend real-only cleanup) : global, lecture seule ──
+-- ── Reference catalogs (frontend real-only cleanup): global, read-only ──────
 do $$
 declare t text;
 begin
@@ -239,7 +239,7 @@ begin
   end loop;
 end $$;
 
--- ── Taxonomie sémantique (A1) : globale, lecture seule (FOR SELECT) ───────
+-- ── Semantic taxonomy (A1): global, read-only (FOR SELECT) ────────────────
 alter table taxonomy_concepts enable row level security;
 alter table taxonomy_concepts force row level security;
 create policy backend_read on taxonomy_concepts
@@ -275,10 +275,10 @@ alter table dq_constraints force row level security;
 create policy backend_read on dq_constraints
   for select using (nullif(current_setting('app.tenant_id', true), '') is not null);
 
--- ── Ontologie/causal (B1) : globale, lecture seule (FOR SELECT) ───────────
--- Mêmes catalogues de référence que la taxonomie A1 : RLS activée + gate
--- « session backend » en lecture. Aucune policy d'écriture ⇒ le seed entre par
--- le rôle privilégié.
+-- ── Ontology/causal (B1): global, read-only (FOR SELECT) ──────────────────
+-- Same reference catalogs as the A1 taxonomy: RLS enabled + "backend
+-- session" gate on read. No write policy ⇒ the seed loads via
+-- the privileged role.
 do $$
 declare t text;
 begin
@@ -295,7 +295,7 @@ begin
   end loop;
 end $$;
 
--- ── dq_bundles (A3a) : tenant-scopé via org_id ───────────────────────────
+-- ── dq_bundles (A3a): tenant-scoped via org_id ───────────────────────────
 alter table dq_bundles enable row level security;
 alter table dq_bundles force row level security;
 create policy tenant_isolation on dq_bundles
@@ -303,8 +303,8 @@ create policy tenant_isolation on dq_bundles
     with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 
 -- ── Corpus live (retrieve-and-freeze) ─────────────────────────────────────
--- search_sessions / literature_events / literature_queries : isolation tenant
--- simple (org_id = app.tenant_id), comme la base de 0002.
+-- search_sessions / literature_events / literature_queries: simple tenant
+-- isolation (org_id = app.tenant_id), like the 0002 baseline.
 do $$
 declare
     t text;
@@ -322,18 +322,18 @@ begin
 end
 $$;
 
--- ── literature_snapshots : isolation tenant + visibilité PAR ÉTUDE (Tier 3) ──
--- L'isolation tenant (org_id) reste le premier rempart. Par-dessus, l'accès est
--- gaté ainsi :
---   • study_id NON NULL ⇒ visible aux MEMBRES de l'étude (study_members), PAS à
---     tout le tenant. C'est le point critique (gate 9) : on gate par study_members,
---     jamais par study_id seul — sinon un snapshot fuiterait entre études du même
---     tenant. Un non-membre échoue fermé (l'EXISTS est faux ⇒ ligne invisible).
---   • study_id NULL ⇒ snapshot standalone, visible de son seul créateur.
--- created_by est enregistré mais n'est PAS le gate pour les snapshots d'étude.
--- WITH CHECK : on n'écrit que pour le tenant courant, en tant que créateur, et —
--- si rattaché à une étude — seulement si on en est membre (pas d'écriture dans
--- l'étude d'autrui). app.user_id non posé ⇒ tout échoue fermé.
+-- ── literature_snapshots: tenant isolation + PER-STUDY visibility (Tier 3) ──
+-- Tenant isolation (org_id) remains the first line of defense. On top of it, access is
+-- gated as follows:
+--   • study_id NON NULL ⇒ visible to the study MEMBERS (study_members), NOT to
+--     the whole tenant. This is the critical point (gate 9): we gate by study_members,
+--     never by study_id alone — otherwise a snapshot would leak between studies of the same
+--     tenant. A non-member fails closed (the EXISTS is false ⇒ row invisible).
+--   • study_id NULL ⇒ standalone snapshot, visible only to its creator.
+-- created_by is recorded but is NOT the gate for study snapshots.
+-- WITH CHECK: we only write for the current tenant, as the creator, and —
+-- if attached to a study — only if we are a member of it (no writing into
+-- someone else's study). app.user_id not set ⇒ everything fails closed.
 alter table literature_snapshots enable row level security;
 alter table literature_snapshots force row level security;
 create policy snapshot_tenant_study_access on literature_snapshots

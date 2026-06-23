@@ -1,8 +1,8 @@
-"""Tier 1b — client ClinicalTrials.gov API v2.
+"""Tier 1b — ClinicalTrials.gov API v2 client.
 
-httpx.MockTransport (aucun réseau). Les payloads reproduisent la forme confirmée
-par sonde : recherche enveloppée dans `studies[]`, fetch par NCT au niveau racine,
-404 pour un NCT inconnu.
+httpx.MockTransport (no network). The payloads reproduce the probe-confirmed
+shape: search wrapped in `studies[]`, fetch by NCT at the root level,
+404 for an unknown NCT.
 """
 
 from datetime import date as _date
@@ -71,7 +71,7 @@ async def test_fetch_by_nct_known_item() -> None:
     assert study is not None
     assert study.nct_id == "NCT01691846"
     assert study.title.startswith("Aleglitazar")
-    # fetch direct par id, sans passer par la recherche topique
+    # direct fetch by id, without going through topical search
     assert record[0].url.path == "/api/v2/studies/NCT01691846"
 
 
@@ -108,8 +108,8 @@ async def test_search_applies_filters_to_params() -> None:
 
 
 async def test_base_url_override_targets_relay() -> None:
-    # base_url (relais Vercel) doit remplacer l'hôte CT.gov tout en transmettant
-    # les query params — c'est le contournement du WAF 403 sur IP datacenter.
+    # base_url (Vercel relay) must replace the CT.gov host while still forwarding
+    # the query params — this is the workaround for the WAF 403 on datacenter IPs.
     record: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:

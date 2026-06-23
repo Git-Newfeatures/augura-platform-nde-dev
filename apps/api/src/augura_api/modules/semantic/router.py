@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module semantic."""
+"""HTTP adapter of the semantic module."""
 
 import json
 from datetime import UTC, datetime
@@ -39,7 +39,7 @@ async def relations(
     session: SessionDep,
     concept_id: str | None = None,
 ) -> list[schemas.RelationOut]:
-    """Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id)."""
+    """Causal ontology (B1). `?concept_id=` → subgraph (subject or object = id)."""
     return await SemanticService(SemanticRepo(session)).relations(concept_id=concept_id)
 
 
@@ -48,7 +48,7 @@ async def bundle(
     tenant: CurrentTenantDep,
     session: SessionDep,
 ) -> schemas.SemanticBundle:
-    """Couche sémantique gouvernée (14 tables) en un bloc — hydrate le store front."""
+    """Governed semantic layer (14 tables) as a single block — hydrates the frontend store."""
     return await SemanticService(SemanticRepo(session)).bundle()
 
 
@@ -57,7 +57,7 @@ async def release(
     tenant: CurrentTenantDep,
     session: SessionDep,
 ) -> schemas.ReleaseStatus:
-    """Release sémantique courante + compte par table (onglet Versions)."""
+    """Current semantic release + per-table count (Versions tab)."""
     return await SemanticService(SemanticRepo(session)).release()
 
 
@@ -67,7 +67,7 @@ async def enrich_apply(
     tenant: OwnerTenantDep,
     session: SessionDep,
 ) -> enrich_schemas.EnrichApplyResponse:
-    """Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version."""
+    """Persists an enrichment into the GLOBAL ontology (owner-gated). Version bump."""
     today = datetime.now(UTC).strftime("%Y%m%d")
     return await EnrichApplyService(SemanticRepo(session)).apply(req, today=today)
 
@@ -84,7 +84,7 @@ async def enrich_propose(
     settings: SettingsDep,
     background_tasks: BackgroundTasks,
 ) -> enrich_schemas.EnrichProposeAccepted:
-    """Lance l'analyse de couverture + proposition LLM en job background (suivi par polling)."""
+    """Runs coverage analysis + LLM proposal as a background job (tracked via polling)."""
     job = await jobs_iface.create_job(
         session,
         tenant.tenant_id,
@@ -104,9 +104,9 @@ async def enrich_proposals(
     tenant: CurrentTenantDep,
     session: SessionDep,
 ) -> Response:
-    """Sert les propositions d'un job réussi (scopé tenant). Lues EN BASE
-    (jobs.result_json), pas sur disque — relisibles depuis n'importe quel conteneur Modal."""
+    """Serves the proposals of a successful job (tenant-scoped). Read FROM THE DB
+    (jobs.result_json), not from disk — re-readable from any Modal container."""
     job = await jobs_iface.get_job(session, tenant.tenant_id, job_id)
     if job is None or job.result_json is None:
-        raise NotFoundError("propositions non disponibles", job_id=str(job_id))
+        raise NotFoundError("proposals not available", job_id=str(job_id))
     return Response(content=json.dumps(job.result_json), media_type="application/json")

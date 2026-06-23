@@ -1,4 +1,4 @@
-"""Contrat public du module simulation."""
+"""Public contract of the simulation module."""
 
 from datetime import datetime
 from typing import Any
@@ -68,7 +68,7 @@ class SimulationRunCreated(BaseModel):
 
 
 class SimulationRunOut(BaseModel):
-    """Élément de la liste des runs (alimente la page Runs du front)."""
+    """Item of the runs list (feeds the frontend Runs page)."""
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,4 +1,4 @@
-"""Index de concepts pour l'appariement lexical (depuis la taxonomie A1)."""
+"""Concept index for lexical matching (from the A1 taxonomy)."""
 
 from __future__ import annotations
 

@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/workspace/CollectionStates'
 import { apiJson } from '@/api'
 
-// ── Recherche sémantique (pgvector) ───────────────────────────────────────────
-// POST /corpus/search : embed-on-server puis match vectoriel scopé tenant.
+// ── Semantic search (pgvector) ────────────────────────────────────────────────
+// POST /corpus/search: embed-on-server then tenant-scoped vector match.
 export function SemanticSearch() {
   const [q, setQ] = useState('')
   const [running, setRunning] = useState(false)

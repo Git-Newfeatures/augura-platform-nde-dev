@@ -1,13 +1,13 @@
-"""artifacts.kind : autorise 'simulation_run' et 'document'
+"""artifacts.kind: allow 'simulation_run' and 'document'
 
-La couche d'orchestration (jobs.handlers) émet des artefacts de provenance de kind
-'document' (handle_document) et 'simulation_run' (handle_bootstrap), mais le CHECK
-artifacts_kind_check ne les listait pas → CheckViolationError sur create_artifact, qui
-faisait échouer TOUTE la transaction de travail du job (le dossier ne devenait jamais
-`ready`, le bootstrap ne finalisait jamais son run). On élargit la contrainte aux kinds
-réellement produits par le code. Idempotent : DROP CONSTRAINT IF EXISTS puis ré-ajout
-(Postgres n'a pas d'ADD CONSTRAINT IF NOT EXISTS). La contrainte vit aussi dans le
-bundle canonique schema.sql exécuté par 0001_baseline.
+The orchestration layer (jobs.handlers) emits provenance artifacts of kind
+'document' (handle_document) and 'simulation_run' (handle_bootstrap), but the CHECK
+artifacts_kind_check did not list them → CheckViolationError on create_artifact, which
+made the job's ENTIRE work transaction fail (the dossier never became `ready`, the
+bootstrap never finalized its run). We widen the constraint to the kinds actually
+produced by the code. Idempotent: DROP CONSTRAINT IF EXISTS then re-add (Postgres has
+no ADD CONSTRAINT IF NOT EXISTS). The constraint also lives in the canonical bundle
+schema.sql executed by 0001_baseline.
 
 Revision ID: 0009_artifacts_kind_document
 Revises: 0008_documents_content

@@ -1,6 +1,6 @@
-// Client API typé. Les types viennent de `schema.d.ts`, généré depuis l'OpenAPI
-// du backend (`npm run generate`). Ne jamais écrire un appel à la main : passer
-// par ce client pour bénéficier du typage et de la vérification de drift en CI.
+// Typed API client. The types come from `schema.d.ts`, generated from the
+// backend's OpenAPI (`npm run generate`). Never write a call by hand: go
+// through this client to benefit from typing and the CI drift check.
 
 import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
@@ -9,8 +9,8 @@ export type { paths } from "./schema";
 export type TokenProvider = () => string | null | Promise<string | null>;
 
 /**
- * Crée un client API typé pour `baseUrl`, injectant le JWT Supabase courant
- * en `Authorization: Bearer` à chaque requête (auth = porte unique, spec §7).
+ * Creates a typed API client for `baseUrl`, injecting the current Supabase JWT
+ * as `Authorization: Bearer` on every request (auth = single gate, spec §7).
  */
 export function createApiClient(
   baseUrl: string,

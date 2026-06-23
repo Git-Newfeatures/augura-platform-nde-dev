@@ -1,4 +1,4 @@
-"""Accès base du module jobs — idempotence sur (org_id, idempotency_key)."""
+"""Database access for the jobs module — idempotency on (org_id, idempotency_key)."""
 
 from typing import Any
 from uuid import UUID
@@ -28,8 +28,8 @@ class JobRepo:
         payload: dict[str, Any],
         idempotency_key: str | None = None,
     ) -> Job:
-        # Idempotence : une clé déjà vue renvoie le job existant (un double-clic
-        # ne relance pas deux bootstraps — spec §8).
+        # Idempotency: a key already seen returns the existing job (a double-click
+        # does not launch two bootstraps — spec §8).
         if idempotency_key is not None:
             res = await self.session.execute(
                 select(Job).where(Job.org_id == tenant_id, Job.idempotency_key == idempotency_key)
@@ -54,8 +54,8 @@ class JobRepo:
         result_json: dict[str, Any] | None = None,
         error: str | None = None,
     ) -> None:
-        """Met à jour les champs de suivi d'un job (écrit par le runner). Scopé tenant
-        (défense en profondeur en plus de la RLS). `updated_at` toujours rafraîchi."""
+        """Update a job's tracking fields (written by the runner). Tenant-scoped
+        (defense in depth on top of RLS). `updated_at` is always refreshed."""
         values: dict[str, Any] = {"updated_at": text("now()")}
         if status is not None:
             values["status"] = status

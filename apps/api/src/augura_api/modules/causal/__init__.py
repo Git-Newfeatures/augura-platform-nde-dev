@@ -1,4 +1,4 @@
-"""Interface publique du module causal."""
+"""Public interface of the causal module."""
 
 from augura_api.modules.causal.router import router
 

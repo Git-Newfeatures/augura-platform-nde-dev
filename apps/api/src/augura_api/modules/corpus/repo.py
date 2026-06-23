@@ -1,4 +1,4 @@
-"""Accès base du module corpus. RLS : la session voit le corpus global + le tenant."""
+"""Database access for the corpus module. RLS: the session sees the global corpus + tenant."""
 
 import json
 from datetime import date
@@ -73,8 +73,8 @@ class CorpusRepo:
         return [(j, e, int(n)) for j, e, n in rows.all()]
 
     async def source_coverage_counts(self) -> list[tuple[str | None, str | None, int]]:
-        """Comptage par (source_id, evidence_type) — alimente la mini-carte source×type
-        du panneau corpus (CorpusPanelEmbed)."""
+        """Count by (source_id, evidence_type) — feeds the source×type mini-map
+        of the corpus panel (CorpusPanelEmbed)."""
         rows = await self.session.execute(
             select(Document.source_id, Document.evidence_type, func.count()).group_by(
                 Document.source_id, Document.evidence_type
@@ -97,9 +97,9 @@ class CorpusRepo:
         )
         return [dict(m) for m in rows.mappings().all()]
 
-    # ── Ingestion (recherche de littérature) ─────────────────────────────────
-    # Les écritures sont scopées tenant (org_id = tenant) : la RLS WITH CHECK
-    # interdit la création de lignes globales (org_id NULL) depuis une session tenant.
+    # ── Ingestion (literature search) ────────────────────────────────────────
+    # Writes are tenant-scoped (org_id = tenant): the RLS WITH CHECK
+    # forbids creating global rows (org_id NULL) from a tenant session.
 
     async def find_document_by_url(self, tenant_id: TenantId, url: str) -> Document | None:
         res = await self.session.execute(

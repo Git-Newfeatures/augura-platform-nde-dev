@@ -1,4 +1,4 @@
-"""Hachage canonique des artefacts : déterministe et indépendant de l'ordre des clés."""
+"""Canonical hashing of artifacts: deterministic and key-order independent."""
 
 from augura_api.core.provenance import canonical_json, content_hash, sha256_hex
 
@@ -9,7 +9,7 @@ def test_hash_is_deterministic() -> None:
 
 
 def test_hash_is_key_order_invariant() -> None:
-    # Même contenu sémantique, ordre de clés différent → même hash.
+    # Same semantic content, different key order → same hash.
     a = {"from": "x", "to": "y", "rationale": "r"}
     b = {"to": "y", "rationale": "r", "from": "x"}
     assert content_hash(a) == content_hash(b)

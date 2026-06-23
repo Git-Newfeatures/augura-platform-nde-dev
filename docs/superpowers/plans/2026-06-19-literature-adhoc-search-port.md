@@ -36,7 +36,7 @@ git -C ~/Desktop/Augure/lucis-dashboard show origin/corpus-live:src/literature/<
 
 ```python
 # apps/api/tests/test_corpus_filters.py
-"""Mappers de filtres (date + type d'étude) — purs, sans réseau."""
+"""Filter mappers (date + study type) — pure, no network."""
 
 from datetime import date
 
@@ -55,7 +55,7 @@ def test_empty_filters_are_noop() -> None:
     assert build_pubmed_term("hba1c", f) == "hba1c"
     assert pubmed_date_params(f, TODAY) == {}
     assert ctgov_filter_params(f, TODAY) == {}
-    # None aussi (chemin sans filtres)
+    # None too (no-filters path)
     assert build_pubmed_term("hba1c", None) == "hba1c"
     assert pubmed_date_params(None, TODAY) == {}
     assert ctgov_filter_params(None, TODAY) == {}
@@ -87,11 +87,11 @@ def test_ctgov_single_study_type_maps_to_aggfilter() -> None:
 
 
 def test_ctgov_both_or_unmappable_types_skip_studytype() -> None:
-    # rct + observational ⇒ les deux types ⇒ pas de filtre studyType
+    # rct + observational ⇒ both types ⇒ no studyType filter
     assert "aggFilters" not in ctgov_filter_params(
         SearchFilters(study_types=("rct", "observational")), TODAY
     )
-    # systematic_review/meta_analysis n'existent pas côté CT.gov
+    # systematic_review/meta_analysis do not exist on the CT.gov side
     assert ctgov_filter_params(SearchFilters(study_types=("systematic_review",)), TODAY) == {}
 
 
@@ -110,12 +110,12 @@ Expected: FAIL — `ModuleNotFoundError: augura_api.modules.corpus.filters`
 
 ```python
 # apps/api/src/augura_api/modules/corpus/filters.py
-"""Filtres de recherche live (date + type d'étude) — mapping PUR, source-spécifique.
+"""Live search filters (date + study type) — PURE, source-specific mapping.
 
-Aucune I/O ⇒ testable sans réseau. Le routeur construit `SearchFilters` depuis la
-requête ; le retriever le passe aux clients PubMed/CT.gov, qui appliquent ces
-mappers. Un filtre vide (date_range='any', study_types=()) est un no-op : la requête
-part inchangée — préserve le comportement existant.
+No I/O ⇒ testable without network. The router builds `SearchFilters` from the
+request; the retriever passes it to the PubMed/CT.gov clients, which apply these
+mappers. An empty filter (date_range='any', study_types=()) is a no-op: the request
+goes out unchanged — preserves the existing behavior.
 """
 
 from __future__ import annotations
@@ -126,7 +126,7 @@ from datetime import date
 VALID_DATE_RANGES = ("any", "1y", "5y", "10y")
 _YEARS_BACK = {"1y": 1, "5y": 5, "10y": 10}
 
-# study_type Augura → terme PubMed Publication Type ([pt]).
+# Augura study_type → PubMed Publication Type term ([pt]).
 _PUBMED_PT = {
     "rct": "Randomized Controlled Trial[pt]",
     "observational": "Observational Study[pt]",
@@ -135,8 +135,8 @@ _PUBMED_PT = {
 }
 VALID_STUDY_TYPES = tuple(_PUBMED_PT.keys())
 
-# study_type Augura → studyType CT.gov (aggFilters). Revues/méta-analyses ne sont
-# pas des types d'essai CT.gov → ignorées côté CT.gov.
+# Augura study_type → CT.gov studyType (aggFilters). Reviews/meta-analyses are not
+# CT.gov trial types → ignored on the CT.gov side.
 _CTGOV_STUDY_TYPE = {"rct": "int", "observational": "obs"}
 
 
@@ -152,7 +152,7 @@ def _from_year(date_range: str, today: date) -> int | None:
 
 
 def build_pubmed_term(query: str, filters: SearchFilters | None) -> str:
-    """Terme esearch : `(query) AND (pt OR pt)`. Sans study_types → `query` inchangée."""
+    """esearch term: `(query) AND (pt OR pt)`. Without study_types → `query` unchanged."""
     if not filters or not filters.study_types:
         return query
     pts = [_PUBMED_PT[t] for t in filters.study_types if t in _PUBMED_PT]
@@ -162,7 +162,7 @@ def build_pubmed_term(query: str, filters: SearchFilters | None) -> str:
 
 
 def pubmed_date_params(filters: SearchFilters | None, today: date) -> dict[str, str]:
-    """Params esearch de date (granularité année). Vide si date_range='any'."""
+    """esearch date params (year granularity). Empty if date_range='any'."""
     if not filters:
         return {}
     year = _from_year(filters.date_range, today)
@@ -172,8 +172,8 @@ def pubmed_date_params(filters: SearchFilters | None, today: date) -> dict[str, 
 
 
 def ctgov_filter_params(filters: SearchFilters | None, today: date) -> dict[str, str]:
-    """Params CT.gov v2 : aggFilters studyType (1 seul type mappable) + range de date.
-    Deux types int+obs sélectionnés, ou type non mappable seul → pas de studyType."""
+    """CT.gov v2 params: aggFilters studyType (only 1 mappable type) + date range.
+    Both types int+obs selected, or an unmappable type alone → no studyType."""
     if not filters:
         return {}
     params: dict[str, str] = {}
@@ -482,10 +482,10 @@ async def test_topical_passes_filters_to_clients_and_captures_term() -> None:
         "engagement and hba1c", max_results=5, today=DAY, filters=filters
     )
 
-    # les filtres atteignent les deux clients
+    # the filters reach both clients
     assert pm.last_filters == filters
     assert ct.last_filters == filters
-    # le query_string capturé reflète le terme PubMed filtré (pour le gel)
+    # the captured query_string reflects the filtered PubMed term (for the freeze)
     pmg = r.groups[0]
     assert pmg.query_string == (
         "(engagement and hba1c) AND (Randomized Controlled Trial[pt])"
@@ -522,7 +522,7 @@ Update `retrieve` to accept `filters` and pass it down (known-item path ignores 
         day = today or datetime.now(UTC).date()
         item = classify_known_item(query)
         if item is not None:
-            # known-item = lookup exact : les filtres date/type ne s'appliquent pas.
+            # known-item = exact lookup: date/type filters do not apply.
             return await self._known_item(query, item, srcs, day)
         return await self._topical(query, srcs, max_results, day, filters)
 ```
@@ -551,7 +551,7 @@ Update the two topical builders to apply + capture filters:
     async def _pubmed_topical(
         self, query: str, max_results: int, day: date, filters: SearchFilters | None
     ) -> SourceGroup:
-        # Le terme réellement envoyé à esearch (avec filtres [pt]) EST le query_string.
+        # The term actually sent to esearch (with [pt] filters) IS the query_string.
         term = build_pubmed_term(query, filters)
         articles = await self._pubmed.search(query, max_results, filters=filters, today=day)
         items = [
@@ -565,7 +565,7 @@ Update the two topical builders to apply + capture filters:
     ) -> SourceGroup:
         extra = ctgov_filter_params(filters, day)
         suffix = "".join(f"&{k}={v}" for k, v in sorted(extra.items()))
-        qs = f"query.term={query}{suffix}"  # chaîne API CT.gov réellement envoyée
+        qs = f"query.term={query}{suffix}"  # CT.gov API string actually sent
         studies = await self._ctgov.search(query, max_results, filters=filters, today=day)
         items = [
             RetrievedItem(SOURCE_CTGOV, s.nct_id, s.title, qs, day, _ctgov_record(s))
@@ -599,7 +599,7 @@ git commit -m "feat(corpus): thread date/study-type filters through the retrieve
 
 ```python
 # apps/api/tests/test_corpus_retrieve_request.py
-"""Validation de la requête retrieve + construction des SearchFilters côté routeur."""
+"""Retrieve request validation + SearchFilters construction on the router side."""
 
 import pytest
 
@@ -639,10 +639,10 @@ In `apps/api/src/augura_api/modules/corpus/schemas.py`, extend `LiteratureRetrie
 ```python
 class LiteratureRetrieveRequest(BaseModel):
     query: str = Field(min_length=2, max_length=400)
-    # Défaut : les deux sources. Validé côté service (source inconnue → 400).
+    # Default: both sources. Validated on the service side (unknown source → 400).
     sources: list[str] | None = None
     max_results: int = Field(default=10, ge=1, le=50)
-    # Filtres v0 : fenêtre de date + types d'étude. Validés côté routeur (_build_filters).
+    # v0 filters: date window + study types. Validated on the router side (_build_filters).
     date_range: str = "any"
     study_types: list[str] = Field(default_factory=list)
 ```
@@ -715,7 +715,7 @@ git commit -m "feat(corpus): accept date_range/study_types on POST /corpus/liter
 
 ```python
 # apps/api/tests/test_corpus_snapshot_list.py
-"""LiteratureSnapshotService.list_snapshots : mappe les lignes en SnapshotSummary."""
+"""LiteratureSnapshotService.list_snapshots: maps the rows to SnapshotSummary."""
 
 from datetime import UTC, datetime
 from typing import cast
@@ -783,7 +783,7 @@ In `apps/api/src/augura_api/modules/corpus/schemas.py`, add after `LiteratureSna
 
 ```python
 class SnapshotSummary(BaseModel):
-    """Vue légère pour la liste « Saved evidence » : pas de results ni de hash."""
+    """Lightweight view for the "Saved evidence" list: no results, no hash."""
 
     id: UUID
     study_id: UUID | None = None
@@ -833,7 +833,7 @@ In `apps/api/src/augura_api/modules/corpus/router.py`, add the route immediately
 async def list_snapshots(
     tenant: CurrentTenantDep, session: SessionDep, study_id: UUID | None = None
 ) -> list[schemas.SnapshotSummary]:
-    """Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash)."""
+    """Lists the tenant's frozen evidence (lightweight view, no results, no hash recompute)."""
     return await _live_service(session).list_snapshots(tenant, study_id=study_id)
 ```
 
@@ -883,7 +883,7 @@ async def test_ingest_by_ids_fetches_and_ingests() -> None:
     res = await _service(repo).ingest_by_ids(TENANT, pmids=["1"])
     assert (res.found, res.ingested) == (1, 1)
     assert {d.url for d in res.documents} == {"https://doi.org/10.1/a"}
-    # idempotent : même PMID déjà ingéré ⇒ 0 nouvelle ingestion
+    # idempotent: same PMID already ingested ⇒ 0 new ingestion
     res2 = await _service(repo).ingest_by_ids(TENANT, pmids=["1"])
     assert (res2.found, res2.ingested) == (1, 0)
 ```
@@ -913,8 +913,8 @@ In `apps/api/src/augura_api/modules/corpus/service.py`, refactor `LiteratureServ
     async def ingest_by_ids(
         self, tenant: CurrentTenant, *, pmids: list[str]
     ) -> schemas.LiteratureSearchResult:
-        """Ingère des enregistrements PubMed précis (efetch par PMID), sans recherche.
-        Sert « Add to corpus » sur des résultats de retrieve déjà sélectionnés."""
+        """Ingests specific PubMed records (efetch by PMID), without a search.
+        Serves "Add to corpus" on already-selected retrieve results."""
         articles = await self.pubmed.fetch_by_ids(pmids)
         return await self._ingest_articles(
             tenant, articles, query=",".join(pmids), effective_query=",".join(pmids)
@@ -933,7 +933,7 @@ In `apps/api/src/augura_api/modules/corpus/service.py`, refactor `LiteratureServ
         embedded_any = False
         for art in articles:
             if art.url and await self.repo.find_document_by_url(tenant.tenant_id, art.url):
-                continue  # déjà ingéré pour ce tenant
+                continue  # already ingested for this tenant
             doc = await self.repo.insert_document(
                 tenant.tenant_id,
                 source_id="pubmed",
@@ -1005,8 +1005,8 @@ async def literature_ingest(
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.LiteratureSearchResult:
-    """Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.
-    Sert « Add to corpus » sur des résultats de retrieve gardés (PubMed only)."""
+    """Ingests specific PubMed records (by PMID) into the tenant's corpus.
+    Serves "Add to corpus" on kept retrieve results (PubMed only)."""
     embedder: Embedder | None = None
     try:
         embedder = get_embedder(settings)
@@ -1150,8 +1150,8 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/workspace/CollectionStates'
 import { apiJson } from '@/api'
 
-// ── Recherche sémantique (pgvector) ───────────────────────────────────────────
-// POST /corpus/search : embed-on-server puis match vectoriel scopé tenant.
+// ── Semantic search (pgvector) ────────────────────────────────────────────────
+// POST /corpus/search: embed-on-server then tenant-scoped vector match.
 export function SemanticSearch() {
   const [q, setQ] = useState('')
   const [running, setRunning] = useState(false)
@@ -1258,20 +1258,20 @@ All files in this phase live under `apps/web/src/workspace/literature/`. Ported 
 ```js
 // apps/web/src/workspace/literature/literatureClient.js
 //
-// Client du workbench Littérature, branché sur le vrai backend FastAPI :
+// Literature workbench client, wired to the real FastAPI backend:
 //   - retrieve  → POST /corpus/literature/retrieve (stream NDJSON: meta|group|done)
 //   - sessions  → POST/GET /corpus/literature/sessions(+events)   (Recent queries + audit)
 //   - snapshots → POST/GET /corpus/literature/snapshots(/{id})    (Saved evidence)
 //   - ingest    → POST /corpus/literature/ingest                  (Add to corpus, PubMed)
-// Pas de mode démo, pas de localStorage : tout vient du backend (règle no-mock).
+// No demo mode, no localStorage: everything comes from the backend (no-mock rule).
 import { apiFetch, apiJson } from '@/api'
 
-// id stable d'un résultat across sources (pmid pour PubMed, nct_id pour CT.gov).
+// stable id of a result across sources (pmid for PubMed, nct_id for CT.gov).
 export const resultId = (r) => r.pmid || r.nct_id || r.id || ''
 
-// Aplati un item backend (record imbriqué) → forme plate attendue par les cartes
-// (r.pmid, r.abstract…). Conserve source/id/query_string/retrieval_date/record pour
-// reconstruire un FrozenResult au moment du Save.
+// Flattens a backend item (nested record) → flat shape expected by the cards
+// (r.pmid, r.abstract…). Keeps source/id/query_string/retrieval_date/record to
+// rebuild a FrozenResult at Save time.
 export function flattenItem(item) {
   const rec = item.record || {}
   return {
@@ -1287,7 +1287,7 @@ export function flattenItem(item) {
   }
 }
 
-// Stream NDJSON du retrieve. onEvent reçoit {type:'meta'|'group'|'done'|'error', ...}.
+// NDJSON stream of the retrieve. onEvent receives {type:'meta'|'group'|'done'|'error', ...}.
 export async function streamRetrieve({ query, sources, dateRange, studyTypes, maxResults = 10, signal, onEvent }) {
   const body = JSON.stringify({
     query,
@@ -1312,7 +1312,7 @@ export async function streamRetrieve({ query, sources, dateRange, studyTypes, ma
   const reader = res.body.getReader()
   const dec = new TextDecoder()
   let buf = ''
-  const emit = (raw) => { try { onEvent(JSON.parse(raw)) } catch { /* ligne partielle */ } }
+  const emit = (raw) => { try { onEvent(JSON.parse(raw)) } catch { /* partial line */ } }
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -1328,7 +1328,7 @@ export async function streamRetrieve({ query, sources, dateRange, studyTypes, ma
   }
 }
 
-// ── Sessions (Recent queries) — historique serveur ───────────────────────────
+// ── Sessions (Recent queries) — server history ───────────────────────────────
 export const createSession = (query, studyId = null) =>
   apiJson('/corpus/literature/sessions', {
     method: 'POST',
@@ -1337,7 +1337,7 @@ export const createSession = (query, studyId = null) =>
 
 export const listSessions = () => apiJson('/corpus/literature/sessions')
 
-// Best-effort : ne jette jamais (l'audit ne doit pas casser le flux).
+// Best-effort: never throws (audit must not break the flow).
 export const logEvent = (sessionId, eventType, payload = {}) =>
   apiFetch(`/corpus/literature/sessions/${sessionId}/events`, {
     method: 'POST',
@@ -1415,8 +1415,8 @@ const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
 const doiUrl = (doi) => `https://doi.org/${doi}`
 const ctgovUrl = (nct) => `https://clinicaltrials.gov/study/${nct}`
 
-// Dismissed → ligne repliée (conservé pour l'audit). Kept → carte pleine.
-// readOnly (snapshot gelé) masque les actions. `ingestState` ∈ undefined|'busy'|'done'|'error'.
+// Dismissed → collapsed row (kept for audit). Kept → full card.
+// readOnly (frozen snapshot) hides the actions. `ingestState` ∈ undefined|'busy'|'done'|'error'.
 export function ResultCard({ result, position, status, onKeep, onDismiss, onAddToCorpus, ingestState, readOnly }) {
   const [showAbstract, setShowAbstract] = useState(false)
   const isCtgov = result.source === 'ctgov'
@@ -1572,7 +1572,7 @@ const SOURCE_META = {
   ctgov: { label: 'ClinicalTrials.gov', Icon: FlaskConical },
 }
 
-// Résultats groupés par source (un en-tête par source). `groups` est keyé par
+// Results grouped by source (one header per source). `groups` is keyed by
 // source → { results, note, error, loading }.
 export function ResultsList({ sources, groups, statusFor, onKeep, onDismiss, onAddToCorpus, ingestStateFor, readOnly }) {
   return (
@@ -1648,8 +1648,8 @@ import { Badge } from '@/components/ui/badge'
 import { History, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Sessions de recherche récentes (serveur). Ré-ouverture = relance live ; pas un
-// snapshot/audit. Replié par défaut ; masqué s'il n'y a pas d'historique.
+// Recent search sessions (server). Re-opening = live re-run; not a
+// snapshot/audit. Collapsed by default; hidden if there is no history.
 export function RecentQueries({ entries, activeId, onOpen }) {
   const [open, setOpen] = useState(false)
   if (!entries?.length) return null
@@ -1712,7 +1712,7 @@ import { Badge } from '@/components/ui/badge'
 import { Lock, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Snapshots gelés (Saved evidence) — ré-ouverture en lecture seule. Masqué si vide.
+// Frozen snapshots (Saved evidence) — read-only re-open. Hidden if empty.
 export function SavedEvidence({ entries, activeId, onOpen }) {
   const [open, setOpen] = useState(false)
   if (!entries?.length) return null
@@ -1753,8 +1753,8 @@ export function SavedEvidence({ entries, activeId, onOpen }) {
 import { Button } from '@/components/ui/button'
 import { Plus, Trash2, Bookmark, BookmarkCheck, Check } from 'lucide-react'
 
-// Actions de session : sauver (étude ou standalone) gèle un snapshot. `saved`
-// (quand défini) affiche une confirmation à la place des boutons de sauvegarde.
+// Session actions: saving (study or standalone) freezes a snapshot. `saved`
+// (when defined) shows a confirmation in place of the save buttons.
 export function SessionActions({ saved, onSaveToStudy, onSaveStandalone, onNewQuery, onDiscard }) {
   return (
     <div className="flex flex-col gap-3">
@@ -1789,8 +1789,8 @@ import { useCollection } from '@/workspace/dataClient'
 import { Button } from '@/components/ui/button'
 import { Library, X } from 'lucide-react'
 
-// Sélecteur d'étude pour « Save to study ». Lit la VRAIE liste d'études via le data
-// client existant (jamais une liste mockée).
+// Study picker for "Save to study". Reads the REAL study list via the existing data
+// client (never a mocked list).
 export function StudyPicker({ onPick, onClose }) {
   const { data: studies, loading } = useCollection('studies')
 
@@ -1902,7 +1902,7 @@ const initialState = {
   groups: {},      // source -> { results, note, error, loading }
   marks: {},       // resultId -> 'kept' | 'dismissed'
   error: null,
-  saved: null,     // { label, href } après sauvegarde
+  saved: null,     // { label, href } after saving
   frozenAt: null,
 }
 
@@ -1954,13 +1954,13 @@ export function AdHocQuery() {
     try {
       const rows = await listSessions()
       setHistory(rows.map((s) => ({ id: s.id, question: s.query, createdAt: s.created_at })))
-    } catch { /* non-bloquant */ }
+    } catch { /* non-blocking */ }
   }, [])
   const refreshSaved = useCallback(async () => {
     try {
       const rows = await listSnapshots()
       setSavedList(rows.map((s) => ({ snapshotId: s.id, question: s.query, studyId: s.study_id, resultCount: s.result_count })))
-    } catch { /* non-bloquant */ }
+    } catch { /* non-blocking */ }
   }, [])
 
   useEffect(() => { refreshHistory(); refreshSaved() }, [refreshHistory, refreshSaved])

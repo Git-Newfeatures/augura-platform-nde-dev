@@ -1,4 +1,4 @@
-"""Logique du module documents : génération asynchrone via job (spec §5)."""
+"""Logic of the documents module: asynchronous generation via job (spec §5)."""
 
 from uuid import UUID
 
@@ -23,17 +23,17 @@ class DocumentService:
     async def get(self, tenant: CurrentTenant, document_id: UUID) -> schemas.GeneratedDocumentOut:
         doc = await DocumentRepo(self.session).get(tenant.tenant_id, document_id)
         if doc is None:
-            raise NotFoundError("document introuvable", document_id=str(document_id))
+            raise NotFoundError("document not found", document_id=str(document_id))
         return schemas.GeneratedDocumentOut.model_validate(doc)
 
     async def download(self, tenant: CurrentTenant, document_id: UUID) -> tuple[str, bytes]:
-        """Renvoie (type, octets) du dossier généré, lus EN BASE (content) — cohérent
-        cross-conteneur sur Modal. NotFoundError tant que le dossier n'est pas `ready`."""
+        """Returns (type, bytes) of the generated document, read FROM THE DATABASE (content) —
+        consistent cross-container on Modal. NotFoundError until the document is `ready`."""
         doc = await DocumentRepo(self.session).get(tenant.tenant_id, document_id)
         if doc is None:
-            raise NotFoundError("document introuvable", document_id=str(document_id))
+            raise NotFoundError("document not found", document_id=str(document_id))
         if doc.content is None:
-            raise NotFoundError("document non encore généré", document_id=str(document_id))
+            raise NotFoundError("document not yet generated", document_id=str(document_id))
         return doc.type, bytes(doc.content)
 
     async def generate(
@@ -60,8 +60,8 @@ class DocumentService:
             route="/documents",
             metadata={"document_id": str(doc.id), "type": req.type},
         )
-        # Le worker (jobs.runner) génère le dossier et le marque `ready` après la
-        # réponse — fallback local du worker Modal WeasyPrint/python-docx → Storage.
+        # The worker (jobs.runner) generates the document and marks it `ready` after the
+        # response — local fallback of the Modal WeasyPrint/python-docx worker → Storage.
         return schemas.GeneratedDocumentCreated(
             document_id=doc.id, job_id=job.id, status=doc.status
         )

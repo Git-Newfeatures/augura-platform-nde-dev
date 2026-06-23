@@ -9,7 +9,7 @@ const SOURCE_META = {
   ctgov: { label: 'ClinicalTrials.gov', Icon: FlaskConical },
 }
 
-// Résultats groupés par source (un en-tête par source). `groups` est keyé par
+// Results grouped by source (one header per source). `groups` is keyed by
 // source → { results, note, error, loading }.
 export function ResultsList({ sources, groups, statusFor, onKeep, onDismiss, readOnly }) {
   return (

@@ -1,7 +1,7 @@
-"""Curation LLM (re-ranking par abstract) — helper de mapping pur + LLMCurator mocké.
+"""LLM curation (re-ranking by abstract) — pure mapping helper + mocked LLMCurator.
 
-Aucun réseau : le mapping est pur ; le LLMCurator est testé avec un client LLM factice
-(même pattern que test_agents_dag.py)."""
+No network: the mapping is pure; the LLMCurator is tested with a fake LLM client
+(same pattern as test_agents_dag.py)."""
 
 from typing import Any
 
@@ -49,15 +49,15 @@ class _FakeClient:
 
 def test_apply_curation_reorders_and_drops() -> None:
     by_id = {"a": "RecA", "b": "RecB", "c": "RecC"}
-    refs = [CuratedRef(id="c", rationale="plus pertinent"), CuratedRef(id="a", rationale="ok")]
+    refs = [CuratedRef(id="c", rationale="more relevant"), CuratedRef(id="a", rationale="ok")]
     out = apply_curation(refs, by_id, max_results=10)
-    assert out == [("RecC", "plus pertinent"), ("RecA", "ok")]
+    assert out == [("RecC", "more relevant"), ("RecA", "ok")]
 
 
 def test_apply_curation_ignores_hallucinated_and_dupes() -> None:
     by_id = {"a": "RecA"}
     refs = [
-        CuratedRef(id="zzz", rationale="inventé"),
+        CuratedRef(id="zzz", rationale="hallucinated"),
         CuratedRef(id="a", rationale="1"),
         CuratedRef(id="a", rationale="2"),
     ]
@@ -82,8 +82,8 @@ async def test_llm_curator_returns_ordered_refs() -> None:
         _msg(
             {
                 "selected": [
-                    {"id": "2", "rationale": "RCT directement sur la question"},
-                    {"id": "1", "rationale": "pertinent mais observationnel"},
+                    {"id": "2", "rationale": "RCT directly on the question"},
+                    {"id": "1", "rationale": "relevant but observational"},
                 ]
             }
         )

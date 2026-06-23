@@ -1,4 +1,4 @@
-"""handle_enrich_propose : exécute le pipeline (mocké) et persiste le résultat EN BASE."""
+"""handle_enrich_propose: runs the (mocked) pipeline and persists the result IN THE DB."""
 
 from types import SimpleNamespace
 from typing import Any
@@ -40,7 +40,7 @@ async def test_handle_enrich_propose_stores_result_in_db(monkeypatch: pytest.Mon
     )
     monkeypatch.setattr("augura_api.modules.semantic.enrich_propose.propose", fake_propose)
     monkeypatch.setattr("augura_api.modules.analytics.log_usage", fake_log_usage)
-    # Le résultat est stocké EN BASE (jobs.result_json), pas sur disque.
+    # The result is stored IN THE DB (jobs.result_json), not on disk.
     monkeypatch.setattr("augura_api.modules.jobs.set_result_json", fake_set_result_json)
 
     from augura_api.jobs.handlers import handle_enrich_propose
@@ -59,7 +59,7 @@ async def test_handle_enrich_propose_stores_result_in_db(monkeypatch: pytest.Mon
     )
 
     ref = await handle_enrich_propose(ctx)  # type: ignore[arg-type]
-    assert ref is None  # plus d'artefact disque : le résultat est en base
+    assert ref is None  # no more disk artifact: the result is in the DB
 
     data = captured["result"]
     assert "proposals" in data

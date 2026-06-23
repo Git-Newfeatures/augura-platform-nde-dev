@@ -1,8 +1,8 @@
-"""Tier 1a — routeur known-item + efetch-par-id du client PubMed.
+"""Tier 1a — known-item router + efetch-by-id of the PubMed client.
 
-Le classifieur est pur (tests synchrones). Le client réel est testé via
-httpx.MockTransport (aucun réseau) pour inspecter l'appel CONSTRUIT : un PMID
-doit passer par efetch `id=`, jamais par esearch avec un tag de titre.
+The classifier is pure (synchronous tests). The real client is tested via
+httpx.MockTransport (no network) to inspect the BUILT call: a PMID must go
+through efetch `id=`, never through esearch with a title tag.
 """
 
 from typing import cast
@@ -54,7 +54,7 @@ def _mock_http(record: list[httpx.Request]) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
-# ── Classifieur (pur) ─────────────────────────────────────────────────────────
+# ── Classifier (pure) ─────────────────────────────────────────────────────────
 
 
 def test_classify_pmid() -> None:
@@ -67,7 +67,7 @@ def test_classify_pmid() -> None:
 
 
 def test_classify_long_digit_string_is_not_pmid() -> None:
-    # 10 chiffres : hors plage PMID (1–9) → topique (None).
+    # 10 digits: outside the PMID range (1–9) → topical (None).
     assert classify_known_item("1234567890") is None
 
 
@@ -104,7 +104,7 @@ def test_classify_topical_and_empty_are_none() -> None:
     assert classify_known_item("   ") is None
 
 
-# ── Client : efetch-par-id (gate 1) ─────────────────────────────────────────────
+# ── Client: efetch-by-id (gate 1) ─────────────────────────────────────────────
 
 
 async def test_fetch_by_pmid_uses_efetch_not_esearch() -> None:
@@ -118,12 +118,12 @@ async def test_fetch_by_pmid_uses_efetch_not_esearch() -> None:
     assert articles[0].title == "Exact known-item paper"
 
     paths = [r.url.path for r in record]
-    assert any("efetch" in p for p in paths), "doit appeler efetch"
-    assert not any("esearch" in p for p in paths), "ne doit JAMAIS appeler esearch"
+    assert any("efetch" in p for p in paths), "must call efetch"
+    assert not any("esearch" in p for p in paths), "must NEVER call esearch"
 
     efetch = next(r for r in record if "efetch" in r.url.path)
     assert efetch.url.params.get("id") == "35319473"
-    assert "[Title]" not in str(efetch.url), "aucun tag de titre dans un lookup par id"
+    assert "[Title]" not in str(efetch.url), "no title tag in an id lookup"
 
 
 async def test_fetch_by_ids_empty_returns_empty_without_call() -> None:
@@ -134,7 +134,7 @@ async def test_fetch_by_ids_empty_returns_empty_without_call() -> None:
     assert record == []
 
 
-# ── Résolveur PubMed : routage par type ─────────────────────────────────────────
+# ── PubMed resolver: routing by type ─────────────────────────────────────────
 
 
 class RecordingPubMed:

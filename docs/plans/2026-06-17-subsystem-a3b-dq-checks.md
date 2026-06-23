@@ -19,7 +19,7 @@
 
 - [ ] **Step 1: Write the failing unit test** `apps/api/tests/test_dq_checks_a3b.py`:
 ```python
-"""Tests des checks DQ A3b (file/column/table data-only)."""
+"""Tests for the A3b DQ checks (file/column/table data-only)."""
 
 from augura_api.modules.dq.engine import run_dq
 from augura_api.modules.dq.profiler import profile_column

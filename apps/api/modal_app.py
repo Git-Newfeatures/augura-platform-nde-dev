@@ -1,17 +1,17 @@
 # pyright: reportUnknownMemberType=false
-# Justification (spec §9) : les décorateurs de la lib `modal` sont partiellement typés
-# (stubs incomplets). Ce fichier est de la glue de déploiement, hors `src/` ; il est
-# couvert par ruff et n'est pas dans l'`include` pyright de la CI.
+# Rationale (spec §9): the `modal` library decorators are partially typed
+# (incomplete stubs). This file is deployment glue, outside `src/`; it is
+# covered by ruff and is not in the CI's pyright `include`.
 from pathlib import Path
 
 import modal
 from fastapi import FastAPI
 
-# Image runtime : on installe TOUTES les dépendances du projet depuis pyproject.toml
-# (source de vérité unique — pas de liste dupliquée). Indispensable : create_app()
-# importe les routers qui tirent sqlalchemy/asyncpg/pyjwt/anthropic… ; une image
-# minimale planterait à l'import. Le code applicatif est ajouté à part via
-# add_local_python_source (pip installe les deps, pas le package augura_api lui-même).
+# Runtime image: we install ALL of the project's dependencies from pyproject.toml
+# (single source of truth — no duplicated list). Indispensable: create_app()
+# imports the routers, which pull in sqlalchemy/asyncpg/pyjwt/anthropic…; a minimal
+# image would crash at import. The application code is added separately via
+# add_local_python_source (pip installs the deps, not the augura_api package itself).
 _PYPROJECT = Path(__file__).parent / "pyproject.toml"
 
 image = (
@@ -22,11 +22,11 @@ image = (
 
 app = modal.App("augura-api")
 
-# Config prod injectée par un secret Modal (PAS une env d'image figée). Doit contenir
-# au minimum : AUGURA_ENV=prod, AUGURA_DATABASE_URL, AUGURA_CORS_ORIGINS (origine(s)
-# du front Vercel), et AUGURA_SUPABASE_JWT_SECRET ou AUGURA_SUPABASE_JWKS_URL pour la
-# vérif JWT ; AUGURA_ANTHROPIC_API_KEY/OPENAI/NCBI selon les agents activés.
-# Création hors-bundle :
+# Prod config injected via a Modal secret (NOT a frozen image env). Must contain
+# at minimum: AUGURA_ENV=prod, AUGURA_DATABASE_URL, AUGURA_CORS_ORIGINS (Vercel
+# front-end origin(s)), and AUGURA_SUPABASE_JWT_SECRET or AUGURA_SUPABASE_JWKS_URL for
+# JWT verification; AUGURA_ANTHROPIC_API_KEY/OPENAI/NCBI depending on enabled agents.
+# Out-of-bundle creation:
 #   modal secret create augura-api AUGURA_ENV=prod AUGURA_DATABASE_URL=… …
 _secret = modal.Secret.from_name("augura-api")
 
@@ -39,11 +39,11 @@ def api() -> FastAPI:
     return create_app()
 
 
-# Worker de jobs (traitements longs : enrichissement sémantique, bootstrap, dossiers).
-# Spawné par `jobs.runner.enqueue_job` (`run_job.spawn(...)`) DEPUIS le conteneur ASGI :
-# tourne dans un conteneur dédié, écrit son résultat EN BASE (jamais sur disque éphémère)
-# et progresse par transactions courtes — le polling `/jobs/{id}` le voit avancer.
-# timeout généreux : un run d'enrichissement enchaîne plusieurs appels LLM.
+# Jobs worker (long-running tasks: semantic enrichment, bootstrap, documents).
+# Spawned by `jobs.runner.enqueue_job` (`run_job.spawn(...)`) FROM the ASGI container:
+# runs in a dedicated container, writes its result IN THE DATABASE (never on ephemeral disk)
+# and progresses via short transactions — polling `/jobs/{id}` sees it advance.
+# Generous timeout: an enrichment run chains several LLM calls.
 @app.function(image=image, secrets=[_secret], timeout=900)
 def run_job(tenant_id: str, user_id: str, job_id: str) -> None:
     import asyncio

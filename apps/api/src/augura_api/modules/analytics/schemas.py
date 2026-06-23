@@ -1,4 +1,4 @@
-"""Contrat public du module analytics."""
+"""Public contract of the analytics module."""
 
 from datetime import datetime
 from uuid import UUID
@@ -22,7 +22,7 @@ class AdminStats(BaseModel):
 
 
 class ActivityEvent(BaseModel):
-    """Élément du fil d'activité (audit trail), accessible à tout membre du tenant."""
+    """Activity-feed item (audit trail), accessible to any tenant member."""
 
     id: UUID
     event_type: str
@@ -32,8 +32,8 @@ class ActivityEvent(BaseModel):
 
 
 class ArtifactOut(BaseModel):
-    """Artefact versionné & hashé (colonne vertébrale reproductibilité) — alimente
-    l'onglet Lineage. `content` est volontairement exclu (peut être volumineux)."""
+    """Versioned & hashed artifact (reproducibility backbone) — feeds the
+    Lineage tab. `content` is intentionally excluded (can be large)."""
 
     id: UUID
     kind: str

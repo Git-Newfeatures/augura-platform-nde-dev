@@ -1,9 +1,9 @@
-"""Client PubMed via les E-utilities NCBI (esearch + efetch).
+"""PubMed client via the NCBI E-utilities (esearch + efetch).
 
-Le backend déployé (Modal) ne peut pas utiliser un MCP plugin : on tape l'API
-publique NCBI directement (HTTP). `PubMedClient` est un Protocol injectable ⇒ les
-tests fournissent un faux client sans réseau. Le parsing efetch (XML) extrait
-titre/abstract/DOI/date/types de publication, mappés vers le modèle Document.
+The deployed backend (Modal) cannot use an MCP plugin: we hit the public NCBI
+API directly (HTTP). `PubMedClient` is an injectable Protocol ⇒ tests provide a
+fake client with no network. The efetch parsing (XML) extracts
+title/abstract/DOI/date/publication types, mapped to the Document model.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from augura_api.modules.corpus.filters import (
 
 EUTILS_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
-# Type de publication PubMed → evidence_type Augura (cf. heatmap de couverture).
+# PubMed publication type → Augura evidence_type (cf. coverage heatmap).
 _EVIDENCE_TYPE_MAP: list[tuple[str, str]] = [
     ("Randomized Controlled Trial", "rct"),
     ("Meta-Analysis", "meta_analysis"),
@@ -73,7 +73,7 @@ def _evidence_type(article_types: list[str]) -> str:
 
 
 def _parse_pubdate(article_el: ET.Element) -> date | None:
-    # PubDate (Year/Month/Day) ou ArticleDate ; on tolère les champs manquants.
+    # PubDate (Year/Month/Day) or ArticleDate; we tolerate missing fields.
     for path in (".//Article/Journal/JournalIssue/PubDate", ".//Article/ArticleDate"):
         el = article_el.find(path)
         if el is None:
@@ -103,8 +103,8 @@ def _text(el: ET.Element | None) -> str:
 
 
 def _parse_authors(article_el: ET.Element) -> tuple[str, ...]:
-    """Auteurs sous forme « Nom Initiales » (ex. « Smith JA ») dans l'ordre PubMed.
-    Tolère les auteurs collectifs (CollectiveName) et les champs manquants."""
+    """Authors in "LastName Initials" form (e.g. "Smith JA") in PubMed order.
+    Tolerates collective authors (CollectiveName) and missing fields."""
     out: list[str] = []
     for author in article_el.findall(".//Article/AuthorList/Author"):
         last = _text(author.find("LastName"))
@@ -123,7 +123,7 @@ def _parse_article(article_el: ET.Element) -> PubMedArticle | None:
     title = _text(article_el.find(".//Article/ArticleTitle"))
     if not pmid or not title:
         return None
-    # Abstract : peut être segmenté (plusieurs AbstractText) → on concatène.
+    # Abstract: may be segmented (several AbstractText) → we concatenate.
     abstract = "\n\n".join(
         _text(a) for a in article_el.findall(".//Article/Abstract/AbstractText")
     ).strip()
@@ -163,7 +163,7 @@ class PubMedClient(Protocol):
 
 
 class NCBIPubMedClient:
-    """Implémentation réelle : esearch (JSON) → PMIDs, efetch (XML) → articles."""
+    """Real implementation: esearch (JSON) → PMIDs, efetch (XML) → articles."""
 
     def __init__(self, http: httpx.AsyncClient, *, api_key: str | None = None) -> None:
         self._http = http
@@ -189,10 +189,10 @@ class NCBIPubMedClient:
         return idlist
 
     async def fetch_by_ids(self, pmids: list[str]) -> list[PubMedArticle]:
-        """Efetch direct par PMID — aucun esearch. C'est le chemin known-item PMID :
-        en s'adressant à efetch avec `id=`, il est structurellement insensible au bug
-        de qualificateur de champ (un PMID n'est jamais réinterprété comme un terme).
-        Réutilise le même parseur efetch que `search`."""
+        """Direct efetch by PMID — no esearch. This is the known-item PMID path:
+        by calling efetch with `id=`, it is structurally immune to the field-qualifier
+        bug (a PMID is never reinterpreted as a term).
+        Reuses the same efetch parser as `search`."""
         clean = [p.strip() for p in pmids if p.strip()]
         if not clean:
             return []

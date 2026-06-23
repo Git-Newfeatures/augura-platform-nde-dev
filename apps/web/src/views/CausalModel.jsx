@@ -382,8 +382,8 @@ export default function CausalModel({ studyType, product, outcome, dagCache, set
     // Step 2 — DAG construction (with gap context injected)
     try {
       setGapLoadStep("dag");
-      // apiJson lève sur non-2xx (ex. backend sans clé LLM → 503) ; le catch ci-dessous
-      // surface un message propre au lieu d'une erreur JSON brute.
+      // apiJson throws on non-2xx (e.g. backend without an LLM key → 503); the catch below
+      // surfaces a clean message instead of a raw JSON error.
       let data;
       try {
         data = await apiJson("/agents/dag", {

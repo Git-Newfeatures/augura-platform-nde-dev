@@ -1,11 +1,11 @@
-"""semantic_releases : historique de version de la couche sémantique gouvernée
+"""semantic_releases: version history of the governed semantic layer
 
-Ajoute la seule table que le design /bundle nécessitait et qui manquait au schéma
-public (les 14 autres tables taxonomie/ontologie sont déjà là via schema.sql). Sert
-GET /semantic/release (onglet Versions). Idempotent (IF NOT EXISTS / ON CONFLICT) :
-elle vit aussi dans le bundle canonique schema.sql + policies.sql exécuté par
-0001_baseline. RLS backend_read comme les autres catalogues gouvernés (lecture
-ouverte à toute session backend, aucune écriture hors rôle privilégié).
+Adds the one table the design/bundle needed that was missing from the public
+schema (the 14 other taxonomy/ontology tables are already there via schema.sql).
+Serves GET /semantic/release (Versions tab). Idempotent (IF NOT EXISTS / ON
+CONFLICT): it also lives in the canonical bundle schema.sql + policies.sql
+executed by 0001_baseline. RLS backend_read like the other governed catalogs
+(read open to any backend session, no write outside a privileged role).
 
 Revision ID: 0005_semantic_release
 Revises: 0004_reference_catalogs

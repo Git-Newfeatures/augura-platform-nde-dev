@@ -1,6 +1,6 @@
-"""Embeddings OpenAI (text-embedding-3-small, 1536) — pour le retrieval E1.
+"""OpenAI embeddings (text-embedding-3-small, 1536) — for the E1 retrieval.
 
-Injectable via le Protocol `Embedder` : les tests fournissent un faux embedder.
+Injectable via the `Embedder` Protocol: tests provide a fake embedder.
 """
 
 from typing import Protocol
@@ -30,5 +30,5 @@ class OpenAIEmbedder:
 
 def get_embedder(settings: Settings) -> Embedder:
     if settings.openai_api_key is None:
-        raise AgentUpstreamError("OPENAI_API_KEY manquant")
+        raise AgentUpstreamError("OPENAI_API_KEY missing")
     return OpenAIEmbedder(openai.AsyncOpenAI(api_key=settings.openai_api_key))

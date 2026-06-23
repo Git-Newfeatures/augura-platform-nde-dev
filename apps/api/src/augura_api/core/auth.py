@@ -1,12 +1,12 @@
-"""Vérification du JWT Supabase (spec §7).
+"""Supabase JWT verification (spec §7).
 
-Le front envoie le JWT en `Authorization: Bearer`. On vérifie signature, exp et
-audience, puis on en extrait le `UserId`. Deux modes :
-- asymétrique : JWKS Supabase (RS256/ES256), clés mises en cache par `kid` ;
-- symétrique : secret partagé HS256 (projets Supabase legacy).
+The frontend sends the JWT in `Authorization: Bearer`. We verify signature, exp and
+audience, then extract the `UserId` from it. Two modes:
+- asymmetric: Supabase JWKS (RS256/ES256), keys cached by `kid`;
+- symmetric: shared HS256 secret (legacy Supabase projects).
 
-`verify_token` est pur et synchrone (cœur testable). `authenticate` résout la
-clé (JWKS via httpx, injectable) puis délègue à `verify_token`.
+`verify_token` is pure and synchronous (testable core). `authenticate` resolves the
+key (JWKS via httpx, injectable) then delegates to `verify_token`.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ JwksFetcher = Callable[[], Awaitable[dict[str, Any]]]
 
 @dataclass(frozen=True)
 class Principal:
-    """Utilisateur authentifié (pas encore résolu à un tenant)."""
+    """Authenticated user (not yet resolved to a tenant)."""
 
     user_id: UserId
     email: str | None
@@ -44,7 +44,7 @@ def verify_token(
     audience: str,
     issuer: str | None = None,
 ) -> Principal:
-    """Décode et valide un JWT. Lève UnauthorizedError sur tout échec."""
+    """Decode and validate a JWT. Raises UnauthorizedError on any failure."""
     try:
         claims: dict[str, Any] = jwt.decode(
             token,
@@ -55,15 +55,15 @@ def verify_token(
             options={"require": ["exp", "sub"]},
         )
     except jwt.PyJWTError as exc:
-        raise UnauthorizedError("jwt invalide", reason=str(exc)) from exc
+        raise UnauthorizedError("invalid jwt", reason=str(exc)) from exc
 
     sub = claims.get("sub")
     if not isinstance(sub, str):
-        raise UnauthorizedError("jwt sans sub exploitable")
+        raise UnauthorizedError("jwt without usable sub")
     try:
         user_id = UserId(UUID(sub))
     except ValueError as exc:
-        raise UnauthorizedError("sub n'est pas un uuid", sub=sub) from exc
+        raise UnauthorizedError("sub is not a uuid", sub=sub) from exc
 
     email = claims.get("email")
     return Principal(
@@ -77,7 +77,7 @@ def _unverified_kid(token: str) -> str | None:
     try:
         return jwt.get_unverified_header(token).get("kid")
     except jwt.PyJWTError as exc:
-        raise UnauthorizedError("en-tête jwt illisible", reason=str(exc)) from exc
+        raise UnauthorizedError("unreadable jwt header", reason=str(exc)) from exc
 
 
 def _signing_key_from_jwks(jwks: dict[str, Any], kid: str | None) -> Any:
@@ -85,7 +85,7 @@ def _signing_key_from_jwks(jwks: dict[str, Any], kid: str | None) -> Any:
     for jwk in key_set.keys:
         if kid is None or jwk.key_id == kid:
             return jwk.key
-    raise UnauthorizedError("clé de signature introuvable", kid=kid)
+    raise UnauthorizedError("signing key not found", kid=kid)
 
 
 async def _default_jwks_fetcher(url: str) -> dict[str, Any]:
@@ -102,7 +102,7 @@ async def authenticate(
     *,
     jwks_fetcher: JwksFetcher | None = None,
 ) -> Principal:
-    """Résout la clé (secret HS256 ou JWKS) puis vérifie le token."""
+    """Resolve the key (HS256 secret or JWKS) then verify the token."""
     if settings.supabase_jwt_secret is not None:
         return verify_token(
             token,
@@ -113,7 +113,7 @@ async def authenticate(
         )
 
     if settings.supabase_jwks_url is None:
-        raise UnauthorizedError("aucune clé configurée (AUGURA_SUPABASE_JWKS_URL ou _JWT_SECRET)")
+        raise UnauthorizedError("no key configured (AUGURA_SUPABASE_JWKS_URL or _JWT_SECRET)")
 
     fetcher = jwks_fetcher
     if fetcher is None:

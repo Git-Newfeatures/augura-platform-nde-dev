@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module reference (porte unique FastAPI)."""
+"""HTTP adapter for the reference module (single FastAPI gate)."""
 
 from fastapi import APIRouter
 

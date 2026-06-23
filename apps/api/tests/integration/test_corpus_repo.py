@@ -1,7 +1,7 @@
-"""Tests d'intégration du module corpus — lecture du corpus global sous RLS.
+"""Integration tests for the corpus module — reading the global corpus under RLS.
 
-Le seed insère 8 documents globaux (org_id NULL) : ils restent visibles quel que
-soit le tenant. Sautés sans AUGURA_DATABASE_URL ; en CI sous le rôle augura_app.
+The seed inserts 8 global documents (org_id NULL): they stay visible regardless of
+the tenant. Skipped without AUGURA_DATABASE_URL; in CI under the augura_app role.
 """
 
 import os
@@ -27,7 +27,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def session() -> AsyncIterator[AsyncSession]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as s, s.begin():
@@ -55,13 +55,13 @@ async def test_sources_counts(session: AsyncSession) -> None:
 async def test_coverage_matrix_zero_filled(session: AsyncSession) -> None:
     out = await CorpusService(CorpusRepo(session)).coverage()
     assert out.meta.total_docs == 8
-    assert len(out.matrix) == 24  # 4 juridictions × 6 types
+    assert len(out.matrix) == 24  # 4 jurisdictions × 6 types
     cell = {(c.jurisdiction, c.evidence_type): c.doc_count for c in out.matrix}
     assert cell[("fda", "rct")] == 1
-    assert cell[("fda", "preprint")] == 0  # cellule vide → gap
+    assert cell[("fda", "preprint")] == 0  # empty cell → gap
 
 
 async def test_search_runs_against_match_chunks(session: AsyncSession) -> None:
-    # Pas de chunks seedés → résultat vide, mais la fonction pgvector s'exécute.
+    # No chunks seeded → empty result, but the pgvector function runs.
     rows = await CorpusRepo(session).search([0.0] * 1536, 5, {})
     assert rows == []

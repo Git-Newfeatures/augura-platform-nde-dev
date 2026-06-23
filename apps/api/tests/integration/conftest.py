@@ -1,17 +1,17 @@
-"""Garde : les tests d'intégration ne doivent JAMAIS viser le projet Supabase de démo.
+"""Guard: integration tests must NEVER target the demo Supabase project.
 
-Les fixtures committent (elles ouvrent `session.begin()`), donc lancer la suite contre
-la base de démo y laisse des lignes (étude « Integration », datasets de test, jobs…).
-En CI ils tournent contre un Postgres éphémère ; en local, pointer AUGURA_DATABASE_URL
-vers une branche Supabase jetable. Si l'URL contient le ref du projet démo, on échoue
-franchement AVANT d'écrire quoi que ce soit.
+The fixtures commit (they open `session.begin()`), so running the suite against
+the demo database leaves rows behind (an "Integration" study, test datasets, jobs…).
+In CI they run against an ephemeral Postgres; locally, point AUGURA_DATABASE_URL
+at a throwaway Supabase branch. If the URL contains the demo project ref, we fail
+hard BEFORE writing anything at all.
 """
 
 import os
 
 import pytest
 
-# Projet Supabase de démo/connecté (à ne pas polluer). Étendre si besoin.
+# Demo/connected Supabase project (must not be polluted). Extend if needed.
 _FORBIDDEN_PROJECT_REFS = ("fqmoylmvjoafihiuiiuj",)
 
 
@@ -21,8 +21,8 @@ def _forbid_demo_db() -> None:
     for ref in _FORBIDDEN_PROJECT_REFS:
         if ref in url:
             pytest.fail(
-                f"Tests d'intégration pointés sur le projet Supabase de démo ({ref}) : "
-                "ils committeraient des données. Utilise une branche Supabase jetable "
-                "(ou laisse la CI utiliser son Postgres éphémère).",
+                f"Integration tests pointed at the demo Supabase project ({ref}): "
+                "they would commit data. Use a throwaway Supabase branch "
+                "(or let CI use its ephemeral Postgres).",
                 pytrace=False,
             )

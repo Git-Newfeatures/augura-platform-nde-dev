@@ -324,7 +324,7 @@ create table if not exists variable_role_catalog (
 
 After the `cesl_study_designs` policy block (line 222), add:
 ```sql
--- ── Reference catalogs (frontend real-only cleanup) : global, lecture seule ──
+-- ── Reference catalogs (frontend real-only cleanup): global, read-only ──
 do $$
 declare t text;
 begin
@@ -348,11 +348,11 @@ end $$;
 Create `apps/api/alembic/versions/0004_reference_catalogs.py`. Mirror the idempotent style of `0002`. Copy the **exact** `create table` statements from schema.sql Step 1 into the `op.execute(""" … """)` block (CREATE TABLE IF NOT EXISTS + the three `alter table … add column if not exists`), then the RLS loop from Step 2.
 
 ```python
-"""reference catalogs : tables de config pour le nettoyage front real-only
+"""reference catalogs: config tables for the frontend real-only cleanup
 
-Catalogues globaux (lecture seule, RLS backend_read) consommés par le front à la
-place des constantes codées en dur. Idempotent (IF NOT EXISTS) : ces objets vivent
-aussi dans le bundle canonique schema.sql + policies.sql exécuté par 0001_baseline.
+Global catalogs (read-only, RLS backend_read) consumed by the frontend in place
+of the hardcoded constants. Idempotent (IF NOT EXISTS): these objects also live
+in the canonical schema.sql + policies.sql bundle executed by 0001_baseline.
 
 Revision ID: 0004_reference_catalogs
 Revises: 0003_literature_per_study_rls

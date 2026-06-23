@@ -1,19 +1,19 @@
-"""Fan-out multi-sources de la recherche live (retrieve, pas ingest).
+"""Multi-source fan-out of the live search (retrieve, not ingest).
 
-Cœur de récupération du nouvel endpoint retrieve-and-freeze (Tier 2 ajoute le gel
-+ hash + persistance par-dessus ces résultats). Il ne touche NI `LiteratureService`
-NI `search_and_ingest` : c'est un autre verbe partageant les mêmes clients.
+Retrieval core of the new retrieve-and-freeze endpoint (Tier 2 adds the freeze
++ hash + persistence on top of these results). It touches NEITHER `LiteratureService`
+NOR `search_and_ingest`: it is a separate verb sharing the same clients.
 
-Aiguillage :
-  - known-item (PMID/DOI/titre/NCT) → on interroge UNIQUEMENT la source de
-    l'identifiant. Un miss renvoie un groupe vide + un message honnête ; jamais de
-    repli sur la recherche topique.
-  - topique (texte libre) → fan-out parallèle sur les sources demandées (défaut :
-    PubMed + CT.gov), résultats regroupés par source.
+Routing:
+  - known-item (PMID/DOI/title/NCT) → we query ONLY the identifier's
+    source. A miss returns an empty group + an honest message; never a
+    fallback to the topical search.
+  - topical (free text) → parallel fan-out over the requested sources (default:
+    PubMed + CT.gov), results grouped by source.
 
-Pour CHAQUE résultat on capture le `query_string` réellement envoyé à la source
-(terme esearch / appel efetch par id côté PubMed ; chaîne API côté CT.gov) — c'est
-le champ que le schéma de preuve gelée (Tier 2) attend, désormais contrôlé en direct.
+For EACH result we capture the `query_string` actually sent to the source
+(esearch term / efetch-by-id call on the PubMed side; API string on the CT.gov side) —
+it is the field the frozen-evidence schema (Tier 2) expects, now controlled directly.
 """
 
 from __future__ import annotations
@@ -49,25 +49,23 @@ VALID_SOURCES = (SOURCE_PUBMED, SOURCE_CTGOV)
 
 log = structlog.get_logger(__name__)
 
-# Note affichée quand une source tombe (réseau/WAF) — ex. CT.gov renvoie 403 sur
-# certaines IP datacenter (Modal). On dégrade en partiel plutôt que tout casser.
-_SOURCE_UNAVAILABLE_NOTE = (
-    "Source temporairement indisponible (erreur réseau) — résultats partiels."
-)
+# Note shown when a source goes down (network/WAF) — e.g. CT.gov returns 403 on
+# some datacenter IPs (Modal). We degrade to partial rather than break everything.
+_SOURCE_UNAVAILABLE_NOTE = "Source temporarily unavailable (network error) — partial results."
 
 
 @dataclass(frozen=True)
 class RetrievedItem:
-    """Résultat normalisé, aligné sur le schéma de preuve gelée (par citation)."""
+    """Normalized result, aligned with the frozen-evidence schema (per citation)."""
 
     source: str
-    id: str  # PMID ou NCT
+    id: str  # PMID or NCT
     title: str
-    query_string: str  # terme/appel exact envoyé à la source
+    query_string: str  # exact term/call sent to the source
     retrieval_date: date
-    record: dict[str, Any]  # enregistrement structuré, JSON-sérialisable (gel)
-    annotation: str | None = None  # kept/dismissed/null — posé plus tard par l'UI
-    rationale: str | None = None  # justification de curation (None si non curé)
+    record: dict[str, Any]  # structured record, JSON-serializable (freeze)
+    annotation: str | None = None  # kept/dismissed/null — set later by the UI
+    rationale: str | None = None  # curation justification (None if not curated)
 
 
 @dataclass(frozen=True)
@@ -75,7 +73,7 @@ class SourceGroup:
     source: str
     query_string: str
     items: list[RetrievedItem]
-    note: str | None = None  # ex. message de miss known-item
+    note: str | None = None  # e.g. known-item miss message
 
 
 @dataclass(frozen=True)
@@ -119,12 +117,12 @@ def _normalize_sources(sources: set[str] | None) -> set[str]:
         return set(VALID_SOURCES)
     unknown = sources - set(VALID_SOURCES)
     if unknown:
-        raise BadRequestError("source inconnue", value=sorted(unknown))
+        raise BadRequestError("unknown source", value=sorted(unknown))
     return set(sources)
 
 
 class LiteratureRetriever:
-    """Orchestration retrieve-only : known-item routing + fan-out topique parallèle."""
+    """Retrieve-only orchestration: known-item routing + parallel topical fan-out."""
 
     def __init__(
         self, pubmed: PubMedClient, ctgov: CTGovClient, *, curator: Curator | None = None
@@ -146,14 +144,14 @@ class LiteratureRetriever:
         day = today or datetime.now(UTC).date()
         item = classify_known_item(query)
         if item is not None:
-            # known-item = lookup exact : les filtres date/type ne s'appliquent pas.
+            # known-item = exact lookup: the date/type filters do not apply.
             return await self._known_item(query, item, srcs, day)
         return await self._topical(query, srcs, max_results, day, filters)
 
     async def _known_item(
         self, query: str, item: KnownItem, srcs: set[str], day: date
     ) -> RetrievalResult:
-        # L'identifiant détermine sa source ; si elle n'est pas demandée, rien à faire.
+        # The identifier determines its source; if it is not requested, nothing to do.
         if item.source not in srcs:
             return RetrievalResult(query, sorted(srcs), True, str(item.kind), [])
 
@@ -210,9 +208,9 @@ class LiteratureRetriever:
 
     @staticmethod
     async def _safe_group(source: str, coro: Coroutine[Any, Any, SourceGroup]) -> SourceGroup:
-        """Isole l'échec d'une source : renvoie un groupe vide annoté plutôt que de
-        laisser l'exception faire échouer tout le fan-out (ce qui couperait le stream
-        → « network error » côté front). La source qui fonctionne remonte normalement."""
+        """Isolates a source failure: returns an annotated empty group rather than
+        letting the exception fail the whole fan-out (which would cut the stream
+        → "network error" on the front side). The working source comes back normally."""
         try:
             return await coro
         except Exception as exc:
@@ -220,8 +218,8 @@ class LiteratureRetriever:
             return SourceGroup(source, "", [], note=_SOURCE_UNAVAILABLE_NOTE)
 
     def _pool(self, max_results: int) -> int:
-        """Taille du pool sur-récupéré : pas de curation ⇒ exactement max_results
-        (comportement historique inchangé) ; sinon min(50, max(25, max_results*2))."""
+        """Over-fetched pool size: no curation ⇒ exactly max_results
+        (historical behavior unchanged); otherwise min(50, max(25, max_results*2))."""
         if self._curator is None:
             return max_results
         return min(50, max(25, max_results * 2))
@@ -252,7 +250,7 @@ class LiteratureRetriever:
                 s.nct_id,
                 s.title,
                 f"Conditions: {', '.join(s.conditions)}. Interventions: "
-                f"{', '.join(s.interventions)}. Phase {s.phase}. Statut {s.status}.",
+                f"{', '.join(s.interventions)}. Phase {s.phase}. Status {s.status}.",
             )
             for s in studies
         ]
@@ -269,7 +267,7 @@ class LiteratureRetriever:
     async def _pubmed_topical(
         self, query: str, max_results: int, day: date, filters: SearchFilters | None
     ) -> SourceGroup:
-        # Le terme réellement envoyé à esearch (avec filtres [pt]) EST le query_string.
+        # The term actually sent to esearch (with [pt] filters) IS the query_string.
         term = build_pubmed_term(query, filters)
         articles = await self._pubmed.search(
             query, self._pool(max_results), filters=filters, today=day
@@ -286,7 +284,7 @@ class LiteratureRetriever:
     ) -> SourceGroup:
         extra = ctgov_filter_params(filters, day)
         suffix = "".join(f"&{k}={v}" for k, v in sorted(extra.items()))
-        qs = f"query.term={query}{suffix}"  # chaîne API CT.gov réellement envoyée
+        qs = f"query.term={query}{suffix}"  # CT.gov API string actually sent
         studies = await self._ctgov.search(
             query, self._pool(max_results), filters=filters, today=day
         )

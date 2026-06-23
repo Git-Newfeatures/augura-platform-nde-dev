@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module corpus."""
+"""HTTP adapter for the corpus module."""
 
 import json
 from collections.abc import AsyncIterator
@@ -40,8 +40,8 @@ router = APIRouter(prefix="/corpus", tags=["corpus"])
 
 log = structlog.get_logger(__name__)
 
-# User-Agent explicite pour les appels sortants live (PubMed/CT.gov) : identifie
-# l'app (bonne citoyenneté NLM) et évite les WAF qui filtrent l'UA httpx par défaut.
+# Explicit User-Agent for live outbound calls (PubMed/CT.gov): identifies
+# the app (good NLM citizenship) and avoids WAFs that filter the default httpx UA.
 _RETRIEVE_HEADERS = {
     "User-Agent": "Augura/1.0 (clinical-evidence-platform; +https://augura.health)",
     "Accept": "application/json",
@@ -57,16 +57,16 @@ def _validate_sources(sources: list[str] | None) -> None:
         return
     unknown = [s for s in sources if s not in schemas.VALID_RETRIEVE_SOURCES]
     if unknown:
-        raise BadRequestError("source inconnue", value=unknown)
+        raise BadRequestError("unknown source", value=unknown)
 
 
 def build_filters(date_range: str, study_types: list[str]) -> SearchFilters:
-    """Valide et construit les SearchFilters depuis les champs de la requête."""
+    """Validates and builds the SearchFilters from the request fields."""
     if date_range not in VALID_DATE_RANGES:
-        raise BadRequestError("date_range invalide", value=date_range)
+        raise BadRequestError("invalid date_range", value=date_range)
     unknown = [t for t in study_types if t not in VALID_STUDY_TYPES]
     if unknown:
-        raise BadRequestError("study_type inconnu", value=unknown)
+        raise BadRequestError("unknown study_type", value=unknown)
     return SearchFilters(date_range=date_range, study_types=tuple(study_types))
 
 
@@ -123,10 +123,10 @@ async def search(
     session: SessionDep,
     settings: SettingsDep,
 ) -> list[schemas.SearchHit]:
-    # Embed-on-server si le client envoie un texte `query` sans embedding pré-calculé.
+    # Embed-on-server if the client sends a `query` text without a pre-computed embedding.
     embedder: Embedder | None = None
     if not req.query_embedding and req.query:
-        embedder = get_embedder(settings)  # lève 503 si la clé OpenAI manque
+        embedder = get_embedder(settings)  # raises 503 if the OpenAI key is missing
     return await _service(session).search(req, embedder=embedder)
 
 
@@ -137,9 +137,9 @@ async def literature(
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.LiteratureSearchResult:
-    """Agent de recherche de littérature : cherche sur PubMed (E-utilities NCBI) et
-    ingère les articles dans le corpus du tenant (Document + Chunk). Embedder/LLM
-    optionnels (sans clé : ingestion sans vecteur, requête non élargie)."""
+    """Literature search agent: searches PubMed (NCBI E-utilities) and
+    ingests the articles into the tenant's corpus (Document + Chunk). Embedder/LLM
+    optional (without a key: ingestion without a vector, query not expanded)."""
     embedder: Embedder | None = None
     try:
         embedder = get_embedder(settings)
@@ -174,8 +174,8 @@ async def literature_ingest(
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.LiteratureSearchResult:
-    """Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.
-    Sert « Add to corpus » sur des résultats de retrieve gardés (PubMed only)."""
+    """Ingests specific PubMed records (by PMID) into the tenant's corpus.
+    Serves "Add to corpus" on kept retrieve results (PubMed only)."""
     embedder: Embedder | None = None
     try:
         embedder = get_embedder(settings)
@@ -187,7 +187,7 @@ async def literature_ingest(
         return await service.ingest_by_ids(tenant, pmids=req.pmids)
 
 
-# ── Recherche live (retrieve-and-freeze) — verbe distinct de l'ingestion ──────
+# ── Live search (retrieve-and-freeze) — verb distinct from ingestion ──────────
 
 
 @router.post("/literature/retrieve")
@@ -196,15 +196,15 @@ async def literature_retrieve(
     tenant: CurrentTenantDep,
     settings: SettingsDep,
 ) -> StreamingResponse:
-    """Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.
-    Ne touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique
-    ⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel."""
-    _validate_sources(req.sources)  # 400 avant le stream si source inconnue
+    """Retrieves live (PubMed + CT.gov), grouped by source, streamed as NDJSON.
+    Does NOT touch the corpus (no ingestion). known-item ⇒ single source; topical
+    ⇒ parallel fan-out. The exact query_string per result is carried for the freeze."""
+    _validate_sources(req.sources)  # 400 before the stream if a source is unknown
     filters = build_filters(req.date_range, req.study_types)
     sources = set(req.sources) if req.sources else None
 
-    # Curator construit une fois par requête (réutilise le client Anthropic). Pas de clé
-    # ⇒ curator=None ⇒ retrieve se comporte comme avant (zéro régression).
+    # Curator built once per request (reuses the Anthropic client). No key
+    # ⇒ curator=None ⇒ retrieve behaves as before (zero regression).
     curator: Curator | None = None
     try:
         curator = LLMCurator(get_anthropic_client(settings), settings.agent_model_fast)
@@ -212,12 +212,12 @@ async def literature_retrieve(
         curator = None
 
     async def gen() -> AsyncIterator[str]:
-        # Filet de sécurité : toute erreur (ex. known-item CT.gov 403) devient un event
-        # `error` propre au lieu d'une connexion coupée que le front lit en « network error ».
-        # Le fan-out topique isole déjà chaque source (cf. LiteratureRetriever._safe_group).
+        # Safety net: any error (e.g. known-item CT.gov 403) becomes a clean `error`
+        # event instead of a dropped connection that the front reads as "network error".
+        # The topical fan-out already isolates each source (cf. LiteratureRetriever._safe_group).
         try:
-            # PubMed en direct ; CT.gov via proxy si AUGURA_CTGOV_PROXY_URL est défini
-            # (contourne le 403 WAF sur les IP datacenter). proxy=None ⇒ appel direct.
+            # PubMed live; CT.gov via proxy if AUGURA_CTGOV_PROXY_URL is set
+            # (bypasses the 403 WAF on datacenter IPs). proxy=None ⇒ direct call.
             async with (
                 httpx.AsyncClient(timeout=20.0, headers=_RETRIEVE_HEADERS) as http,
                 httpx.AsyncClient(
@@ -248,9 +248,7 @@ async def literature_retrieve(
             yield _ndjson("done")
         except Exception as exc:
             log.exception("literature_retrieve.failed", query=req.query, error=str(exc))
-            yield _ndjson(
-                "error", message="La recherche a échoué — réessaie ou ajuste la question."
-            )
+            yield _ndjson("error", message="The search failed — retry or adjust the question.")
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 
@@ -259,8 +257,8 @@ async def literature_retrieve(
 async def create_snapshot(
     req: schemas.SnapshotWriteRequest, tenant: CurrentTenantDep, session: SessionDep
 ) -> schemas.LiteratureSnapshot:
-    """Gèle le jeu de résultats + annotations : calcule le content_hash, épingle
-    model/prompt version, persiste. La réponse porte le hash (auto-vérifiable)."""
+    """Freezes the result set + annotations: computes the content_hash, pins the
+    model/prompt version, persists. The response carries the hash (self-verifiable)."""
     return await _live_service(session).freeze(tenant, req)
 
 
@@ -268,7 +266,7 @@ async def create_snapshot(
 async def list_snapshots(
     tenant: CurrentTenantDep, session: SessionDep, study_id: UUID | None = None
 ) -> list[schemas.SnapshotSummary]:
-    """Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash)."""
+    """Lists the tenant's frozen evidence (lightweight view, no results, no hash recompute)."""
     return await _live_service(session).list_snapshots(tenant, study_id=study_id)
 
 
@@ -276,8 +274,8 @@ async def list_snapshots(
 async def read_snapshot(
     snapshot_id: UUID, tenant: CurrentTenantDep, session: SessionDep
 ) -> schemas.LiteratureSnapshot:
-    """Relit un snapshot et VÉRIFIE le content_hash (erreur dure si divergence).
-    Lecture base pure : zéro appel PubMed/CT.gov (rejeu reproductible)."""
+    """Re-reads a snapshot and VERIFIES the content_hash (hard error on divergence).
+    Pure DB read: zero PubMed/CT.gov calls (reproducible replay)."""
     return await _live_service(session).read_snapshot(tenant, snapshot_id)
 
 
@@ -304,7 +302,7 @@ async def get_session(
 
 @router.delete("/literature/sessions", status_code=204)
 async def clear_sessions(tenant: CurrentTenantDep, session: SessionDep) -> Response:
-    """Vide l'historique « Recent queries » du tenant (nettoyage en un clic)."""
+    """Clears the tenant's "Recent queries" history (one-click cleanup)."""
     await _live_service(session).clear_sessions(tenant)
     return Response(status_code=204)
 
@@ -313,7 +311,7 @@ async def clear_sessions(tenant: CurrentTenantDep, session: SessionDep) -> Respo
 async def delete_session(
     session_id: UUID, tenant: CurrentTenantDep, session: SessionDep
 ) -> Response:
-    """Supprime une entrée de l'historique « Recent queries » (suppression unitaire)."""
+    """Deletes a single entry from the "Recent queries" history (single deletion)."""
     await _live_service(session).delete_session(tenant, session_id)
     return Response(status_code=204)
 

@@ -1,7 +1,7 @@
-"""Tests locaux gap-detection + variable-check — LLM mocké.
+"""Local gap-detection + variable-check tests — mocked LLM.
 
-Couvre le happy path et les dégradations gracieuses (gap → liste vide ;
-dataset-questions → None) sans aucune clé.
+Covers the happy path and graceful degradations (gap → empty list;
+dataset-questions → None) without any key.
 """
 
 from typing import Any
@@ -44,7 +44,7 @@ class _FakeClient:
 
 
 def _settings() -> Settings:
-    return Settings(env="dev")  # pyright: ignore[reportCallIssue] -- champs env
+    return Settings(env="dev")  # pyright: ignore[reportCallIssue] -- env fields
 
 
 GAP_OK: dict[str, Any] = {
@@ -68,7 +68,7 @@ async def test_detect_gaps_happy_path() -> None:
 
 
 async def test_detect_gaps_degrades_to_empty() -> None:
-    # Deux sorties invalides → AgentInvalidOutput → dégradation à liste vide.
+    # Two invalid outputs → AgentInvalidOutput → degradation to empty list.
     bad = _msg("identify_data_gaps", {"missing_variables": "oops"})
     bad2 = _msg("identify_data_gaps", {"missing_variables": "still bad"})
     svc = AgentService(_FakeClient(bad, bad2), _settings())
@@ -126,7 +126,7 @@ async def test_classify_variables_happy_path() -> None:
 
 
 async def test_classify_variables_dataset_questions_degrade() -> None:
-    # classify OK, mais les deux tentatives dataset-questions échouent → None.
+    # classify OK, but both dataset-questions attempts fail → None.
     client = _FakeClient(
         _msg("classify_columns", CLASSIFY_OK),
         _msg("answer_dataset_questions", {"questions": "bad"}),

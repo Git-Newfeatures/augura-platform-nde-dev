@@ -1,4 +1,4 @@
-"""Normalisation lexicale + similarité de chaînes (porté de l'MVP lexical-normalizer.js)."""
+"""Lexical normalization + string similarity (ported from MVP lexical-normalizer.js)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import math
 import re
 from collections import Counter
 
-# Sous-ensemble clinique de l'ABBREV_MAP du MVP (les synonymes portent le reste).
+# Clinical subset of the MVP ABBREV_MAP (synonyms carry the rest).
 ABBREV_MAP: dict[str, str] = {
     "hba1c": "hemoglobin a1c",
     "a1c": "hemoglobin a1c",

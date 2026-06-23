@@ -1,4 +1,4 @@
-"""Logique du module analytics."""
+"""Analytics module logic."""
 
 from datetime import UTC, datetime, timedelta
 from typing import cast

@@ -1,4 +1,4 @@
-"""Tests du parseur de fichiers (CSV/XLSX)."""
+"""Tests for the file parser (CSV/XLSX)."""
 
 import io
 

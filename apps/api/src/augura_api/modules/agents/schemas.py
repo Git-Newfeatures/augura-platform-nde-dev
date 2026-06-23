@@ -1,5 +1,5 @@
-"""Contrats du module agents. DagResponse est validé depuis la sortie outil ET
-renvoyé tel quel au front (edges émis en {from, to} via alias)."""
+"""Agents module contracts. DagResponse is validated from the tool output AND
+returned as-is to the frontend (edges emitted as {from, to} via alias)."""
 
 from typing import Any, Literal
 
@@ -29,7 +29,7 @@ class DagNode(BaseModel):
 class DagEdge(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    # 'from' est un mot-clé Python → champ `source`, alias entrée/sortie "from".
+    # 'from' is a Python keyword → field `source`, input/output alias "from".
     source: str = Field(validation_alias="from", serialization_alias="from")
     to: str
 
@@ -139,14 +139,14 @@ class VariableCheckResponse(BaseModel):
 
 
 class ProfilingRequest(BaseModel):
-    # system + tools + messages sont fournis par le front (comme api/trace.js).
+    # system + tools + messages are provided by the frontend (like api/trace.js).
     system: str
     tools: list[dict[str, Any]] = []
     messages: list[dict[str, Any]]
     product_description: str | None = None
 
 
-# ── chat (assistant inline, passerelle LLM) ────────────────────────────────
+# ── chat (inline assistant, LLM gateway) ───────────────────────────────────
 
 
 class ChatMessage(BaseModel):

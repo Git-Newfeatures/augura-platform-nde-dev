@@ -1,4 +1,4 @@
-"""Interface publique du module dq."""
+"""Public interface for the dq module."""
 
 from augura_api.modules.dq.router import router
 

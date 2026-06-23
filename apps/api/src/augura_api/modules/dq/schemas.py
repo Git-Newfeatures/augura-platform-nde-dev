@@ -1,4 +1,4 @@
-"""Contrat public du module dq."""
+"""Public contract for the dq module."""
 
 from datetime import datetime
 from typing import Any

@@ -1,8 +1,8 @@
-"""Logique applicative du module jobs : création (idempotente) + lecture.
+"""Application logic for the jobs module: creation (idempotent) + read.
 
-Ces fonctions sont l'interface consommée par les autres modules (simulation,
-documents) ET par le routeur HTTP du module — une seule porte, pas de court-circuit
-vers le repo. `jobs/__init__.py` les ré-exporte comme interface publique.
+These functions are the interface consumed by other modules (simulation,
+documents) AND by the module's HTTP router — a single gate, no shortcut to
+the repo. `jobs/__init__.py` re-exports them as the public interface.
 """
 
 from typing import Any
@@ -63,7 +63,7 @@ async def mark_succeeded(
 async def set_result_json(
     session: AsyncSession, tenant_id: TenantId, job_id: UUID, result_json: dict[str, Any]
 ) -> None:
-    """Persiste le résultat structuré du job EN BASE (relisible cross-conteneur sur Modal)."""
+    """Persist the job's structured result IN THE DB (readable cross-container on Modal)."""
     await JobRepo(session).update(tenant_id, job_id, result_json=result_json)
 
 

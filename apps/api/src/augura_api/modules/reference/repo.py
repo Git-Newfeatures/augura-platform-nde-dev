@@ -1,8 +1,8 @@
-"""Accès base du module reference.
+"""Database access for the reference module.
 
-`orgs` est lu scopé au tenant courant (la RLS `tenant_self` n'expose que sa
-ligne ; le filtre explicite est une défense en profondeur). Les catalogues CESL
-sont globaux (lecture seule, RLS « backend FOR SELECT »).
+`orgs` is read scoped to the current tenant (the `tenant_self` RLS exposes only its
+row; the explicit filter is defense in depth). The CESL catalogs are global
+(read-only, RLS "backend FOR SELECT").
 """
 
 from sqlalchemy import select

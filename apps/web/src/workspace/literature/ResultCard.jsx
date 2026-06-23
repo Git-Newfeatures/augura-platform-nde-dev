@@ -10,8 +10,8 @@ const pubmedUrl = (pmid) => `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
 const doiUrl = (doi) => `https://doi.org/${doi}`
 const ctgovUrl = (nct) => `https://clinicaltrials.gov/study/${nct}`
 
-// Dismissed → ligne repliée (conservé pour l'audit). Kept → carte pleine.
-// readOnly (snapshot gelé) masque les actions.
+// Dismissed → collapsed row (kept for the audit). Kept → full card.
+// readOnly (frozen snapshot) hides the actions.
 export function ResultCard({ result, position, status, onKeep, onDismiss, readOnly }) {
   const [showAbstract, setShowAbstract] = useState(false)
   const isCtgov = result.source === 'ctgov'
@@ -129,7 +129,7 @@ function titleCase(s) {
   return String(s).toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// Liste d'auteurs : 3 premiers + « et al. » au-delà (forme citation type PubMed).
+// Author list: first 3 + "et al." beyond that (PubMed-style citation form).
 function formatAuthors(authors) {
   const list = authors.slice(0, 3).join(', ')
   return authors.length > 3 ? `${list}, et al.` : list

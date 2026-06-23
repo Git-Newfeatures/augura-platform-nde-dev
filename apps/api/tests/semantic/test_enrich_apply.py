@@ -1,4 +1,4 @@
-"""Unitaires : construction manifest/payload des 4 chemins d'apply (sans DB)."""
+"""Unit tests: manifest/payload construction for the 4 apply paths (no DB)."""
 
 from typing import Any, cast
 from unittest.mock import AsyncMock
@@ -88,7 +88,7 @@ async def test_proposals_minor_bump_when_concepts_selected() -> None:
         selected_relation_ids=["R1"],
     )
     resp = await svc.apply(req, today="20260620")
-    assert resp.new_version == "3.1.0"  # minor : un concept sélectionné
+    assert resp.new_version == "3.1.0"  # minor: one concept selected
     assert resp.concepts_added == 1
     assert resp.relations_added == 1
     _, payload = repo.apply_release.call_args.args

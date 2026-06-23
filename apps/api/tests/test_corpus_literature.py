@@ -1,6 +1,6 @@
-"""LiteratureService : ingestion PubMed → corpus, dédup par URL, embedding optionnel.
+"""LiteratureService: PubMed ingestion → corpus, dedup by URL, optional embedding.
 
-Repo/PubMed/Embedder factices (pas de base, pas de réseau)."""
+Fake Repo/PubMed/Embedder (no database, no network)."""
 
 from typing import cast
 from uuid import UUID, uuid4
@@ -87,7 +87,7 @@ async def test_ingests_then_dedupes_by_url() -> None:
     assert len(res.documents) == 2
     assert {d.source_id for d in res.documents} == {"pubmed"}
 
-    # Re-run : mêmes URLs déjà présentes → 0 nouvelle ingestion.
+    # Re-run: same URLs already present → 0 new ingestions.
     res2 = await _service(repo).search_and_ingest(TENANT, query="engagement", max_results=10)
     assert (res2.found, res2.ingested) == (2, 0)
 
@@ -107,6 +107,6 @@ async def test_ingest_by_ids_fetches_and_ingests() -> None:
     res = await _service(repo).ingest_by_ids(TENANT, pmids=["1"])
     assert (res.found, res.ingested) == (1, 1)
     assert {d.url for d in res.documents} == {"https://doi.org/10.1/a"}
-    # idempotent : même PMID déjà ingéré ⇒ 0 nouvelle ingestion
+    # idempotent: same PMID already ingested ⇒ 0 new ingestions
     res2 = await _service(repo).ingest_by_ids(TENANT, pmids=["1"])
     assert (res2.found, res2.ingested) == (1, 0)

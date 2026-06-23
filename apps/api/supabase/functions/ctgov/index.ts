@@ -1,15 +1,15 @@
-// Relais ClinicalTrials.gov — Supabase Edge Function (egress non bloqué par le WAF CT.gov).
+// ClinicalTrials.gov relay — Supabase Edge Function (egress not blocked by the CT.gov WAF).
 //
-// Pourquoi : le WAF de CT.gov renvoie 403 aux IP datacenter de Modal (backend). L'egress
-// Supabase Edge n'est pas bloqué → on réémet les appels CT.gov v2 par ici, et le backend
-// Modal appelle ce relais (AUGURA_CTGOV_RELAY_URL) au lieu de CT.gov directement.
+// Why: the CT.gov WAF returns 403 to Modal datacenter IPs (backend). Supabase Edge
+// egress is not blocked → we re-issue the CT.gov v2 calls here, and the Modal backend
+// calls this relay (AUGURA_CTGOV_RELAY_URL) instead of CT.gov directly.
 //
-// Upstream VERROUILLÉ sur l'endpoint studies de CT.gov (pas un proxy ouvert) :
+// Upstream LOCKED to the CT.gov studies endpoint (not an open proxy):
 //   GET /functions/v1/ctgov            → https://clinicaltrials.gov/api/v2/studies
 //   GET /functions/v1/ctgov/NCT012345  → https://clinicaltrials.gov/api/v2/studies/NCT012345
-// Les query params (query.term, pageSize, format, filtres) sont transmis tels quels.
+// The query params (query.term, pageSize, format, filters) are forwarded as-is.
 //
-// Public (verify_jwt=false) : lecture seule de données publiques, upstream verrouillé.
+// Public (verify_jwt=false): read-only access to public data, locked upstream.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const UPSTREAM = "https://clinicaltrials.gov/api/v2/studies";
@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = new URL(req.url);
-  // Sous-chemin après le nom de la fonction : "" (search) ou "/NCT012345" (fetch par id).
+  // Sub-path after the function name: "" (search) or "/NCT012345" (fetch by id).
   const idx = url.pathname.indexOf(MARKER);
   let sub = idx >= 0 ? url.pathname.slice(idx + MARKER.length) : "";
   if (sub === "/") sub = "";

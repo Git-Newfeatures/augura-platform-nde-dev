@@ -1,11 +1,11 @@
 # Augura Platform
 
-Monorepo de production d'Augura — plateforme de conception d'études cliniques.
+Augura production monorepo — clinical study design platform.
 
-- `apps/api` — backend FastAPI (monolithe modulaire), déployé sur Modal
-- `apps/web` — frontend React (arrive en phase 2)
-- `packages/api-client` — client TS généré depuis l'OpenAPI (drift-check en CI)
-- `docs/specs` — architecture validée · `docs/plans` — plans d'implémentation
+- `apps/api` — FastAPI backend (modular monolith), deployed on Modal
+- `apps/web` — React frontend (arriving in phase 2)
+- `packages/api-client` — TS client generated from the OpenAPI (drift-check in CI)
+- `docs/specs` — validated architecture · `docs/plans` — implementation plans
 
-Spec de référence : `docs/specs/2026-06-11-augura-backend-architecture-design.md`.
-Design de livraison : `docs/specs/2026-06-13-delivery-design.md`.
+Reference spec: `docs/specs/2026-06-11-augura-backend-architecture-design.md`.
+Delivery design: `docs/specs/2026-06-13-delivery-design.md`.

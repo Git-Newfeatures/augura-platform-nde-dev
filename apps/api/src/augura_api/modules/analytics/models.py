@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module analytics (observabilité métier)."""
+"""SQLAlchemy models of the analytics module (business observability)."""
 
 from datetime import datetime
 from typing import Any
@@ -45,7 +45,7 @@ class OutboxEvent(Base):
 
 
 class AgentRun(Base):
-    """Coûts / latence par run d'agent (fix coûts LLM invisibles, spec §14)."""
+    """Cost / latency per agent run (fixes invisible LLM costs, spec §14)."""
 
     __tablename__ = "agent_runs"
 
@@ -67,7 +67,7 @@ class AgentRun(Base):
 
 
 class Artifact(Base):
-    """Artefact versionné & hashé — colonne vertébrale reproductibilité (spec §2)."""
+    """Versioned & hashed artifact — reproducibility backbone (spec §2)."""
 
     __tablename__ = "artifacts"
 

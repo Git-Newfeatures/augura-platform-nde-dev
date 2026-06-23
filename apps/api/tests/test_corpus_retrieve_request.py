@@ -1,5 +1,5 @@
 # apps/api/tests/test_corpus_retrieve_request.py
-"""Validation de la requête retrieve + construction des SearchFilters côté routeur."""
+"""Validation of the retrieve request + construction of SearchFilters on the router side."""
 
 import pytest
 

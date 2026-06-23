@@ -1,4 +1,4 @@
-"""Tests unitaires du service semantic — mapping ORM→schéma sans base."""
+"""Unit tests for the semantic service — ORM→schema mapping without a database."""
 
 from typing import Any
 
@@ -44,7 +44,7 @@ class _FakeRepo:
         return [_relation("r-sub", concept_ids[0], "retinopathy")]
 
     async def read_bundle(self):
-        # Les 14 clés sont toujours présentes (coalesce à [] côté SQL).
+        # The 14 keys are always present (coalesced to [] on the SQL side).
         empty: dict[str, list[Any]] = {
             t: []
             for t in (
@@ -96,7 +96,7 @@ async def test_relations_subgraph_when_concept_id_given() -> None:
 async def test_bundle_exposes_14_tables_with_raw_rows() -> None:
     out = await SemanticService(_FakeRepo()).bundle()  # type: ignore[arg-type]
     assert out.taxonomy_concepts[0]["local_concept_id"] == "hba1c"
-    # Les tables vides restent présentes (contrat à 14 clés).
+    # The empty tables remain present (14-key contract).
     assert out.dq_constraints == []
     assert out.table_archetypes == []
 

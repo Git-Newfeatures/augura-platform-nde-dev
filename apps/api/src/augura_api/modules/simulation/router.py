@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module simulation."""
+"""HTTP adapter of the simulation module."""
 
 from fastapi import APIRouter, BackgroundTasks, status
 
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/simulations", tags=["simulation"])
 
 @router.post("/power", response_model=schemas.PowerResponse)
 async def power(req: schemas.PowerRequest, tenant: CurrentTenantDep) -> schemas.PowerResponse:
-    # Mode LIVE — pur calcul, pas de session.
+    # LIVE mode — pure computation, no session.
     return compute_power_response(req)
 
 
@@ -39,7 +39,7 @@ async def create_simulation(
     background_tasks: BackgroundTasks,
 ) -> schemas.SimulationRunCreated:
     created = await SimulationService(session).create_simulation(tenant, req)
-    # Le job tourne après la réponse (la session de requête est alors committée) :
-    # bootstrap réel → simulation_runs.results + read-model simulation_results.
+    # The job runs after the response (the request session is committed by then):
+    # real bootstrap → simulation_runs.results + read-model simulation_results.
     enqueue_job(background_tasks, tenant, created.job_id, settings=settings)
     return created

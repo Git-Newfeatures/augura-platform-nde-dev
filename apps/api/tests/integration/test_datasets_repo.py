@@ -1,7 +1,7 @@
-"""Tests d'intégration du module datasets — CRUD, colonnes, lecture cohortes.
+"""Integration tests for the datasets module — CRUD, columns, cohort reads.
 
-Sous le rôle augura_app (RLS active). Le seed fournit la cohorte validation_v1
-(6 membres, 12 lignes de biomarqueurs).
+Under the augura_app role (RLS active). The seed provides the validation_v1 cohort
+(6 members, 12 biomarker rows).
 """
 
 import os
@@ -27,7 +27,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def session() -> AsyncIterator[AsyncSession]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as s, s.begin():
@@ -42,11 +42,11 @@ async def session() -> AsyncIterator[AsyncSession]:
 async def test_dataset_crud_and_columns(session: AsyncSession) -> None:
     repo = DatasetRepo(session)
     dataset = await repo.create_dataset(
-        LUCIS, name="cohorte test", study_id=None, storage_path=None, row_count=824
+        LUCIS, name="test cohort", study_id=None, storage_path=None, row_count=824
     )
     fetched = await repo.get_dataset(LUCIS, dataset.id)
     assert fetched is not None
-    assert fetched.name == "cohorte test"
+    assert fetched.name == "test cohort"
 
     await repo.replace_columns(
         dataset.id,
@@ -58,7 +58,7 @@ async def test_dataset_crud_and_columns(session: AsyncSession) -> None:
     listed = [schemas.ColumnOut.model_validate(c) for c in await repo.list_columns(dataset.id)]
     by_name = {c.name: c for c in listed}
     assert len(by_name) == 2
-    assert by_name["age"].min == 18  # colonne "min" → champ min via alias value_min
+    assert by_name["age"].min == 18  # "min" column → min field via the value_min alias
     assert by_name["hba1c_12m"].proposed_role == "outcome"
 
 
@@ -90,7 +90,7 @@ async def test_import_cohort_round_trip(session: AsyncSession) -> None:
     assert len(await repo.cohort_members(LUCIS, name)) == 2
     assert len(await repo.cohort_biomarkers(LUCIS, name)) == 2
 
-    # Idempotence : ré-import remplace (pas de doublon).
+    # Idempotence: re-import replaces (no duplicate).
     await repo.import_cohort(
         LUCIS,
         cohort_name=name,

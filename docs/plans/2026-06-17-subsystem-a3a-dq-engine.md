@@ -76,7 +76,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 `tests/test_dq_profiler.py`:
 ```python
-"""Tests du profiler DQ complet (quartiles, sentinelles, vecteurs)."""
+"""Tests for the full DQ profiler (quartiles, sentinels, vectors)."""
 
 from augura_api.modules.dq.profiler import profile_column
 
@@ -99,7 +99,7 @@ def test_missing_and_sentinel() -> None:
 
 `tests/test_dq_scorer.py`:
 ```python
-"""Tests du scorer DQ (déductions + score pondéré)."""
+"""Tests for the DQ scorer (deductions + weighted score)."""
 
 from augura_api.modules.dq.provenance import make_finding
 from augura_api.modules.dq.scorer import compute_dq_score
@@ -121,11 +121,11 @@ def test_hard_missing_finding_deducts_completeness() -> None:
 
 - [ ] **Step 2: Run → FAIL.** `cd apps/api && uv run pytest tests/test_dq_profiler.py tests/test_dq_scorer.py -q`
 
-- [ ] **Step 3: `dq/__init__.py`** = `"""Module dq — moteur de qualité des données (A3)."""`
+- [ ] **Step 3: `dq/__init__.py`** = `"""dq module — data-quality engine (A3)."""`
 
 - [ ] **Step 4: `dq/config.py`** (exact MVP values):
 ```python
-"""Constantes DQ — profils de poids, dimensions, seuils, déductions (MVP dq-config.js)."""
+"""DQ constants — weight profiles, dimensions, thresholds, deductions (MVP dq-config.js)."""
 
 WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     "exploratory": {
@@ -151,7 +151,7 @@ POLICY_VERSION = "1.0.0"
 
 - [ ] **Step 5: `dq/provenance.py`**:
 ```python
-"""Fabrique de findings DQ (forme exacte, traçabilité)."""
+"""DQ findings factory (exact shape, traceability)."""
 
 from __future__ import annotations
 
@@ -193,7 +193,7 @@ def make_finding(
 
 - [ ] **Step 6: `dq/profiler.py`** (full port of MVP `profiler.js`):
 ```python
-"""Profiler DQ complet — porté de l'MVP profiler.js (transitoire, non persisté)."""
+"""Full DQ profiler — ported from the MVP profiler.js (transient, not persisted)."""
 
 from __future__ import annotations
 
@@ -308,7 +308,7 @@ def profile_column(col_name: str, values: list[str]) -> ColumnDQProfile:
 
 - [ ] **Step 7: `dq/scorer.py`**:
 ```python
-"""Scoring DQ — par dimension + global pondéré (MVP dq-scorer.js)."""
+"""DQ scoring — per dimension + weighted overall (MVP dq-scorer.js)."""
 
 from __future__ import annotations
 
@@ -360,7 +360,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write failing engine unit test** `tests/test_dq_engine.py`:
 ```python
-"""Test du moteur DQ end-to-end sur des feuilles en mémoire (sans base)."""
+"""End-to-end test of the DQ engine on in-memory sheets (no database)."""
 
 from augura_api.modules.dq.engine import run_dq
 
@@ -392,7 +392,7 @@ def test_run_dq_produces_scored_bundle() -> None:
 
 - [ ] **Step 3: `dq/checks.py`** (the 4 starter checks + registry entries):
 ```python
-"""Checks DQ data-only (A3a). Chaque check : trigger(ctx) + run(ctx)->findings."""
+"""Data-only DQ checks (A3a). Each check: trigger(ctx) + run(ctx)->findings."""
 
 from __future__ import annotations
 
@@ -487,7 +487,7 @@ REGISTRY: list[dict[str, Any]] = [
 
 - [ ] **Step 4: `dq/registry.py`** (dispatch + audit):
 ```python
-"""Dispatch des checks DQ + audit d'exécution."""
+"""DQ checks dispatch + execution audit."""
 
 from __future__ import annotations
 
@@ -521,7 +521,7 @@ def evaluate_check(check: dict[str, Any], ctx: dict[str, Any], audit: dict[str, 
 
 - [ ] **Step 5: `dq/engine.py`** (orchestration + bundle assembly + scoring):
 ```python
-"""Moteur DQ : profile → checks (file/column) → bundle scoré (A3a, sync, sans concept)."""
+"""DQ engine: profile → checks (file/column) → scored bundle (A3a, sync, concept-free)."""
 
 from __future__ import annotations
 
@@ -614,7 +614,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: `dq/models.py`**:
 ```python
-"""Modèle SQLAlchemy du module dq."""
+"""SQLAlchemy model for the dq module."""
 
 from datetime import datetime
 from typing import Any
@@ -648,7 +648,7 @@ class DqBundle(Base):
 
 - [ ] **Step 2: `dq/schemas.py`**:
 ```python
-"""Contrat public du module dq."""
+"""Public contract of the dq module."""
 
 from datetime import datetime
 from typing import Any
@@ -678,7 +678,7 @@ class DqRunResult(BaseModel):
 
 - [ ] **Step 3: `dq/repo.py`**:
 ```python
-"""Accès base du module dq."""
+"""Database access for the dq module."""
 
 from uuid import UUID
 
@@ -720,7 +720,7 @@ class DqRepo:
 
 - [ ] **Step 4: `dq/service.py`** (load dataset → read file → parse → engine → persist):
 ```python
-"""Logique métier du module dq."""
+"""Business logic for the dq module."""
 
 from uuid import UUID
 
@@ -746,7 +746,7 @@ class DqService:
     ) -> schemas.DqRunResult:
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None or not dataset.storage_path:
-            raise NotFoundError("dataset introuvable ou sans fichier", dataset_id=str(dataset_id))
+            raise NotFoundError("dataset not found or without a file", dataset_id=str(dataset_id))
         data = read_bytes(settings, dataset.storage_path)
         sheets = parse_upload(dataset.name, data)
         bundle = run_dq(
@@ -766,7 +766,7 @@ class DqService:
     async def latest(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.DqBundleOut:
         row = await self.repo.latest_for_dataset(tenant.tenant_id, dataset_id)
         if row is None:
-            raise NotFoundError("aucun bundle DQ pour ce dataset", dataset_id=str(dataset_id))
+            raise NotFoundError("no DQ bundle for this dataset", dataset_id=str(dataset_id))
         return schemas.DqBundleOut.model_validate(row)
 ```
 
@@ -788,7 +788,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 2: `dq/router.py`**:
 ```python
-"""Adaptateur HTTP du module dq."""
+"""HTTP adapter for the dq module."""
 
 from uuid import UUID
 
@@ -823,7 +823,7 @@ async def latest_dq(
 
 - [ ] **Step 3:** `dq/__init__.py` → export router:
 ```python
-"""Interface publique du module dq."""
+"""Public interface of the dq module."""
 
 from augura_api.modules.dq.router import router
 

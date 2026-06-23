@@ -1,4 +1,4 @@
-"""Interface publique du module documents."""
+"""Public interface of the documents module."""
 
 from augura_api.modules.documents.router import router
 

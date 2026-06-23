@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module reference (DDL créé par le bundle SQL)."""
+"""SQLAlchemy models for the reference module (DDL created by the SQL bundle)."""
 
 from typing import Any
 from uuid import UUID

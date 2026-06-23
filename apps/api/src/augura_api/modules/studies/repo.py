@@ -1,7 +1,7 @@
-"""Accès base du module studies — chaque méthode exige un TenantId (spec §4).
+"""Database access for the studies module — every method requires a TenantId (spec §4).
 
-Le filtre `org_id == tenant_id` est une défense en profondeur : la RLS l'impose
-déjà côté Postgres, mais le repo ne s'y fie pas.
+The `org_id == tenant_id` filter is defense in depth: RLS already enforces it
+on the Postgres side, but the repo does not rely on that.
 """
 
 from typing import Any
@@ -59,8 +59,8 @@ class StudyRepo:
     async def update(
         self, tenant_id: TenantId, study_id: StudyId, *, fields: dict[str, Any]
     ) -> Study | None:
-        """Met à jour les champs fournis (déjà filtrés) + updated_at. Renvoie la ligne
-        rafraîchie (ou None si l'étude n'existe pas / hors tenant)."""
+        """Update the provided fields (already filtered) + updated_at. Returns the
+        refreshed row (or None if the study does not exist / is out of tenant)."""
         if fields:
             values: dict[str, Any] = {**fields, "updated_at": text("now()")}
             await self.session.execute(

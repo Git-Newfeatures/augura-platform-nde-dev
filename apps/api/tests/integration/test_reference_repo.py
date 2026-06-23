@@ -1,7 +1,7 @@
-"""Tests d'intégration du module reference — catalogues globaux + org tenant + RLS.
+"""Integration tests for the reference module — global catalogs + tenant org + RLS.
 
-Sautés si AUGURA_DATABASE_URL est absent. En CI, tournent après le seed, sous le
-rôle augura_app (NON exempt de RLS).
+Skipped if AUGURA_DATABASE_URL is not set. In CI, run after the seed, under the
+augura_app role (NOT RLS-exempt).
 """
 
 import os
@@ -26,7 +26,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def sm() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
@@ -59,8 +59,8 @@ async def test_reference_catalogs_are_readable_and_ordered(
 
 async def test_tenant_reads_only_its_own_org(sm: async_sessionmaker[AsyncSession]) -> None:
     tenant = TenantId(uuid4())
-    # INSERT de l'org scopé au tenant courant : la policy orgs `tenant_self`
-    # (using id = app.tenant_id, défaut WITH CHECK = USING) autorise cette ligne.
+    # INSERT of the org scoped to the current tenant: the orgs `tenant_self` policy
+    # (using id = app.tenant_id, WITH CHECK defaults to USING) permits this row.
     async with sm() as session, session.begin():
         await _scope(session, tenant, USER)
         await session.execute(
@@ -84,7 +84,7 @@ async def test_tenant_reads_only_its_own_org(sm: async_sessionmaker[AsyncSession
     other = TenantId(uuid4())
     async with sm() as session, session.begin():
         await _scope(session, other, USER)
-        assert await ReferenceRepo(session).get_org(tenant) is None  # RLS isole
+        assert await ReferenceRepo(session).get_org(tenant) is None  # RLS isolates
 
 
 async def test_reference_tables_are_read_only_for_tenant(

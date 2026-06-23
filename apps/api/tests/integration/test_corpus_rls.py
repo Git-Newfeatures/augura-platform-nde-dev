@@ -1,16 +1,16 @@
-"""Tier 3 (intégration) — gate 9 : RLS par-étude des `literature_snapshots`.
+"""Tier 3 (integration) — gate 9: per-study RLS of `literature_snapshots`.
 
-Exige un Postgres avec le rôle non-BYPASSRLS `augura_app` (schema.sql + policies.sql
-appliqués). Tourne contre AUGURA_DATABASE_URL (sauté sinon ; jamais le projet de démo,
-cf. conftest). TOUT se passe dans une transaction rollback-ée — aucune donnée laissée.
+Requires a Postgres with the non-BYPASSRLS role `augura_app` (schema.sql + policies.sql
+applied). Runs against AUGURA_DATABASE_URL (skipped otherwise; never the demo project,
+see conftest). EVERYTHING runs in a rolled-back transaction — no data left behind.
 
-Le cœur de gate 9 : les snapshots rattachés à une étude sont gatés par `study_members`,
-JAMAIS par `study_id` seul. Un `study_id`-only fuiterait entre études du même tenant.
+The core of gate 9: snapshots attached to a study are gated by `study_members`,
+NEVER by `study_id` alone. A `study_id`-only check would leak across studies of the same tenant.
 
-Trois cas vérifiés en tant que rôle `augura_app` (RLS active) :
-  1. Un MEMBRE de l'étude lit le snapshot rattaché à l'étude.
-  2. Un NON-membre du même tenant ne le lit PAS (fail-closed).
-  3. Un snapshot standalone (study_id NULL) n'est lisible que de son créateur.
+Three cases verified as the `augura_app` role (RLS active):
+  1. A MEMBER of the study reads the snapshot attached to the study.
+  2. A NON-member of the same tenant does NOT read it (fail-closed).
+  3. A standalone snapshot (study_id NULL) is readable only by its creator.
 """
 
 import json
@@ -36,7 +36,7 @@ OUTSIDER = UUID("cccccccc-0000-4000-8000-0000000000c1")
 async def conn() -> AsyncIterator[AsyncConnection]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     raw = await engine.connect()
     trans = await raw.begin()
@@ -45,17 +45,17 @@ async def conn() -> AsyncIterator[AsyncConnection]:
             await raw.execute(text("select 1 from pg_roles where rolname = 'augura_app'"))
         ).first()
         if exists is None:
-            pytest.skip("rôle augura_app absent — RLS par-étude non testable ici")
+            pytest.skip("augura_app role missing — per-study RLS not testable here")
         yield raw
     finally:
-        await trans.rollback()  # ne laisse AUCUNE donnée, quel que soit l'état
+        await trans.rollback()  # leaves NO data behind, whatever the state
         await raw.close()
         await engine.dispose()
 
 
 async def _seed(conn: AsyncConnection) -> tuple[UUID, UUID, UUID]:
-    """Crée org + étude + appartenance (MEMBER) + 3 snapshots, en rôle privilégié
-    (avant tout `set role`). Retourne (study_snap, member_standalone, outsider_standalone)."""
+    """Create org + study + membership (MEMBER) + 3 snapshots, as privileged role
+    (before any `set role`). Returns (study_snap, member_standalone, outsider_standalone)."""
     suffix = uuid4().hex[:8]
     study_id = uuid4()
     await conn.execute(
@@ -103,7 +103,7 @@ async def _seed(conn: AsyncConnection) -> tuple[UUID, UUID, UUID]:
 
 
 async def _visible(conn: AsyncConnection, *, user: UUID) -> set[UUID]:
-    """IDs des snapshots visibles pour `user` dans TENANT, sous RLS (rôle augura_app)."""
+    """IDs of snapshots visible to `user` in TENANT, under RLS (augura_app role)."""
     await conn.execute(
         text("select set_config('app.tenant_id', :t, true)").bindparams(t=str(TENANT))
     )
@@ -121,27 +121,27 @@ async def _visible(conn: AsyncConnection, *, user: UUID) -> set[UUID]:
 async def test_gate9_per_study_visibility(conn: AsyncConnection) -> None:
     study_snap, member_standalone, outsider_standalone = await _seed(conn)
 
-    # Bascule en rôle applicatif non-BYPASSRLS : à partir d'ici la RLS s'applique.
+    # Switch to the non-BYPASSRLS application role: from here on RLS applies.
     await conn.execute(text("set local role augura_app"))
 
-    # Cas 1 & 3 (côté membre) : le membre voit le snapshot d'étude ET son standalone,
-    # mais PAS le standalone d'un autre utilisateur.
+    # Cases 1 & 3 (member side): the member sees the study snapshot AND their standalone,
+    # but NOT another user's standalone.
     member_view = await _visible(conn, user=MEMBER)
-    assert study_snap in member_view, "le membre doit voir le snapshot rattaché à l'étude"
-    assert member_standalone in member_view, "le membre doit voir son propre standalone"
-    assert outsider_standalone not in member_view, "standalone d'autrui invisible"
+    assert study_snap in member_view, "the member must see the snapshot attached to the study"
+    assert member_standalone in member_view, "the member must see their own standalone"
+    assert outsider_standalone not in member_view, "another user's standalone is invisible"
 
-    # Cas 2 (fail-closed) : un non-membre du MÊME tenant ne voit PAS le snapshot
-    # d'étude — c'est le gating par study_members, pas par study_id seul.
+    # Case 2 (fail-closed): a non-member of the SAME tenant does NOT see the study
+    # snapshot — gating is by study_members, not by study_id alone.
     outsider_view = await _visible(conn, user=OUTSIDER)
-    assert study_snap not in outsider_view, "FUITE gate 9 : non-membre voit un snapshot d'étude"
-    assert member_standalone not in outsider_view, "standalone d'autrui invisible"
-    assert outsider_standalone in outsider_view, "l'outsider voit son propre standalone"
+    assert study_snap not in outsider_view, "gate 9 LEAK: non-member sees a study snapshot"
+    assert member_standalone not in outsider_view, "another user's standalone is invisible"
+    assert outsider_standalone in outsider_view, "the outsider sees their own standalone"
 
 
 async def test_gate9_write_check_blocks_non_member_study_write(conn: AsyncConnection) -> None:
-    """WITH CHECK : on ne peut pas geler un snapshot dans une étude dont on n'est pas
-    membre (même tenant). L'INSERT doit être refusé par la RLS."""
+    """WITH CHECK: you cannot freeze a snapshot into a study you are not a member
+    of (same tenant). The INSERT must be rejected by RLS."""
     suffix = uuid4().hex[:8]
     study_id = uuid4()
     await conn.execute(
@@ -155,7 +155,7 @@ async def test_gate9_write_check_blocks_non_member_study_write(conn: AsyncConnec
             "values (cast(:sid as uuid), cast(:t as uuid), :n, :sl)"
         ).bindparams(sid=str(study_id), t=str(TENANT), n="WC study", sl=f"wc-{suffix}")
     )
-    # MEMBER n'est PAS ajouté à study_members → OUTSIDER (= n'importe qui) n'est pas membre.
+    # MEMBER is NOT added to study_members → OUTSIDER (= anyone) is not a member.
 
     await conn.execute(text("set local role augura_app"))
     await conn.execute(

@@ -1,4 +1,4 @@
-"""Accès base du module datasets — chaque méthode exige un TenantId."""
+"""Database access for the datasets module — every method requires a TenantId."""
 
 from uuid import UUID
 
@@ -20,8 +20,8 @@ class DatasetRepo:
         self.session = session
 
     async def list_datasets(self, tenant_id: TenantId) -> list[tuple[Dataset, int]]:
-        """Datasets du tenant + leur nombre de colonnes (sous-requête corrélée
-        sur dataset_columns, intra-module)."""
+        """Datasets of the tenant + their column count (correlated subquery
+        on dataset_columns, intra-module)."""
         col_count = (
             select(func.count(DatasetColumn.id))
             .where(DatasetColumn.dataset_id == Dataset.id)
@@ -149,8 +149,8 @@ class DatasetRepo:
         members: list[schemas.CohortMemberIn],
         biomarkers: list[schemas.CohortBiomarkerIn],
     ) -> tuple[int, int]:
-        """Remplace la cohorte (members + biomarkers) pour (tenant, cohort_name) — la
-        voie d'écriture des tables cohort_*. Delete-then-insert pour idempotence."""
+        """Replaces the cohort (members + biomarkers) for (tenant, cohort_name) — the
+        write path for the cohort_* tables. Delete-then-insert for idempotence."""
         await self.session.execute(
             delete(CohortMember).where(
                 CohortMember.org_id == tenant_id, CohortMember.cohort_name == cohort_name

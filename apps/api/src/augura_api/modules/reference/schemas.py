@@ -1,4 +1,4 @@
-"""Schémas Pydantic — contrat public du module reference."""
+"""Pydantic schemas — public contract for the reference module."""
 
 from typing import Any
 from uuid import UUID

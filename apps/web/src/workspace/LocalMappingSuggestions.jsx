@@ -1,8 +1,8 @@
-// Suggestions de mapping LOCALES (offline), additives au mapping serveur (POST
-// /datasets/{id}/map). Branche le moteur sémantique client (concept-matcher +
-// confidence-scorer + lexical-normalizer) sur le bundle gouverné (/semantic/bundle).
-// Strictement isolé : toute erreur (store indispo, matching) rend `null` — ça ne
-// peut pas casser l'onglet Mapping ni le mapping serveur qui reste la source de vérité.
+// LOCAL mapping suggestions (offline), additive to the server mapping (POST
+// /datasets/{id}/map). Wires the client semantic engine (concept-matcher +
+// confidence-scorer + lexical-normalizer) onto the governed bundle (/semantic/bundle).
+// Strictly isolated: any error (store unavailable, matching) returns `null` — it can't
+// break the Mapping tab nor the server mapping, which remains the source of truth.
 import { useState, useEffect, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { initSemanticStore, isSemanticStoreReady } from '@/lib/semantic-store'
@@ -42,7 +42,7 @@ export function LocalMappingSuggestions({ columns }) {
           }
         }
       } catch {
-        // matching indisponible pour cette colonne — on l'ignore silencieusement
+        // matching unavailable for this column — silently ignored
       }
       return { column, best, confidence }
     })
@@ -57,26 +57,26 @@ export function LocalMappingSuggestions({ columns }) {
 
   if (error) return null
   if (!ready) {
-    return <p className="px-1 py-3 text-[12px] text-muted-foreground">Chargement de la taxonomie locale…</p>
+    return <p className="px-1 py-3 text-[12px] text-muted-foreground">Loading local taxonomy…</p>
   }
   if (!rows.length) return null
 
   return (
     <Card className="mt-4 p-0 overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <h4 className="text-[13px] font-medium text-foreground">Suggestions locales (offline)</h4>
+        <h4 className="text-[13px] font-medium text-foreground">Local suggestions (offline)</h4>
         {score && (
           <span className="text-[11px] text-muted-foreground">
-            {score.mappedCount}/{score.totalCount} · confiance moy. {Math.round((score.avgConfidence || 0) * 100)}%
+            {score.mappedCount}/{score.totalCount} · avg. confidence {Math.round((score.avgConfidence || 0) * 100)}%
           </span>
         )}
       </div>
       <table className="w-full text-left text-[12px]">
         <thead className="text-muted-foreground">
           <tr className="border-b border-border">
-            <th className="px-4 py-2 font-medium">Colonne</th>
-            <th className="px-4 py-2 font-medium">Concept suggéré</th>
-            <th className="px-4 py-2 font-medium">Confiance</th>
+            <th className="px-4 py-2 font-medium">Column</th>
+            <th className="px-4 py-2 font-medium">Suggested concept</th>
+            <th className="px-4 py-2 font-medium">Confidence</th>
           </tr>
         </thead>
         <tbody>

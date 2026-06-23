@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge'
 import { History, ChevronDown, ChevronRight, X, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Sessions de recherche récentes (serveur). Ré-ouverture = relance live ; pas un
-// snapshot/audit. Replié par défaut ; masqué s'il n'y a pas d'historique.
-// Dédoublonné en amont (AdHocQuery) ; suppression unitaire (X) ou globale (Clear all).
+// Recent search sessions (server). Re-opening = live re-run; not a snapshot/audit.
+// Collapsed by default; hidden when there is no history.
+// Deduplicated upstream (AdHocQuery); single removal (X) or global (Clear all).
 export function RecentQueries({ entries, activeId, onOpen, onDelete, onClear }) {
   const [open, setOpen] = useState(false)
   if (!entries?.length) return null

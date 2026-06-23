@@ -28,12 +28,12 @@ import { LocalMappingSuggestions } from '@/workspace/LocalMappingSuggestions'
 import { apiJson } from '@/api'
 import { uploadDataset, uploadDatasets, mapDataset, runDq, getDq, listColumns } from '@/intake/intakeApi'
 
-// Data workspace — port de la vue /datasets de Nico, recâblée sur le backend
-// Quentin. Le flux intake (upload → mapping → data quality) vit ICI, par dataset,
-// dans des sous-onglets — plus d'onglet « Intake » séparé.
-// Upload/Mapping/Data Quality tapent les vraies routes (/datasets/upload,
-// /{id}/map, /{id}/dq). Privacy/Validation/Lineage sont des placeholders « beta »
-// (pas encore de backend), fidèles à la maquette de Nico.
+// Data workspace — port of Nico's /datasets view, rewired onto Quentin's
+// backend. The intake flow (upload → mapping → data quality) lives HERE, per
+// dataset, in sub-tabs — no more separate "Intake" tab.
+// Upload/Mapping/Data Quality hit the real routes (/datasets/upload,
+// /{id}/map, /{id}/dq). Privacy/Validation/Lineage are "beta" placeholders
+// (no backend yet), faithful to Nico's mockup.
 
 // ── Small presentational helpers ──────────────────────────────────────────────
 const TAG_CLS = {
@@ -114,11 +114,7 @@ function StatusBadge({ d }) {
       </Badge>
     )
   }
-  return (
-    <Badge variant="outline" className="text-muted-foreground">
-      Locked
-    </Badge>
-  )
+  return null
 }
 
 // ── Placeholder content (beta tabs — Privacy / Validation / Lineage) ───────────
@@ -704,8 +700,8 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
 
 // ── Add-dataset modal (green CTA target) — registers a dataset like Nico's
 // legacy form (name + study), but with the file: one POST /datasets/upload
-// creates + profiles it. One file → land in its detail view. Plusieurs fichiers →
-// un dataset par fichier (nom = nom du fichier), puis on reste sur la liste. ──
+// creates + profiles it. One file → land in its detail view. Multiple files →
+// one dataset per file (name = file name), then stay on the list. ──
 const MODAL_INPUT_CLS =
   'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground ' +
   'placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15'
@@ -727,7 +723,7 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
     setFiles(picked)
     setFailed([])
     setError(null)
-    // Préremplit le nom depuis le fichier unique (flux mono-fichier seulement).
+    // Pre-fill the name from the single file (single-file flow only).
     if (picked.length === 1 && !name.trim()) {
       setName(picked[0].name.replace(/\.(csv|xlsx|xls)$/i, ''))
     }
@@ -742,7 +738,7 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
     setBusy(true)
     setError(null)
     setFailed([])
-    // Mono-fichier → flux historique : nom éditable + saut dans le détail du dataset.
+    // Single file → legacy flow: editable name + jump into the dataset detail.
     if (files.length === 1) {
       try {
         const result = await uploadDataset(files[0], {
@@ -756,7 +752,7 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
       }
       return
     }
-    // Multi → un dataset par fichier (nom du fichier côté serveur), séquentiel.
+    // Multi → one dataset per file (file name server-side), sequential.
     const { ok, failed: fail } = await uploadDatasets(files, {
       studyId: studyId || undefined,
       onProgress: (done, total, current) => setProgress({ done, total, name: current }),
@@ -766,8 +762,8 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
       onClose()
       return
     }
-    // Échec partiel/total : on garde la modale ouverte avec le détail des erreurs
-    // (les datasets réussis sont déjà rafraîchis dans la liste en arrière-plan).
+    // Partial/total failure: keep the modal open with the error details
+    // (the successful datasets are already refreshed in the list in the background).
     setFailed(fail)
     setError(`${fail.length} of ${files.length} files failed — successes were added`)
     setProgress(null)

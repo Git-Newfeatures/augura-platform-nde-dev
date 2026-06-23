@@ -1,4 +1,4 @@
-"""Logique métier du module dq."""
+"""Business logic for the dq module."""
 
 from uuid import UUID
 
@@ -28,15 +28,13 @@ class DqService:
     ) -> schemas.DqRunResult:
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None or not dataset.storage_path:
-            raise NotFoundError("dataset introuvable ou sans fichier", dataset_id=str(dataset_id))
+            raise NotFoundError("dataset not found or has no file", dataset_id=str(dataset_id))
         try:
             data = await read_bytes(settings, dataset.storage_path)
         except FileNotFoundError as exc:
-            # Le ref stocké ne pointe sur rien de lisible (ex. octets écrits sur un disque
-            # éphémère et par-conteneur de Modal avant le passage à l'object store) : 404 propre.
-            raise NotFoundError(
-                "fichier du dataset indisponible", dataset_id=str(dataset_id)
-            ) from exc
+            # The stored ref points to nothing readable (e.g. bytes written to Modal's
+            # ephemeral, per-container disk before the move to the object store): clean 404.
+            raise NotFoundError("dataset file unavailable", dataset_id=str(dataset_id)) from exc
         sheets = parse_upload(dataset.name, data)
         bundle = run_dq(
             [{"name": s.name, "headers": s.headers, "rows": s.rows} for s in sheets],
@@ -61,5 +59,5 @@ class DqService:
     async def latest(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.DqBundleOut:
         row = await self.repo.latest_for_dataset(tenant.tenant_id, dataset_id)
         if row is None:
-            raise NotFoundError("aucun bundle DQ pour ce dataset", dataset_id=str(dataset_id))
+            raise NotFoundError("no DQ bundle for this dataset", dataset_id=str(dataset_id))
         return schemas.DqBundleOut.model_validate(row)

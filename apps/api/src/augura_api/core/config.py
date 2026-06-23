@@ -8,9 +8,9 @@ _CORS_DEV_DEFAULT = "http://localhost:5173,http://127.0.0.1:5173"
 
 
 class Settings(BaseSettings):
-    """Configuration de l'application, lue depuis les variables AUGURA_*.
+    """Application configuration, read from the AUGURA_* variables.
 
-    Tout champ requis manquant fait échouer le boot (fail-fast).
+    Any missing required field fails the boot (fail-fast).
     """
 
     model_config = SettingsConfigDict(env_prefix="AUGURA_", frozen=True)
@@ -20,41 +20,41 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     log_level: str = "INFO"
 
-    # CORS — origines autorisées pour le front (apps/web). Liste séparée par des
-    # virgules : AUGURA_CORS_ORIGINS="https://app.augura.io,https://staging…".
+    # CORS — allowed origins for the frontend (apps/web). Comma-separated
+    # list: AUGURA_CORS_ORIGINS="https://app.augura.io,https://staging…".
     cors_origins: str = _CORS_DEV_DEFAULT
-    # Regex d'origine optionnelle, en plus de la liste explicite. Indispensable pour
-    # les previews Vercel dynamiques : AUGURA_CORS_ORIGIN_REGEX='^https://.*\.vercel\.app$'.
+    # Optional origin regex, in addition to the explicit list. Essential for
+    # dynamic Vercel previews: AUGURA_CORS_ORIGIN_REGEX='^https://.*\.vercel\.app$'.
     cors_origin_regex: str | None = None
 
-    # Infra — optionnels au boot (le healthcheck n'en a pas besoin) ; les
-    # composants qui les consomment échouent franchement s'ils manquent.
-    # Préfixe AUGURA_ : AUGURA_DATABASE_URL, AUGURA_SUPABASE_JWKS_URL, etc.
+    # Infra — optional at boot (the healthcheck does not need them); the
+    # components that consume them fail outright if they are missing.
+    # AUGURA_ prefix: AUGURA_DATABASE_URL, AUGURA_SUPABASE_JWKS_URL, etc.
     database_url: str | None = None
     supabase_jwks_url: str | None = None
-    supabase_jwt_secret: str | None = None  # repli HS256 (projets Supabase legacy)
+    supabase_jwt_secret: str | None = None  # HS256 fallback (legacy Supabase projects)
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_issuer: str | None = None
 
-    # Stockage des artefacts générés (dossiers PDF/HTML, exports). Local en dev ;
-    # un bucket Supabase Storage / volume Modal prendra le relais en prod via la
-    # même interface (core.storage). Chemin relatif → résolu depuis le CWD de l'API.
+    # Storage for generated artifacts (PDF/HTML dossiers, exports). Local in dev;
+    # a Supabase Storage bucket / Modal volume takes over in prod through the
+    # same interface (core.storage). Relative path → resolved from the API's CWD.
     artifacts_dir: str = "var/artifacts"
 
-    # Supabase Storage (object store) pour les octets des datasets uploadés. En prod le
-    # FS Modal est éphémère ET par conteneur : un upload servi par un conteneur ASGI n'est
-    # pas relu par celui qui lance ensuite le DQ. Quand `supabase_url` ET
-    # `supabase_service_role_key` sont définis, core.storage lit/écrit via l'API Storage
-    # (cohérent cross-conteneur) ; sinon repli disque local (dev/test/CI sans secret). La
-    # clé service_role contourne la RLS Storage : secret backend uniquement, jamais côté front.
+    # Supabase Storage (object store) for the bytes of uploaded datasets. In prod the
+    # Modal FS is ephemeral AND per-container: an upload served by one ASGI container is
+    # not re-read by the one that runs the DQ afterwards. When `supabase_url` AND
+    # `supabase_service_role_key` are set, core.storage reads/writes via the Storage API
+    # (consistent cross-container); otherwise it falls back to local disk (dev/test/CI with
+    # no secret). The service_role key bypasses Storage RLS: backend secret only, never frontend.
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     storage_bucket: str = "datasets"
 
-    # LLM (agents). Clés requises pour un run live ; absentes en local ⇒ les routes
-    # /agents/* renvoient une 503 explicite « clé manquante ». On accepte le nom
-    # préfixé AUGURA_* ET le nom standard sans préfixe (ANTHROPIC_API_KEY…), pour
-    # ne pas dépendre d'un renommage des secrets côté plateforme.
+    # LLM (agents). Keys required for a live run; absent locally ⇒ the
+    # /agents/* routes return an explicit 503 "missing key". We accept both the
+    # AUGURA_* prefixed name AND the standard unprefixed name (ANTHROPIC_API_KEY…),
+    # so as not to depend on a renaming of the secrets on the platform side.
     anthropic_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("AUGURA_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
@@ -63,17 +63,17 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("AUGURA_OPENAI_API_KEY", "OPENAI_API_KEY"),
     )
-    # PubMed E-utilities (NCBI). Clé optionnelle : relève la limite de débit
-    # (3→10 req/s). La recherche de littérature marche sans clé.
+    # PubMed E-utilities (NCBI). Optional key: raises the rate limit
+    # (3→10 req/s). Literature search works without a key.
     ncbi_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("AUGURA_NCBI_API_KEY", "NCBI_API_KEY"),
     )
-    # Contournement du WAF CT.gov (403 depuis les IP datacenter Modal). Deux options,
-    # toutes deux optionnelles (absentes ⇒ appel direct = dégradation gracieuse) :
-    #  - relay  : URL d'un relais HTTP (fonction Vercel) qui réémet vers CT.gov depuis
-    #    un egress autorisé. Remplace la base CT.gov. Mécanisme PRIVILÉGIÉ.
-    #  - proxy  : proxy sortant httpx (IP résidentielle) pour les appels CT.gov.
+    # Workaround for the CT.gov WAF (403 from Modal datacenter IPs). Two options,
+    # both optional (absent ⇒ direct call = graceful degradation):
+    #  - relay  : URL of an HTTP relay (Vercel function) that re-issues to CT.gov from
+    #    an allowed egress. Replaces the CT.gov base. PREFERRED mechanism.
+    #  - proxy  : outbound httpx proxy (residential IP) for the CT.gov calls.
     ctgov_relay_url: str | None = None
     ctgov_proxy_url: str | None = None
     agent_model_dag: str = "claude-sonnet-4-6"
@@ -90,9 +90,9 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _blank_key_is_none(cls, v: str | None) -> str | None:
-        # Une clé vide/whitespace dans .env (`ANTHROPIC_API_KEY=`) doit valoir « absente »
-        # (None), sinon les constructeurs LLM bâtissent un client avec une clé vide et
-        # échouent de façon opaque au lieu de renvoyer une 503 « clé manquante » propre.
+        # An empty/whitespace key in .env (`ANTHROPIC_API_KEY=`) must count as "absent"
+        # (None), otherwise the LLM constructors build a client with an empty key and
+        # fail opaquely instead of returning a clean 503 "missing key".
         if isinstance(v, str):
             return v.strip() or None
         return v
@@ -103,20 +103,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _require_explicit_prod_cors(self) -> "Settings":
-        # En prod, la valeur localhost par défaut rejetterait le vrai front
-        # (allow_credentials=True ⇒ pas de wildcard possible) : fail-fast au boot.
+        # In prod, the default localhost value would reject the real frontend
+        # (allow_credentials=True ⇒ no wildcard allowed): fail-fast at boot.
         if (
             self.env == "prod"
             and self.cors_origins == _CORS_DEV_DEFAULT
             and not self.cors_origin_regex
         ):
             raise ValueError(
-                "AUGURA_CORS_ORIGINS ou AUGURA_CORS_ORIGIN_REGEX doit être défini "
-                "explicitement en prod (origine(s) du front), pas la valeur localhost par défaut."
+                "AUGURA_CORS_ORIGINS or AUGURA_CORS_ORIGIN_REGEX must be set "
+                "explicitly in prod (the frontend origin(s)), not the default localhost value."
             )
         return self
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # pyright: ignore[reportCallIssue] -- champs injectés par l'environnement
+    return Settings()  # pyright: ignore[reportCallIssue] -- fields injected by the environment

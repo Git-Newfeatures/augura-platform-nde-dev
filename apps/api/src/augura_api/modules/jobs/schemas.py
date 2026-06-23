@@ -1,4 +1,4 @@
-"""Contrat public du module jobs."""
+"""Public contract for the jobs module."""
 
 from uuid import UUID
 

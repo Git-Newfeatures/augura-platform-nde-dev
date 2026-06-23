@@ -1,4 +1,4 @@
-"""Unitaires de la logique pure d'enrichissement (coverage, BFS, prechecks)."""
+"""Unit tests of the pure enrichment logic (coverage, BFS, prechecks)."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def _rel(
 
 
 def _batch(**kwargs: Any) -> dict[str, Any]:
-    """Crée un batch minimal avec toutes les clés requises."""
+    """Create a minimal batch with all required keys."""
     base: dict[str, Any] = {
         "taxonomy_concepts": [],
         "taxonomy_synonyms": [],
@@ -78,17 +78,17 @@ def test_normalize_empty_string_returns_empty() -> None:
 
 
 def test_normalize_expands_abbreviation() -> None:
-    # "hba1c" doit être expansé en "hemoglobin a1c"
+    # "hba1c" must be expanded to "hemoglobin a1c"
     assert enr.normalize("HbA1c") == "hemoglobin a1c"
 
 
 def test_normalize_strips_timepoint_suffix() -> None:
-    # ".BL" doit être supprimé
+    # ".BL" must be stripped
     assert enr.normalize("cgm_tir.BL") == "cgm time range"
 
 
 def test_normalize_strips_noise_tokens() -> None:
-    # "level", "value" sont des tokens bruit
+    # "level", "value" are noise tokens
     result = enr.normalize("blood pressure level value")
     assert "level" not in result
     assert "value" not in result
@@ -100,13 +100,13 @@ def test_normalize_strips_pure_digits() -> None:
 
 
 def test_normalize_separators_to_space() -> None:
-    # Séparateurs _, -, ., :, | → espace
+    # Separators _, -, ., :, | → space
     assert "blood" in enr.normalize("blood_pressure")
     assert "blood" in enr.normalize("blood-pressure")
 
 
 def test_normalize_cgm_not_expanded() -> None:
-    # "cgm" intentionnellement non expansé (commentaire JS)
+    # "cgm" intentionally not expanded (JS comment)
     result = enr.normalize("cgm")
     assert result == "cgm"
 
@@ -162,7 +162,7 @@ def test_build_semantic_data_predicate_map() -> None:
 
 
 def test_match_tokens_exact_synonym_hit() -> None:
-    """Correspondance exacte via syn_lookup — la phrase DOIT être associée."""
+    """Exact match via syn_lookup — the phrase MUST be associated."""
     concepts = [_concept("C1", "hypertension")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
     matched, unmatched = enr.match_tokens(["hypertension"], idx.syn_lookup, idx.concept_index)
@@ -171,10 +171,10 @@ def test_match_tokens_exact_synonym_hit() -> None:
 
 
 def test_match_tokens_label_substring_match() -> None:
-    """Le label du concept est une sous-chaîne de la phrase."""
+    """The concept label is a substring of the phrase."""
     concepts = [_concept("C1", "blood pressure")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
-    # phrase courte (2 mots) → couverture OK
+    # short phrase (2 words) → coverage OK
     matched, _unmatched = enr.match_tokens(
         ["systolic blood pressure"], idx.syn_lookup, idx.concept_index
     )
@@ -182,25 +182,25 @@ def test_match_tokens_label_substring_match() -> None:
 
 
 def test_match_tokens_word_coverage_rejects_short_label_in_long_phrase() -> None:
-    """Un label de 2 mots NE DOIT PAS matcher une phrase de 7 mots (< 50%)."""
+    """A 2-word label MUST NOT match a 7-word phrase (< 50%)."""
     concepts = [_concept("C1", "blood pressure")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
-    # "blood pressure" = 2 mots / 7 mots de la phrase = 28.6% < 50%
+    # "blood pressure" = 2 words / 7 words of the phrase = 28.6% < 50%
     matched, _unmatched = enr.match_tokens(
         ["reduction of systolic blood pressure after treatment"],
         idx.syn_lookup,
         idx.concept_index,
     )
-    # Le concept ne doit PAS être dans les matchés
+    # The concept MUST NOT be among the matches
     assert "C1" not in matched.get("reduction of systolic blood pressure after treatment", [])
 
 
 def test_match_tokens_short_phrase_accepts_short_label() -> None:
-    """Phrase ≤ 3 mots : toujours acceptée quelle que soit la couverture."""
+    """Phrase ≤ 3 words: always accepted regardless of coverage."""
     concepts = [_concept("C1", "glucose")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
     matched, _unmatched = enr.match_tokens(["blood glucose"], idx.syn_lookup, idx.concept_index)
-    # "glucose" (1 mot) dans "blood glucose" (2 mots) → phrase ≤ 3 mots → OK
+    # "glucose" (1 word) in "blood glucose" (2 words) → phrase ≤ 3 words → OK
     assert "C1" in matched.get("blood glucose", [])
 
 
@@ -226,14 +226,14 @@ def test_match_tokens_unmatched_added_to_set() -> None:
 
 
 def test_match_tokens_label_present_failing_coverage_does_not_fall_through_to_synonym() -> None:
-    # Régression : fidélité au if/else JS (enrich-propose.js ~lignes 233-253).
-    # La phrase normalisée "lowering systolic blood pressure outcomes" a 5 mots.
-    # Label "blood pressure" (2 mots) : PRÉSENT dans la phrase ET ≥ 4 chars.
-    #   → branche else du JS → on vérifie UNIQUEMENT la couverture du label.
-    #   → couverture = 2/5 = 0.40 < 0.50 → AUCUN match.
-    # Le synonyme "systolic blood pressure" (3 mots, 3/5 = 0.60 ≥ 0.50) NE DOIT PAS
-    # être tenté (branche else = interdiction totale des synonymes).
-    # Ce test doit ÉCHOUER avant le correctif et PASSER après.
+    # Regression: fidelity to the JS if/else (enrich-propose.js ~lines 233-253).
+    # The normalized phrase "lowering systolic blood pressure outcomes" has 5 words.
+    # Label "blood pressure" (2 words): PRESENT in the phrase AND ≥ 4 chars.
+    #   → JS else branch → we check ONLY the label coverage.
+    #   → coverage = 2/5 = 0.40 < 0.50 → NO match.
+    # The synonym "systolic blood pressure" (3 words, 3/5 = 0.60 ≥ 0.50) MUST NOT
+    # be attempted (else branch = total ban on synonyms).
+    # This test must FAIL before the fix and PASS after.
     concepts = [_concept("C1", "blood pressure")]
     syns = [{"local_concept_id": "C1", "synonym": "systolic blood pressure"}]
     idx = enr.build_semantic_data(
@@ -249,25 +249,25 @@ def test_match_tokens_label_present_failing_coverage_does_not_fall_through_to_sy
         idx.syn_lookup,
         idx.concept_index,
     )
-    # C1 ne doit PAS apparaître : la branche label est seule autorisée et elle échoue.
+    # C1 must NOT appear: only the label branch is allowed and it fails.
     all_matched_ids = {cid for ids in matched.values() for cid in ids}
     assert "C1" not in all_matched_ids, (
-        "C1 a été matché via le synonyme alors que le label est présent "
-        "(violation du if/else JS : la branche else interdit les synonymes)"
+        "C1 was matched via the synonym while the label is present "
+        "(JS if/else violation: the else branch forbids synonyms)"
     )
 
 
 def test_match_tokens_label_min_length_4() -> None:
-    """Un label de moins de 4 caractères ne doit pas matcher via label-path."""
-    concepts = [_concept("C1", "bp")]  # 2 chars normalisé → "bp"
+    """A label of fewer than 4 characters must not match via the label-path."""
+    concepts = [_concept("C1", "bp")]  # 2 chars normalized → "bp"
     idx = enr.build_semantic_data(_raw(concepts=concepts))
-    # "bp" est < 4 chars → path label ignoré ; syn_lookup direct uniquement
+    # "bp" is < 4 chars → label path ignored; direct syn_lookup only
     matched, unmatched = enr.match_tokens(["bp systolic"], idx.syn_lookup, idx.concept_index)
-    # syn_lookup contient normalize("bp") = "systolic blood pressure" (expansion)
-    # → "bp" → "systolic blood pressure" via abbreviation map, pas "bp"
-    # Donc le lookup exact de "bp systolic" ne trouvera rien via label-path
-    # car normalize("bp") != normalize("bp systolic")
-    # Ce test vérifie simplement qu'il n'y a pas de crash.
+    # syn_lookup contains normalize("bp") = "systolic blood pressure" (expansion)
+    # → "bp" → "systolic blood pressure" via the abbreviation map, not "bp"
+    # So the exact lookup of "bp systolic" will find nothing via the label-path
+    # because normalize("bp") != normalize("bp systolic")
+    # This test simply verifies there is no crash.
     assert isinstance(matched, dict)
     assert isinstance(unmatched, set)
 
@@ -299,7 +299,7 @@ def test_directed_bfs_no_path_returns_false() -> None:
 
 
 def test_directed_bfs_multi_hop() -> None:
-    """Chemin A→B→C doit être trouvé en max 3 sauts."""
+    """Path A→B→C must be found within 3 hops."""
     rels = [_rel("R1", "A", "B"), _rel("R2", "B", "C")]
     idx = enr.build_semantic_data(
         _raw(
@@ -312,7 +312,7 @@ def test_directed_bfs_multi_hop() -> None:
 
 
 def test_directed_bfs_hop_limit_respected() -> None:
-    """Chemin en 4 sauts ne doit PAS être trouvé avec max_hops=3."""
+    """A 4-hop path must NOT be found with max_hops=3."""
     rels = [
         _rel("R1", "A", "B"),
         _rel("R2", "B", "C"),
@@ -330,10 +330,10 @@ def test_directed_bfs_hop_limit_respected() -> None:
 
 
 def test_directed_bfs_nearest_forward_hop() -> None:
-    """Si un voisin de la cible est dans visited, nearest_forward_hop doit être renseigné."""
-    # A→B, mais pas B→C ; C←D (donc D est voisin de C)
-    # On part de [A], on veut atteindre [C]. B n'atteint pas C directement.
-    # D est voisin de C par byObject → si D est visité, nearest_forward_hop = D.
+    """If a neighbor of the target is in visited, nearest_forward_hop must be set."""
+    # A→B, but not B→C; C←D (so D is a neighbor of C)
+    # We start from [A], we want to reach [C]. B does not reach C directly.
+    # D is a neighbor of C via byObject → if D is visited, nearest_forward_hop = D.
     rels = [_rel("R1", "A", "D"), _rel("R2", "D", "C")]
     idx = enr.build_semantic_data(
         _raw(
@@ -341,10 +341,10 @@ def test_directed_bfs_nearest_forward_hop() -> None:
             relations=rels,
         )
     )
-    # On retire la relation D→C pour que D ne puisse pas atteindre C directement
+    # We remove the D→C relation so that D cannot reach C directly
     idx.ontology.by_subject.pop("D", None)
     idx.ontology.relations = [r for r in idx.ontology.relations if r["relation_id"] != "R2"]
-    # Mais on laisse D dans byObject[C] (ajout manuel pour le test)
+    # But we leave D in byObject[C] (manual addition for the test)
     idx.ontology.by_object.setdefault("C", []).append(_rel("R2", "D", "C"))
     res = enr.directed_bfs(idx.ontology, ["A"], ["C"], max_hops=3)
     assert res.found is False
@@ -356,11 +356,11 @@ def test_directed_bfs_nearest_forward_hop() -> None:
 
 
 def test_prechecks_reject_self_loop_and_orphan() -> None:
-    """Self-loop et objet orphelin doivent tous deux être rejetés."""
+    """Self-loop and orphan object must both be rejected."""
     batch = _batch(
         ontology_relations=[
             _rel("X1", "A", "A"),  # self-loop
-            _rel("X2", "A", "ZZ"),  # objet orphelin (ZZ inconnu)
+            _rel("X2", "A", "ZZ"),  # orphan object (ZZ unknown)
         ],
     )
     log: list[str] = []
@@ -379,7 +379,7 @@ def test_prechecks_reject_self_loop_and_orphan() -> None:
 
 
 def test_prechecks_reject_duplicate_relation_key() -> None:
-    """Une relation avec la même clé subject|predicate|object|polarity doit être rejetée."""
+    """A relation with the same subject|predicate|object|polarity key must be rejected."""
     key = "A|precedes|B|increases"
     batch = _batch(
         ontology_relations=[_rel("X1", "A", "B")],
@@ -399,7 +399,7 @@ def test_prechecks_reject_duplicate_relation_key() -> None:
 
 
 def test_prechecks_reject_unknown_predicate() -> None:
-    """Un prédicat inconnu doit être rejeté."""
+    """An unknown predicate must be rejected."""
     batch = _batch(
         ontology_relations=[{**_rel("X1", "A", "B"), "predicate": "unknown_pred"}],
     )
@@ -418,7 +418,7 @@ def test_prechecks_reject_unknown_predicate() -> None:
 
 
 def test_prechecks_reject_l1_without_code() -> None:
-    """Un concept layer=1 sans code standard associé doit être rejeté."""
+    """A layer=1 concept without an associated standard code must be rejected."""
     batch = _batch(
         taxonomy_concepts=[
             {
@@ -428,7 +428,7 @@ def test_prechecks_reject_l1_without_code() -> None:
                 "augura_domain": "therapeutics",
             }
         ],
-        taxonomy_standard_codes=[],  # aucun code → rejet
+        taxonomy_standard_codes=[],  # no code → reject
     )
     log: list[str] = []
     enr.apply_prechecks(
@@ -445,7 +445,7 @@ def test_prechecks_reject_l1_without_code() -> None:
 
 
 def test_prechecks_l1_with_code_accepted() -> None:
-    """Un concept layer=1 AVEC code standard doit être accepté."""
+    """A layer=1 concept WITH a standard code must be accepted."""
     batch = _batch(
         taxonomy_concepts=[
             {
@@ -473,7 +473,7 @@ def test_prechecks_l1_with_code_accepted() -> None:
 
 
 def test_prechecks_autostub_evidence() -> None:
-    """Une relation sans evidence doit recevoir un auto-stub."""
+    """A relation without evidence must receive an auto-stub."""
     batch = _batch(
         ontology_relations=[_rel("R1", "A", "B")],
         ontology_relation_evidence=[],
@@ -496,7 +496,7 @@ def test_prechecks_autostub_evidence() -> None:
 
 
 def test_prechecks_polarity_conflict_detected() -> None:
-    """Une relation en polarity inverse d'une existante → conflit retourné."""
+    """A relation with the inverse polarity of an existing one → conflict returned."""
     batch = _batch(
         ontology_relations=[{**_rel("R1", "A", "B"), "polarity": "decreases"}],
     )
@@ -510,13 +510,13 @@ def test_prechecks_polarity_conflict_detected() -> None:
         id_counters={"concept": 0, "relation": 0, "evidence": 0, "qualifier": 0},
         today="20260619",
     )
-    # La relation est acceptée (conflit ≠ rejet), mais l'opposé est signalé
+    # The relation is accepted (conflict ≠ reject), but the opposite is flagged
     assert len(conflicts) == 1
     assert conflicts[0]["opposite_key"] == "A|precedes|B|increases"
 
 
 def test_prechecks_duplicate_concept_rejected() -> None:
-    """Un concept avec un ID déjà dans existants doit être rejeté."""
+    """A concept with an ID already among the existing ones must be rejected."""
     batch = _batch(
         taxonomy_concepts=[_concept("C1", "hypertension")],
     )
@@ -535,7 +535,7 @@ def test_prechecks_duplicate_concept_rejected() -> None:
 
 
 def test_prechecks_relation_dropped_when_concept_rejected() -> None:
-    """Si un concept est rejeté (L1-sans-code), ses relations doivent aussi être supprimées."""
+    """If a concept is rejected (L1-without-code), its relations must also be removed."""
     batch = _batch(
         taxonomy_concepts=[
             {
@@ -566,7 +566,7 @@ def test_prechecks_relation_dropped_when_concept_rejected() -> None:
 
 
 def test_reassign_ids_concept_format() -> None:
-    """Les concepts doivent recevoir des IDs au format ENRC_{today}_{NNN}."""
+    """Concepts must receive IDs in the format ENRC_{today}_{NNN}."""
     batch = _batch(
         taxonomy_concepts=[_concept("OLD_C1", "hypertension")],
     )
@@ -576,7 +576,7 @@ def test_reassign_ids_concept_format() -> None:
 
 
 def test_reassign_ids_relation_format() -> None:
-    """Les relations doivent recevoir des IDs au format ENRR_{today}_{NNN}."""
+    """Relations must receive IDs in the format ENRR_{today}_{NNN}."""
     batch = _batch(
         ontology_relations=[{**_rel("OLD_R1", "A", "B"), "active": True}],
     )
@@ -586,7 +586,7 @@ def test_reassign_ids_relation_format() -> None:
 
 
 def test_reassign_ids_propagates_concept_id_to_synonyms() -> None:
-    """Le nouvel ID de concept doit être propagé dans les synonymes."""
+    """The new concept ID must be propagated to the synonyms."""
     batch = _batch(
         taxonomy_concepts=[_concept("OLD_C1", "hypertension")],
         taxonomy_synonyms=[
@@ -604,7 +604,7 @@ def test_reassign_ids_propagates_concept_id_to_synonyms() -> None:
 
 
 def test_reassign_ids_propagates_relation_id_to_evidence() -> None:
-    """Le nouvel ID de relation doit être propagé dans les evidences."""
+    """The new relation ID must be propagated to the evidence rows."""
     batch = _batch(
         ontology_relations=[{**_rel("OLD_R1", "A", "B")}],
         ontology_relation_evidence=[
@@ -627,7 +627,7 @@ def test_reassign_ids_propagates_relation_id_to_evidence() -> None:
 
 
 def test_reassign_ids_counter_increments() -> None:
-    """Le compteur doit progresser à travers plusieurs entités."""
+    """The counter must advance across multiple entities."""
     batch = _batch(
         taxonomy_concepts=[_concept("OLD_C1", "a"), _concept("OLD_C2", "b")],
     )
@@ -642,7 +642,7 @@ def test_reassign_ids_counter_increments() -> None:
 
 
 def test_group_missing_concepts_similar_tokens_grouped() -> None:
-    """Deux tokens partageant > 40% des mots (Jaccard) doivent être groupés."""
+    """Two tokens sharing > 40% of their words (Jaccard) must be grouped."""
     missing: list[dict[str, Any]] = [
         {
             "token": "systolic blood pressure",
@@ -660,13 +660,13 @@ def test_group_missing_concepts_similar_tokens_grouped() -> None:
         },
     ]
     groups = enr.group_missing_concepts(missing)
-    # "blood" et "pressure" sont partagés → Jaccard = 2/4 = 0.5 > 0.4
+    # "blood" and "pressure" are shared → Jaccard = 2/4 = 0.5 > 0.4
     assert len(groups) == 1
     assert len(groups[0]) == 2
 
 
 def test_group_missing_concepts_distinct_tokens_separated() -> None:
-    """Deux tokens sans mots communs doivent être dans des groupes séparés."""
+    """Two tokens with no words in common must be in separate groups."""
     missing: list[dict[str, Any]] = [
         {
             "token": "insulin glargine",
@@ -726,7 +726,7 @@ def test_merge_into_appends_lists() -> None:
 
 def test_merge_into_ignores_missing_source_keys() -> None:
     target = {"taxonomy_concepts": [_concept("C1", "a")], "ontology_relations": []}
-    source = {"taxonomy_concepts": [_concept("C2", "b")]}  # pas de 'ontology_relations'
+    source = {"taxonomy_concepts": [_concept("C2", "b")]}  # no 'ontology_relations'
     enr.merge_into(target, source)
     assert len(target["taxonomy_concepts"]) == 2
     assert target["ontology_relations"] == []
@@ -736,7 +736,7 @@ def test_merge_into_ignores_missing_source_keys() -> None:
 
 
 def test_analyze_coverage_detects_path_gap() -> None:
-    """Deux concepts sans relation doivent générer un path gap."""
+    """Two concepts with no relation must produce a path gap."""
     concepts = [_concept("A", "aspirin"), _concept("B", "pain")]
     idx = enr.build_semantic_data(_raw(concepts=concepts))
     questions = [
@@ -751,7 +751,7 @@ def test_analyze_coverage_detects_path_gap() -> None:
 
 
 def test_analyze_coverage_covered_pair() -> None:
-    """Une paire avec chemin direct doit être comptée comme couverte."""
+    """A pair with a direct path must be counted as covered."""
     concepts = [_concept("A", "aspirin"), _concept("B", "pain")]
     rels = [_rel("R1", "A", "B")]
     idx = enr.build_semantic_data(_raw(concepts=concepts, relations=rels))
@@ -768,7 +768,7 @@ def test_analyze_coverage_covered_pair() -> None:
 
 
 def test_analyze_coverage_missing_concept_token() -> None:
-    """Un token non matchable doit apparaître dans missing_concepts."""
+    """A non-matchable token must appear in missing_concepts."""
     idx = enr.build_semantic_data(_raw())
     questions = [
         {

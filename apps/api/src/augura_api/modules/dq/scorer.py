@@ -1,4 +1,4 @@
-"""Scoring DQ — par dimension + global pondéré (MVP dq-scorer.js)."""
+"""DQ scoring — per dimension + weighted overall (MVP dq-scorer.js)."""
 
 from __future__ import annotations
 

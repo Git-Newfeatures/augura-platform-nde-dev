@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module causal."""
+"""HTTP adapter for the causal module."""
 
 from fastapi import APIRouter
 
@@ -18,7 +18,7 @@ async def dag(
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.CausalDagResponse:
-    """DAG causal ancré dans l'ontologie B1, contextualisé par LLM (port de Nico)."""
-    # Client LLM construit après l'auth ⇒ 401 avant 503 si la clé manque.
+    """Causal DAG anchored in the B1 ontology, contextualized by the LLM (port of Nico)."""
+    # LLM client built after auth ⇒ 401 before 503 if the key is missing.
     service = CausalService(SemanticRepo(session), get_anthropic_client(settings), settings)
     return await service.generate(req)

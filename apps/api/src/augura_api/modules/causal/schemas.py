@@ -1,19 +1,19 @@
-"""Schémas Pydantic du module causal — contrat de POST /causal/dag.
+"""Pydantic schemas for the causal module — contract of POST /causal/dag.
 
-Port fidèle de `reference/data-intake-nde/src/causal/{dag-generator,dag-llm-schema}.js`.
-Le DAG est ancré dans l'ontologie B1 (`ontology_relations`) ; le LLM ne fait que
-contextualiser (sélectionner / écarter / assigner les rôles), jamais inventer.
+Faithful port of `reference/data-intake-nde/src/causal/{dag-generator,dag-llm-schema}.js`.
+The DAG is anchored in the B1 ontology (`ontology_relations`); the LLM only
+contextualizes (select / discard / assign roles), it never invents.
 """
 
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# ── Entrée ──────────────────────────────────────────────────────────────────
+# ── Input ─────────────────────────────────────────────────────────────────────
 
 
 class MappedConcept(BaseModel):
-    """Un concept issu du mapping (POST /datasets/{id}/map) présent dans la donnée."""
+    """A concept from the mapping (POST /datasets/{id}/map) present in the data."""
 
     concept_id: str
     concept_label: str = ""
@@ -43,7 +43,7 @@ class CausalDagRequest(BaseModel):
     clinical_question: str | None = None
 
 
-# ── Sortie LLM (port permissif de DAG_FILTER_TOOL — cf. normalizeLLMResult) ──
+# ── LLM output (permissive port of DAG_FILTER_TOOL — cf. normalizeLLMResult) ──
 
 Role = Literal[
     "exposure", "outcome", "confounder", "mediator", "effect_modifier", "collider", "other"
@@ -86,7 +86,7 @@ class ProposedRelation(BaseModel):
 
 
 class DagFilterResult(BaseModel):
-    """Sortie de l'outil `filter_dag_relations`. Champs permissifs + défauts sûrs."""
+    """Output of the `filter_dag_relations` tool. Permissive fields + safe defaults."""
 
     selected_relations: list[SelectedRelation] = []
     excluded_relations: list[ExcludedRelation] = []
@@ -97,7 +97,7 @@ class DagFilterResult(BaseModel):
     llm_reasoning: str = ""
 
 
-# ── Sortie HTTP (port de generateDAG return) ────────────────────────────────
+# ── HTTP output (port of generateDAG return) ────────────────────────────────
 
 
 class DagNode(BaseModel):
@@ -119,7 +119,7 @@ class DagEdge(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: str
-    # 'from' est un mot-clé Python → champ `source`, alias entrée/sortie "from".
+    # 'from' is a Python keyword → field `source`, input/output alias "from".
     source: str = Field(validation_alias="from", serialization_alias="from")
     to: str
     type: Literal["causal", "associative", "temporal"]

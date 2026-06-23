@@ -1,8 +1,8 @@
-"""Logique d'apply de l'enrichissement (B4) — port de api/enrich-apply.js.
+"""Apply logic for enrichment (B4) — port of api/enrich-apply.js.
 
-4 chemins, un seul actif par requête : proposals approuvées (pipeline propose) ·
-direct_relations (relations proposées par le DAG) · deactivate_relation · add_qualifier.
-Tous construisent un (manifest, payload) délégué à SemanticRepo.apply_release.
+4 paths, only one active per request: approved proposals (propose pipeline) ·
+direct_relations (relations proposed by the DAG) · deactivate_relation · add_qualifier.
+All build a (manifest, payload) delegated to SemanticRepo.apply_release.
 """
 
 from typing import Any, Literal, cast
@@ -18,7 +18,7 @@ from augura_api.modules.semantic.repo import SemanticRepo
 
 
 def bump_version(current: str | None, kind: Literal["major", "minor", "patch"]) -> str:
-    """Bump SemVer (port de bumpVersion). Fallback 3.0.0."""
+    """Bump SemVer (port of bumpVersion). Fallback 3.0.0."""
     parts = [int(x) for x in (current or "3.0.0").split(".")]
     major, minor, patch = (parts + [0, 0, 0])[:3]
     if kind == "major":
@@ -42,7 +42,7 @@ def _manifest(version: str, description: str) -> dict[str, Any]:
 def build_direct_relations_payload(
     relations: list[DirectRelationIn], *, version: str, existing_max_rel_n: int, today: str
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Assigne ENRR_{today}_{NNN}, auto-stub evidence, renvoie (payload, id_map)."""
+    """Assigns ENRR_{today}_{NNN}, auto-stubs evidence, returns (payload, id_map)."""
     id_map: dict[str, str] = {}
     rel_rows: list[dict[str, Any]] = []
     ev_rows: list[dict[str, Any]] = []
@@ -82,7 +82,7 @@ def build_direct_relations_payload(
 
 
 class EnrichApplyService:
-    """Orchestre l'apply : choisit le chemin, calcule le bump, délègue au repo."""
+    """Orchestrates the apply: picks the path, computes the bump, delegates to the repo."""
 
     def __init__(self, repo: SemanticRepo) -> None:
         self.repo = repo
@@ -100,7 +100,7 @@ class EnrichApplyService:
             return await self._direct_relations(req.direct_relations, current, today)
         if req.proposals:
             return await self._proposals(req, current)
-        raise BadRequestError("aucun chemin d'apply renseigné")
+        raise BadRequestError("no apply path provided")
 
     async def _direct_relations(
         self, relations: list[DirectRelationIn], current: str, today: str
@@ -114,7 +114,7 @@ class EnrichApplyService:
         if not valid:
             unknown = sorted(all_ids - known)
             raise BadRequestError(
-                "aucune relation ne référence des concepts existants",
+                "no relation references existing concepts",
                 unknown_concept_ids=unknown,
             )
         relations = valid
@@ -136,7 +136,7 @@ class EnrichApplyService:
     async def _deactivate(self, relation_id: str, current: str) -> EnrichApplyResponse:
         existing = await self.repo.get_relation_row(relation_id)
         if existing is None:
-            raise NotFoundError("relation introuvable", relation_id=relation_id)
+            raise NotFoundError("relation not found", relation_id=relation_id)
         new_version = bump_version(current, "patch")
         row: dict[str, Any] = {
             **existing,
@@ -156,7 +156,7 @@ class EnrichApplyService:
         self, q: AddQualifierIn, current: str, today: str
     ) -> EnrichApplyResponse:
         if await self.repo.get_relation_row(q.relation_id) is None:
-            raise NotFoundError("relation introuvable", relation_id=q.relation_id)
+            raise NotFoundError("relation not found", relation_id=q.relation_id)
         new_version = bump_version(current, "patch")
         max_n = await self.repo.max_qualifier_seq(today)
         row: dict[str, Any] = {
@@ -178,14 +178,14 @@ class EnrichApplyService:
         )
 
     async def _proposals(self, req: EnrichApplyRequest, current: str) -> EnrichApplyResponse:
-        # Port de enrich-apply.js:262-345 — filtre les rows sélectionnés + cascade enfants,
-        # stampe approved/active, bump minor si concepts sinon patch.
+        # Port of enrich-apply.js:262-345 — filters selected rows + cascades children,
+        # stamps approved/active, minor bump if concepts else patch.
         p: dict[str, Any] = req.proposals or {}
         csel = set(req.selected_concept_ids)
         rsel = set(req.selected_relation_ids)
 
         def _dicts(key: str) -> list[dict[str, Any]]:
-            """Extrait les items dict[str, Any] d'une liste brute du payload."""
+            """Extracts the dict[str, Any] items from a raw payload list."""
             return [cast(dict[str, Any], row) for row in p.get(key, []) if isinstance(row, dict)]
 
         all_concepts = _dicts("taxonomy_concepts")
@@ -193,7 +193,7 @@ class EnrichApplyService:
         concepts = [c for c in all_concepts if c.get("local_concept_id") in csel]
         relations = [r for r in all_relations if r.get("relation_id") in rsel]
         if not concepts and not relations:
-            raise BadRequestError("aucun concept/relation approuvé à appliquer")
+            raise BadRequestError("no approved concept/relation to apply")
         cset = {c["local_concept_id"] for c in concepts}
         rset = {r["relation_id"] for r in relations}
         kind: Literal["minor", "patch"] = "minor" if concepts else "patch"

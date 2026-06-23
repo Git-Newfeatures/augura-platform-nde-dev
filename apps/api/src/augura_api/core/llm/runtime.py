@@ -1,8 +1,8 @@
-"""Runtime d'agents structurés (port typé de agents/runtime/anthropic.js).
+"""Structured-agent runtime (typed port of agents/runtime/anthropic.js).
 
-Pattern : tool_choice forcé → extraction de l'input outil → validation Pydantic
-→ 1 retry « réparation » avec l'erreur injectée (spec §9), puis échec franc.
-Le client LLM est injecté (Protocol) : les tests tournent à LLM mocké, sans clé.
+Pattern: forced tool_choice → extraction of the tool input → Pydantic validation
+→ 1 "repair" retry with the error injected (spec §9), then outright failure.
+The LLM client is injected (Protocol): tests run against a mocked LLM, without a key.
 """
 
 from collections.abc import Sequence
@@ -56,9 +56,9 @@ class ChatResult:
 
 def get_anthropic_client(settings: Settings) -> LLMClient:
     if settings.anthropic_api_key is None:
-        raise AgentUpstreamError("ANTHROPIC_API_KEY manquant")
-    # AsyncAnthropic.messages a une signature surchargée que pyright ne réconcilie
-    # pas avec le Protocol minimal LLMMessages ; le cast assume cette frontière.
+        raise AgentUpstreamError("ANTHROPIC_API_KEY missing")
+    # AsyncAnthropic.messages has an overloaded signature that pyright does not reconcile
+    # with the minimal LLMMessages Protocol; the cast assumes responsibility for that boundary.
     return cast(LLMClient, anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key))
 
 
@@ -88,14 +88,14 @@ async def run_structured_agent[T: BaseModel](
                 messages=convo,
             )
         except anthropic.APIError as exc:
-            raise AgentUpstreamError("appel LLM en échec", model=model, reason=str(exc)) from exc
+            raise AgentUpstreamError("LLM call failed", model=model, reason=str(exc)) from exc
 
         block = next(
             (b for b in resp.content if isinstance(b, ToolUseBlock) and b.name == tool_name),
             None,
         )
         if block is None:
-            raise AgentInvalidOutput("aucune sortie outil", model=model)
+            raise AgentInvalidOutput("no tool output", model=model)
 
         try:
             output = output_model.model_validate(block.input)
@@ -121,7 +121,7 @@ async def run_structured_agent[T: BaseModel](
                             "type": "tool_result",
                             "tool_use_id": block.id,
                             "content": (
-                                f"Validation échouée: {exc}. Renvoie une sortie outil corrigée."
+                                f"Validation failed: {exc}. Return a corrected tool output."
                             ),
                             "is_error": True,
                         }
@@ -137,9 +137,7 @@ async def run_structured_agent[T: BaseModel](
             output_tokens=resp.usage.output_tokens,
         )
 
-    raise AgentInvalidOutput(
-        "sortie outil invalide après réparation", model=model, error=str(last_error)
-    )
+    raise AgentInvalidOutput("invalid tool output after repair", model=model, error=str(last_error))
 
 
 async def run_chat(
@@ -150,9 +148,9 @@ async def run_chat(
     messages: Sequence[MessageParam],
     max_tokens: int = 1024,
 ) -> ChatResult:
-    """Chat libre (sans outil forcé) — passerelle pour l'assistant inline du front.
-    Concatène les blocs texte de la réponse. Lève AgentUpstreamError (503) sur panne LLM
-    (et get_anthropic_client lève déjà 503 si la clé manque)."""
+    """Free chat (without a forced tool) — gateway for the frontend's inline assistant.
+    Concatenates the response's text blocks. Raises AgentUpstreamError (503) on LLM outage
+    (and get_anthropic_client already raises 503 if the key is missing)."""
     try:
         resp = await client.messages.create(
             model=model,
@@ -161,7 +159,7 @@ async def run_chat(
             messages=list(messages),
         )
     except anthropic.APIError as exc:
-        raise AgentUpstreamError("appel LLM en échec", model=model, reason=str(exc)) from exc
+        raise AgentUpstreamError("LLM call failed", model=model, reason=str(exc)) from exc
 
     text = "".join(b.text for b in resp.content if isinstance(b, TextBlock))
     return ChatResult(

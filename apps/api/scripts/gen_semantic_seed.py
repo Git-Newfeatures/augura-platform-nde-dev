@@ -1,8 +1,8 @@
-"""Génère le SQL de seed de la taxonomie sémantique depuis les CSV du MVP.
+"""Generate the semantic-taxonomy seed SQL from the MVP CSVs.
 
 Usage: python scripts/gen_semantic_seed.py <csv_dir> > seed_fragment.sql
-Déterministe : colonnes citées, valeurs échappées, vides → NULL, bool/num non quotés.
-Le fragment produit est destiné à être collé dans supabase/seed.sql.
+Deterministic: quoted columns, escaped values, empties → NULL, bool/num unquoted.
+The produced fragment is meant to be pasted into supabase/seed.sql.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import csv
 import sys
 from pathlib import Path
 
-# Colonnes booléennes et numériques par table (le reste = texte). Aligne avec le DDL.
+# Boolean and numeric columns per table (the rest = text). Keep aligned with the DDL.
 BOOL_COLS: dict[str, set[str]] = {
     "taxonomy_concepts": {"active"},
     "table_archetypes": {"is_surrogate", "active"},
@@ -25,8 +25,8 @@ NUM_COLS: dict[str, set[str]] = {
     "table_archetypes": {"semantic_score"},
     "unit_conversions": {"scale_factor", "offset", "precision"},
 }
-# Ordre d'insertion (FK : concepts d'abord, puis causal_predicates avant
-# ontology_relations, puis evidence/qualifiers).
+# Insertion order (FK: concepts first, then causal_predicates before
+# ontology_relations, then evidence/qualifiers).
 TABLES = [
     "taxonomy_concepts",
     "taxonomy_synonyms",
@@ -35,7 +35,7 @@ TABLES = [
     "unit_conversions",
     "table_archetypes",
     "dq_constraints",
-    # Ontologie/causal (B1)
+    # Ontology/causal (B1)
     "taxonomy_standard_codes",
     "taxonomy_therapeutic_areas",
     "taxonomy_relationships",
@@ -77,7 +77,7 @@ def main() -> None:
     for table in TABLES:
         csv_path = csv_dir / f"{table}.csv"
         if not csv_path.exists():
-            print(f"-- WARNING: {csv_path} absent, table {table} non seedée", file=sys.stderr)
+            print(f"-- WARNING: {csv_path} missing, table {table} not seeded", file=sys.stderr)
             continue
         out.append(f"-- {table}")
         out.append(rows_to_sql(table, csv_path))

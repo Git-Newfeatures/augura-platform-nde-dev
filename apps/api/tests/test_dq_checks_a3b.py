@@ -1,4 +1,4 @@
-"""Tests des checks DQ A3b (file/column/table data-only)."""
+"""Tests for the DQ A3b checks (file/column/table data-only)."""
 
 from augura_api.modules.dq.engine import run_dq
 from augura_api.modules.dq.profiler import profile_column

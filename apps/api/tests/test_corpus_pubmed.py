@@ -1,4 +1,4 @@
-"""NCBIPubMedClient : esearch + efetch + parsing XML, sans réseau (httpx MockTransport)."""
+"""NCBIPubMedClient: esearch + efetch + XML parsing, no network (httpx MockTransport)."""
 
 from datetime import date
 from datetime import date as _date
@@ -80,8 +80,8 @@ async def test_search_parses_articles() -> None:
     assert rct.journal == "JAMA Network Open"
 
     assert review.evidence_type == "review"
-    assert review.published_at == date(2021, 1, 1)  # année seule → 1er janvier
-    assert review.url == "https://pubmed.ncbi.nlm.nih.gov/222/"  # pas de DOI → lien PubMed
+    assert review.published_at == date(2021, 1, 1)  # year only → January 1st
+    assert review.url == "https://pubmed.ncbi.nlm.nih.gov/222/"  # no DOI → PubMed link
 
 
 async def test_search_empty_when_no_pmids() -> None:

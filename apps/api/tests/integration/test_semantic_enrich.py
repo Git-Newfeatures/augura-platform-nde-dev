@@ -1,8 +1,8 @@
-"""Intégration : write-path d'enrichissement via upsert_semantic_release.
+"""Integration: enrichment write-path via upsert_semantic_release.
 
-Écrit une relation jetable VIA la fonction SECURITY DEFINER (le rôle app n'a pas
-le write direct) et vérifie qu'elle est persistée + que la release courante bascule.
-Cible une base jetable / le Postgres éphémère de CI (cf. conftest garde-fou).
+Writes a throwaway relation VIA the SECURITY DEFINER function (the app role has no
+direct write) and verifies it is persisted + that the current release switches over.
+Targets a throwaway database / the CI ephemeral Postgres (see conftest guard).
 """
 
 import os
@@ -26,7 +26,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def sm() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
@@ -48,7 +48,7 @@ async def test_apply_release_writes_relation_and_bumps_current(
         await _scope(session, tenant, USER)
         repo = SemanticRepo(session)
         concepts = await repo.list_concepts()
-        assert len(concepts) >= 2, "le seed sémantique doit être présent"
+        assert len(concepts) >= 2, "the semantic seed must be present"
         subj, obj = concepts[0].local_concept_id, concepts[1].local_concept_id
         pred = (await repo.list_causal_predicates())[0].predicate_id
 

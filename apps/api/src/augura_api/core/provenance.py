@@ -1,9 +1,9 @@
-"""Hachage canonique des artefacts (colonne vertébrale reproductibilité, spec §1-2).
+"""Canonical hashing of artifacts (reproducibility backbone, spec §1-2).
 
-La reproductibilité vient d'artefacts *versionnés + hashés*, jamais d'un re-run
-stochastique. Le hash est déterministe et indépendant du moteur (LLM/langage) :
-même contenu → même SHA-256, à jamais. Module `core` (pur, sans I/O) ⇒ importable
-partout et testable sans base.
+Reproducibility comes from *versioned + hashed* artifacts, never from a stochastic
+re-run. The hash is deterministic and engine-independent (LLM/language):
+same content → same SHA-256, forever. `core` module (pure, no I/O) ⇒ importable
+everywhere and testable without a database.
 """
 
 import hashlib
@@ -12,8 +12,8 @@ from typing import Any
 
 
 def canonical_json(content: Any) -> str:
-    """Sérialisation canonique : clés triées, séparateurs compacts, UTF-8 conservé.
-    Deux contenus sémantiquement égaux produisent la même chaîne (donc le même hash)."""
+    """Canonical serialization: sorted keys, compact separators, UTF-8 preserved.
+    Two semantically equal contents produce the same string (hence the same hash)."""
     return json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
@@ -22,5 +22,5 @@ def sha256_hex(text: str) -> str:
 
 
 def content_hash(content: Any) -> str:
-    """SHA-256 du contenu canonicalisé — l'empreinte d'un artefact."""
+    """SHA-256 of the canonicalized content — the fingerprint of an artifact."""
     return sha256_hex(canonical_json(content))

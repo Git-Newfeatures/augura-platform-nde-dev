@@ -1,4 +1,4 @@
-"""Accès base du module mapping — met à jour les propositions sur dataset_columns."""
+"""Database access for the mapping module — updates proposals on dataset_columns."""
 
 from uuid import UUID
 

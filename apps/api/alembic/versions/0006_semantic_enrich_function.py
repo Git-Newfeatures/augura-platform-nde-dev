@@ -1,8 +1,8 @@
-"""upsert_semantic_release : write-path d'enrichissement de la couche sémantique (B4)
+"""upsert_semantic_release: semantic-layer enrichment write-path (B4)
 
-Fonction SECURITY DEFINER : le rôle applicatif (RLS FOR SELECT) écrit l'ontologie
-globale EXCLUSIVEMENT via elle. Idempotente (CREATE OR REPLACE + grant conditionnel),
-vit aussi dans le bundle canonique functions.sql exécuté par 0001_baseline.
+SECURITY DEFINER function: the application role (RLS FOR SELECT) writes the global
+ontology EXCLUSIVELY through it. Idempotent (CREATE OR REPLACE + conditional grant),
+also lives in the canonical bundle functions.sql executed by 0001_baseline.
 
 Revision ID: 0006_semantic_enrich_function
 Revises: 0005_semantic_release
@@ -18,9 +18,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 _FUNCTION_SQL = r"""
--- NB : le propriétaire de cette fonction doit être un rôle BYPASSRLS/privilégié
--- (service_role Supabase) pour que SECURITY DEFINER puisse écrire les catalogues
--- gouvernés malgré leur RLS FORCE … FOR SELECT.
+-- NB: the owner of this function must be a BYPASSRLS/privileged role
+-- (Supabase service_role) so that SECURITY DEFINER can write the governed
+-- catalogs despite their RLS FORCE … FOR SELECT.
 create or replace function public.upsert_semantic_release(
   p_manifest jsonb,
   p_payload jsonb
@@ -34,10 +34,10 @@ declare
   v_version text := p_manifest->>'semantic_release_version';
 begin
   if coalesce(v_version, '') = '' then
-    raise exception 'semantic_release_version requis dans le manifest';
+    raise exception 'semantic_release_version required in the manifest';
   end if;
 
-  -- Concepts d'abord (cible FK des relations / synonyms / codes).
+  -- Concepts first (FK target of relations / synonyms / codes).
   insert into public.taxonomy_concepts
     select * from jsonb_populate_recordset(
       null::public.taxonomy_concepts,
@@ -128,7 +128,7 @@ begin
       is_hard_constraint = excluded.is_hard_constraint,
       notes = excluded.notes;
 
-  -- Bascule la release courante (append-only, une seule is_current).
+  -- Switch the current release (append-only, a single is_current).
   update public.semantic_releases set is_current = false where is_current;
   insert into public.semantic_releases (
     semantic_release_version, taxonomy_version, causal_ontology_version,
@@ -161,9 +161,9 @@ end;
 $$;
 
 revoke all on function public.upsert_semantic_release(jsonb, jsonb) from public;
--- Grant au rôle-groupe augura_app (augura_api en hérite via `grant augura_app to augura_api`,
--- cf. policies.sql) : c'est le rôle que portent le runtime ET les tests d'intégration.
--- Conditionnel car le rôle peut manquer sur un Postgres vierge avant policies.sql.
+-- Grant to the group role augura_app (augura_api inherits it via `grant augura_app to augura_api`,
+-- see policies.sql): it is the role carried by both the runtime AND the integration tests.
+-- Conditional because the role may be missing on a fresh Postgres before policies.sql.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'augura_app') then
     execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_app';

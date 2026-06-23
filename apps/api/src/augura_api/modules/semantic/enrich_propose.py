@@ -1,16 +1,16 @@
-"""Orchestration LLM pour la proposition d'enrichissement sémantique (B4).
+"""LLM orchestration for semantic enrichment proposal (B4).
 
-Port de lucis-dashboard/api/enrich-propose.js :
-  - PROPOSAL_TOOL : schéma d'entrée outil (enums depuis vocab.py).
-  - build_system_prompt : prompt système.
-  - propose : orchestration en 4 batches (selectedConcepts / concepts manquants /
-    lacunes de chemin / bootstrap bootstrap), préchecks, fusion, tampon.
+Port of lucis-dashboard/api/enrich-propose.js:
+  - PROPOSAL_TOOL: tool input schema (enums from vocab.py).
+  - build_system_prompt: system prompt.
+  - propose: orchestration over 4 batches (selectedConcepts / missing concepts /
+    path gaps / bootstrap), prechecks, merge, stamp.
 
-L'I/O DB et SSE sont remplacés par :
-  - `bundle` (données sémantiques brutes passées en argument)
-  - `on_progress` (callback async de reporting de progression 0..1)
+DB I/O and SSE are replaced by:
+  - `bundle` (raw semantic data passed as an argument)
+  - `on_progress` (async callback for progress reporting 0..1)
 
-Les helpers purs viennent de `enrichment.py` ; les enums de `vocab.py`.
+The pure helpers come from `enrichment.py`; the enums from `vocab.py`.
 """
 
 from __future__ import annotations
@@ -26,14 +26,14 @@ from pydantic import BaseModel
 from augura_api.core.llm.runtime import LLMClient, run_structured_agent
 from augura_api.modules.semantic import enrichment, vocab
 
-# ── Modèle de sortie LLM (permissif — validation réelle dans apply_prechecks) ─
+# ── LLM output model (permissive — real validation in apply_prechecks) ─────────
 
 
 class ProposalBatch(BaseModel):
-    """Batch de propositions retourné par le LLM.
+    """Batch of proposals returned by the LLM.
 
-    Permissif (``list[dict]``) : la validation structurelle fine se fait dans
-    ``apply_prechecks``, pas à la frontière LLM, conformément au JS source.
+    Permissive (``list[dict]``): the fine-grained structural validation happens in
+    ``apply_prechecks``, not at the LLM boundary, consistent with the JS source.
     """
 
     taxonomy_concepts: list[dict[str, Any]] = []
@@ -44,7 +44,7 @@ class ProposalBatch(BaseModel):
     ontology_relation_qualifiers: list[dict[str, Any]] = []
 
 
-# ── Schéma de l'outil LLM (ce que l'IA voit) ──────────────────────────────────
+# ── LLM tool schema (what the AI sees) ─────────────────────────────────────────
 
 PROPOSAL_TOOL: ToolParam = {
     "name": "propose_enrichment_batch",
@@ -255,13 +255,13 @@ PROPOSAL_TOOL: ToolParam = {
 }
 
 
-# ── Prompt système ─────────────────────────────────────────────────────────────
+# ── System prompt ────────────────────────────────────────────────────────────
 
 
 def build_system_prompt(predicate_list: str, existing_concepts_sample: str) -> str:
-    """Construit le prompt système pour le LLM.
+    """Builds the system prompt for the LLM.
 
-    Port de ``buildSystemPrompt()`` dans enrich-propose.js.
+    Port of ``buildSystemPrompt()`` in enrich-propose.js.
     """
     return (
         "You are a clinical knowledge engineer building a causal ontology for MedTech"
@@ -310,15 +310,15 @@ def build_system_prompt(predicate_list: str, existing_concepts_sample: str) -> s
     )
 
 
-# ── Helpers internes ──────────────────────────────────────────────────────────
+# ── Internal helpers ─────────────────────────────────────────────────────────
 
 
 def _extract_n(concept_id: str, prefix: str, today: str) -> int:
-    """Extrait le numéro séquentiel d'un identifiant du jour.
+    """Extracts the sequential number from a current-day identifier.
 
-    Ex. : ``_extract_n("ENRC_20260619_007", "ENRC", "20260619")`` → ``7``.
-    Retourne 0 si l'ID ne correspond pas au pattern du jour.
-    Port fidèle de la lambda JS ``extractN`` dans enrich-propose.js.
+    E.g.: ``_extract_n("ENRC_20260619_007", "ENRC", "20260619")`` → ``7``.
+    Returns 0 if the ID does not match the current-day pattern.
+    Faithful port of the JS lambda ``extractN`` in enrich-propose.js.
     """
     p = f"{prefix}_{today}_"
     if not concept_id or not concept_id.startswith(p):
@@ -335,10 +335,10 @@ def _seed_id_counters(
     existing_rel_ids: list[str],
     today: str,
 ) -> dict[str, int]:
-    """Initialise les compteurs d'IDs au-delà des IDs existants du jour.
+    """Initializes the ID counters beyond the existing current-day IDs.
 
-    Évite les collisions avec des IDs déjà appliqués à la DB ce même jour.
-    Port de la logique ``maxConceptN / maxRelationN`` dans enrich-propose.js.
+    Avoids collisions with IDs already applied to the DB on the same day.
+    Port of the ``maxConceptN / maxRelationN`` logic in enrich-propose.js.
     """
     max_concept = max(
         (_extract_n(cid, "ENRC", today) for cid in existing_concept_ids),
@@ -359,7 +359,7 @@ async def _call_llm(
     user_message: str,
     max_tokens: int = 8192,
 ) -> dict[str, Any]:
-    """Appelle le LLM et retourne un batch normalisé (dict à 6 clés)."""
+    """Calls the LLM and returns a normalized batch (dict with 6 keys)."""
     result = await run_structured_agent(
         client,
         model=model,
@@ -372,7 +372,7 @@ async def _call_llm(
     return result.output.model_dump()
 
 
-# ── Point d'entrée public ──────────────────────────────────────────────────────
+# ── Public entrypoint ──────────────────────────────────────────────────────────
 
 
 async def propose(
@@ -384,21 +384,21 @@ async def propose(
     selected_concepts: list[dict[str, Any]] | None,
     on_progress: Callable[[float, str], Awaitable[None]],
 ) -> dict[str, Any]:
-    """Orchestre la proposition d'enrichissement sémantique.
+    """Orchestrates the semantic enrichment proposal.
 
-    Renvoie un dict ``{proposals, coverage_summary, precheck_log, summary}``.
+    Returns a dict ``{proposals, coverage_summary, precheck_log, summary}``.
 
-    - ``proposals`` : dict à 6 clés (tables) après ``stamp_rows``.
-    - ``coverage_summary`` : résumé de couverture (None pour le raccourci
-      selectedConcepts, conformément à la spec).
-    - ``precheck_log`` : liste de messages de préchecks.
-    - ``summary`` : comptage par table.
+    - ``proposals``: dict with 6 keys (tables) after ``stamp_rows``.
+    - ``coverage_summary``: coverage summary (None for the selectedConcepts
+      shortcut, consistent with the spec).
+    - ``precheck_log``: list of precheck messages.
+    - ``summary``: per-table count.
 
-    Port de l'handler principal de enrich-propose.js.
+    Port of the main handler of enrich-propose.js.
     """
     today = datetime.now(UTC).strftime("%Y%m%d")
 
-    # ── Construction des index sémantiques ────────────────────────────────────
+    # ── Building the semantic indexes ──────────────────────────────────────────
     sem = enrichment.build_semantic_data(bundle)
 
     existing_concept_ids: set[str] = {c["id"] for c in sem.concept_index}
@@ -434,13 +434,13 @@ async def propose(
     precheck_log: list[str] = []
 
     # ══════════════════════════════════════════════════════════════════════════
-    # Raccourci selectedConcepts
+    # selectedConcepts shortcut
     # ══════════════════════════════════════════════════════════════════════════
     if selected_concepts and len(selected_concepts) > 0:
-        await on_progress(0.1, "Chargement du store sémantique…")
+        await on_progress(0.1, "Loading the semantic store…")
         await on_progress(
             0.2,
-            f"Chargé : {len(sem.concept_index)} concepts, {len(sem.ontology.relations)} relations",
+            f"Loaded: {len(sem.concept_index)} concepts, {len(sem.ontology.relations)} relations",
         )
 
         iv_domains = {"therapeutics", "device", "procedure"}
@@ -460,8 +460,7 @@ async def propose(
 
         await on_progress(
             0.5,
-            f"Proposition de relations causales pour {len(selected_concepts)}"
-            " concept(s) sélectionné(s)…",
+            f"Proposing causal relations for {len(selected_concepts)} selected concept(s)…",
         )
 
         try:
@@ -492,7 +491,7 @@ async def propose(
             )
         except Exception as exc:
             precheck_log.append(f"  ERROR relation proposal: {exc}")
-            await on_progress(0.9, f"⚠ Proposition de relations échouée : {exc}")
+            await on_progress(0.9, f"⚠ Relation proposal failed: {exc}")
             batch = ProposalBatch().model_dump()
 
         enrichment.reassign_ids(batch, id_counters, today)
@@ -510,7 +509,7 @@ async def propose(
         enrichment.merge_into(all_proposals, batch)
 
         enrichment.stamp_rows(all_proposals, "pending")
-        await on_progress(1.0, "Terminé.")
+        await on_progress(1.0, "Done.")
 
         summary = {k: len(v) for k, v in all_proposals.items()}
         return {
@@ -521,19 +520,19 @@ async def propose(
         }
 
     # ══════════════════════════════════════════════════════════════════════════
-    # Flux complet : Phase 2 (couverture) + Phase 3 (batches de propositions)
+    # Full flow: Phase 2 (coverage) + Phase 3 (proposal batches)
     # ══════════════════════════════════════════════════════════════════════════
     if not questions:
-        raise ValueError("questions ou selected_concepts est obligatoire")
+        raise ValueError("questions or selected_concepts is required")
 
-    await on_progress(0.0, "Chargement du store sémantique…")
+    await on_progress(0.0, "Loading the semantic store…")
     await on_progress(
         0.05,
-        f"Chargé : {len(sem.concept_index)} concepts, {len(sem.ontology.relations)} relations",
+        f"Loaded: {len(sem.concept_index)} concepts, {len(sem.ontology.relations)} relations",
     )
 
-    # Phase 2 — analyse de couverture
-    await on_progress(0.1, f"Analyse de couverture pour {len(questions)} questions PICOT…")
+    # Phase 2 — coverage analysis
+    await on_progress(0.1, f"Coverage analysis for {len(questions)} PICOT questions…")
     coverage = enrichment.analyze_coverage(
         questions, sem.concept_index, sem.syn_lookup, sem.ontology
     )
@@ -541,37 +540,37 @@ async def propose(
     await on_progress(
         0.15,
         (
-            f"Couverture : {cov_summary['pairs_covered_pct']}% — "
-            f"{cov_summary['missing_concept_tokens']} tokens manquants, "
-            f"{len(coverage['path_gaps'])} lacunes de chemin"
+            f"Coverage: {cov_summary['pairs_covered_pct']}% — "
+            f"{cov_summary['missing_concept_tokens']} missing tokens, "
+            f"{len(coverage['path_gaps'])} path gaps"
         ),
     )
 
     missing_concepts: list[dict[str, Any]] = coverage["missing_concepts"]
     path_gaps: list[dict[str, Any]] = coverage["path_gaps"]
 
-    # Estimations de fraction pour la progression
-    # Batch 1 : 0.15 → 0.50 ; Batch 2 : 0.50 → 0.75 ; Batch 3 : 0.75 → 0.95
+    # Fraction estimates for the progress reporting
+    # Batch 1: 0.15 → 0.50; Batch 2: 0.50 → 0.75; Batch 3: 0.75 → 0.95
     b1_groups = enrichment.group_missing_concepts(missing_concepts) if missing_concepts else []
     n_b1 = math.ceil(len(b1_groups) / 20) if b1_groups else 0
     n_b2 = math.ceil(len(path_gaps) / 5) if path_gaps else 0
 
-    batch_index = 0  # numéro global de sous-batch traité
+    batch_index = 0  # global index of the processed sub-batch
 
     def _progress_frac() -> float:
-        """Fraction 0..1 estimée à partir du nombre de batches traités."""
+        """Fraction 0..1 estimated from the number of processed batches."""
         total = n_b1 + n_b2 + (1 if missing_concepts else 0)
         if total == 0:
             return 0.5
         done = min(batch_index, total)
         return 0.15 + (done / total) * 0.80
 
-    # ── Batch 1 : concepts manquants ──────────────────────────────────────────
+    # ── Batch 1: missing concepts ──────────────────────────────────────────────
     if missing_concepts:
         total_b1 = n_b1 or 1
         await on_progress(
             0.15,
-            f"Proposition de concepts pour {len(missing_concepts)} tokens non couverts "
+            f"Proposing concepts for {len(missing_concepts)} uncovered tokens "
             f"({total_b1} batch{'es' if total_b1 != 1 else ''})…",
         )
 
@@ -587,7 +586,7 @@ async def propose(
                 for group in batch_groups
             )
 
-            await on_progress(_progress_frac(), f"  Batch concepts {batch_num}/{total_b1}…")
+            await on_progress(_progress_frac(), f"  Concepts batch {batch_num}/{total_b1}…")
 
             try:
                 batch = await _call_llm(
@@ -608,15 +607,13 @@ async def propose(
                 )
             except Exception as exc:
                 precheck_log.append(f"  ERROR concept batch {batch_num}: {exc}")
-                await on_progress(
-                    _progress_frac(), f"  ⚠ Batch concepts {batch_num} échoué : {exc}"
-                )
+                await on_progress(_progress_frac(), f"  ⚠ Concepts batch {batch_num} failed: {exc}")
                 batch_index += 1
                 continue
 
             enrichment.reassign_ids(batch, id_counters, today)
 
-            # Injection du token original comme synonyme (garantit le match futur)
+            # Injection of the original token as a synonym (guarantees the future match)
             for gi, group in enumerate(batch_groups):
                 concept = (
                     batch["taxonomy_concepts"][gi] if gi < len(batch["taxonomy_concepts"]) else None
@@ -640,7 +637,7 @@ async def propose(
                             }
                         )
 
-            # Préchecks : on ne passe que concepts/synonymes/codes (pas les relations)
+            # Prechecks: only concepts/synonyms/codes are passed (not the relations)
             checked: dict[str, Any] = {
                 **batch,
                 "ontology_relations": [],
@@ -666,17 +663,17 @@ async def propose(
 
             await on_progress(
                 _progress_frac(),
-                f"  Concepts jusqu'ici : {len(all_proposals['taxonomy_concepts'])}",
+                f"  Concepts so far: {len(all_proposals['taxonomy_concepts'])}",
             )
             batch_index += 1
 
-    # ── Batch 2 : lacunes de chemin ───────────────────────────────────────────
+    # ── Batch 2: path gaps ─────────────────────────────────────────────────────
     if path_gaps:
         batch_size = 5
         total_b2 = n_b2 or 1
         await on_progress(
             _progress_frac(),
-            f"Proposition de relations pour {len(path_gaps)} lacunes de chemin "
+            f"Proposing relations for {len(path_gaps)} path gaps "
             f"({total_b2} batch{'es' if total_b2 != 1 else ''})…",
         )
 
@@ -711,7 +708,7 @@ async def propose(
                 )
                 new_concepts_ctx = f"\nNewly proposed concepts available:\n{lines}"
 
-            await on_progress(_progress_frac(), f"  Batch relations {batch_num}/{total_b2}…")
+            await on_progress(_progress_frac(), f"  Relations batch {batch_num}/{total_b2}…")
 
             try:
                 batch = await _call_llm(
@@ -730,7 +727,7 @@ async def propose(
             except Exception as exc:
                 precheck_log.append(f"  ERROR gap batch {batch_num}: {exc}")
                 await on_progress(
-                    _progress_frac(), f"  ⚠ Batch relations {batch_num} échoué : {exc}"
+                    _progress_frac(), f"  ⚠ Relations batch {batch_num} failed: {exc}"
                 )
                 batch_index += 1
                 continue
@@ -755,13 +752,13 @@ async def propose(
 
             await on_progress(
                 _progress_frac(),
-                f"  Relations jusqu'ici : {len(all_proposals['ontology_relations'])}",
+                f"  Relations so far: {len(all_proposals['ontology_relations'])}",
             )
             batch_index += 1
 
-    # ── Batch 3 : bootstrap des relations pour les nouveaux concepts ──────────
+    # ── Batch 3: bootstrap relations for the new concepts ──────────────────────
     if all_proposals["taxonomy_concepts"]:
-        # IDs côté intervention (phrases PICOT matchées + nouveaux concepts IV)
+        # Intervention-side IDs (matched PICOT phrases + new IV concepts)
         intervention_concept_ids: list[str] = []
         for q in questions:
             iv_phrases = list(q.get("picot", {}).get("intervention") or []) + list(
@@ -775,7 +772,7 @@ async def propose(
             if c.get("augura_domain") in {"therapeutics", "device", "procedure"}:
                 intervention_concept_ids.append(c["local_concept_id"])
 
-        # IDs côté outcome
+        # Outcome-side IDs
         outcome_concept_ids: list[str] = []
         for q in questions:
             out_phrases = list(q.get("picot", {}).get("outcome") or [])
@@ -820,8 +817,8 @@ async def propose(
 
             await on_progress(
                 0.80,
-                f"Proposition de relations bootstrap pour"
-                f" {len(all_proposals['taxonomy_concepts'])} nouveau(x) concept(s)…",
+                f"Proposing bootstrap relations for"
+                f" {len(all_proposals['taxonomy_concepts'])} new concept(s)…",
             )
 
             try:
@@ -846,7 +843,7 @@ async def propose(
                 )
             except Exception as exc:
                 precheck_log.append(f"  ERROR bootstrap batch: {exc}")
-                await on_progress(0.85, f"  ⚠ Batch bootstrap échoué : {exc}")
+                await on_progress(0.85, f"  ⚠ Bootstrap batch failed: {exc}")
                 batch = ProposalBatch().model_dump()
 
             enrichment.reassign_ids(batch, id_counters, today)
@@ -866,12 +863,12 @@ async def propose(
 
             await on_progress(
                 0.90,
-                f"  Relations bootstrap : {len(all_proposals['ontology_relations'])} au total",
+                f"  Bootstrap relations: {len(all_proposals['ontology_relations'])} in total",
             )
 
-    # ── Finalisation ──────────────────────────────────────────────────────────
+    # ── Finalization ───────────────────────────────────────────────────────────
     enrichment.stamp_rows(all_proposals, "pending")
-    await on_progress(1.0, "Terminé.")
+    await on_progress(1.0, "Done.")
 
     summary = {k: len(v) for k, v in all_proposals.items()}
     return {

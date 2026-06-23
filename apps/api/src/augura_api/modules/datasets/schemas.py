@@ -1,4 +1,4 @@
-"""Contrat public du module datasets (+ cohortes lues par le front)."""
+"""Public contract of the datasets module (+ cohorts read by the frontend)."""
 
 from datetime import datetime
 from typing import Any
@@ -16,9 +16,9 @@ class DatasetOut(BaseModel):
     study_id: UUID | None = None
     storage_path: str | None = None
     row_count: int | None = None
-    # Nombre de colonnes profilées (table dataset_columns, même module). Le libellé
-    # d'étude est résolu côté front via study_id : l'indépendance datasets↔studies
-    # (import-linter) interdit un JOIN sur studies ici.
+    # Number of profiled columns (dataset_columns table, same module). The study
+    # label is resolved on the frontend via study_id: the datasets↔studies
+    # independence (import-linter) forbids a JOIN on studies here.
     column_count: int = 0
     created_at: datetime
 
@@ -130,9 +130,10 @@ class CohortBiomarkerIn(BaseModel):
 
 
 class CohortImportRequest(BaseModel):
-    """Ingestion d'une cohorte longitudinale (members + biomarkers). Remplace toute
-    cohorte existante de même nom pour le tenant. C'est la voie d'écriture qui manquait
-    aux tables cohort_members / cohort_biomarkers (lues par OutcomeSelection/Simulation)."""
+    """Ingestion of a longitudinal cohort (members + biomarkers). Replaces any
+    existing cohort with the same name for the tenant. This is the write path that was
+    missing for the cohort_members / cohort_biomarkers tables (read by
+    OutcomeSelection/Simulation)."""
 
     cohort_name: str = Field(min_length=1, max_length=120)
     dataset_id: UUID | None = None

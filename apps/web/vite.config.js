@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   build: {
-    // Découpe les grosses dépendances en chunks séparés (sinon un seul bundle ~1 Mo).
+    // Split large dependencies into separate chunks (otherwise a single ~1 MB bundle).
     rollupOptions: {
       output: {
         manualChunks(id) {

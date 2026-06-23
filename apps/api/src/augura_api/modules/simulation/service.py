@@ -1,5 +1,5 @@
-"""Logique du module simulation : power analytique (LIVE), résultats VALIDATED,
-bootstrap à la demande (création de job)."""
+"""Simulation module logic: analytical power (LIVE), VALIDATED results,
+on-demand bootstrap (job creation)."""
 
 from dataclasses import asdict
 
@@ -14,7 +14,7 @@ from augura_api.modules.simulation.repo import SimulationRepo
 
 
 def compute_power_response(req: schemas.PowerRequest) -> schemas.PowerResponse:
-    """Mode LIVE — synchrone, sans base ni dépendance scientifique."""
+    """LIVE mode — synchronous, no database or scientific dependency."""
     sigma = calibration.sigma_for(sigma=req.sigma, outcome=req.outcome)
     n = req.n or calibration.COHORT_N
     try:
@@ -68,7 +68,7 @@ class SimulationService:
     async def create_simulation(
         self, tenant: CurrentTenant, req: schemas.SimulationRequest
     ) -> schemas.SimulationRunCreated:
-        # Idempotence : un double POST avec la même clé renvoie le même job.
+        # Idempotence: a duplicate POST with the same key returns the same job.
         job = await create_job(
             self.session,
             tenant.tenant_id,
@@ -87,6 +87,6 @@ class SimulationService:
             route="/simulations",
             metadata={"job_id": str(job.id), "run_id": str(run.id)},
         )
-        # Le worker (jobs.runner.enqueue_job, planifié par le router) exécute le
-        # bootstrap après la réponse — fallback local du worker Modal.
+        # The worker (jobs.runner.enqueue_job, scheduled by the router) runs the
+        # bootstrap after the response — local fallback for the Modal worker.
         return schemas.SimulationRunCreated(job_id=job.id, run_id=run.id, status=job.status)

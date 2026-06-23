@@ -1,5 +1,5 @@
-"""Interface publique du module jobs (consommée par simulation, documents, et le
-routeur HTTP du module). La logique vit dans `service.py` ; ici on ré-expose."""
+"""Public interface for the jobs module (consumed by simulation, documents, and the
+module's HTTP router). The logic lives in `service.py`; here we re-export."""
 
 from augura_api.modules.jobs.router import router
 from augura_api.modules.jobs.service import (

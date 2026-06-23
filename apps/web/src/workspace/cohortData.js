@@ -1,10 +1,10 @@
-// cohortData.js — lectures cohorte via le backend FastAPI (JWT Bearer → RLS tenant).
+// cohortData.js — cohort reads via the FastAPI backend (JWT Bearer → tenant RLS).
 //
-// Remplace les anciennes lectures PostgREST directes des vues cockpit
+// Replaces the old direct PostgREST reads of the cockpit views
 // (`supabase.from('validation_members'/'validation_biomarkers').eq('tenant_id', TENANT_ID)`)
-// qui visaient des tables inexistantes avec un tenant codé en dur (bypass RLS).
-// Le backend résout le tenant depuis le token ; on récupère TOUTES les colonnes et les
-// vues filtrent côté client (timepoint, groupe…). engagement_group est en minuscule.
+// which targeted nonexistent tables with a hard-coded tenant (RLS bypass).
+// The backend resolves the tenant from the token; we fetch ALL columns and the
+// views filter client-side (timepoint, group…). engagement_group is lowercase.
 import { apiJson } from '@/api'
 
 async function resolveCohortName(cohortName) {
@@ -13,7 +13,7 @@ async function resolveCohortName(cohortName) {
   return cohorts?.[0]?.cohort_name ?? null
 }
 
-/** { name, members[], biomarkers[] } pour la cohorte donnée (ou la première du tenant). */
+/** { name, members[], biomarkers[] } for the given cohort (or the tenant's first one). */
 export async function fetchCohort(cohortName = '') {
   const name = await resolveCohortName(cohortName)
   if (!name) return { name: null, members: [], biomarkers: [] }
@@ -25,12 +25,12 @@ export async function fetchCohort(cohortName = '') {
   return { name, members: members ?? [], biomarkers: biomarkers ?? [] }
 }
 
-/** Résultats de simulation VALIDATED précalculés (read-model), scopés tenant. */
+/** Precomputed VALIDATED simulation results (read-model), tenant-scoped. */
 export async function fetchSimulationResults(cohortName = '') {
   const q = cohortName ? `?cohort_name=${encodeURIComponent(cohortName)}` : ''
   return apiJson(`/simulations/results${q}`).catch(() => [])
 }
 
-// engagement_group est minuscule côté backend ('high'/'medium'/'low').
+// engagement_group is lowercase on the backend ('high'/'medium'/'low').
 export const engagementGroup = (m) => (m?.engagement_group ?? '').toLowerCase()
 export const isHighEngager = (m) => engagementGroup(m) === 'high'

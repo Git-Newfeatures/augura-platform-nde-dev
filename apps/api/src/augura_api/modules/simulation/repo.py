@@ -1,4 +1,4 @@
-"""Accès base du module simulation — chaque méthode exige un TenantId."""
+"""Simulation module data access — every method requires a TenantId."""
 
 from typing import Any
 from uuid import UUID
@@ -85,8 +85,8 @@ class SimulationRepo:
         cohort_name: str,
         rows: list[dict[str, Any]],
     ) -> None:
-        """Remplace le read-model VALIDATED pour (tenant, cohort) — delete puis insert
-        en masse, pour qu'un re-run du bootstrap ne duplique pas les lignes."""
+        """Replace the VALIDATED read-model for (tenant, cohort) — delete then bulk
+        insert, so that re-running the bootstrap does not duplicate rows."""
         await self.session.execute(
             delete(SimulationResult).where(
                 SimulationResult.org_id == tenant_id,

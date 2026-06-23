@@ -6,7 +6,7 @@
  * fetchCohort) — there are no fabricated cohort, effect, noise, bias, or
  * pre-computed scenario fallbacks here anymore. Estimator metadata and
  * eligibility are sourced from /reference/estimators.
- * (TENANT_ID retiré : le tenant est résolu côté backend depuis le JWT.
+ * (TENANT_ID removed: the tenant is resolved on the backend from the JWT.
  *  cf. workspace/cohortData.js)
  */
 

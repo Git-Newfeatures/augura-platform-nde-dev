@@ -1,4 +1,4 @@
-"""Le vocabulaire gouverné expose les enums attendus (notamment polarity fixée)."""
+"""The governed vocabulary exposes the expected enums (notably the fixed polarity)."""
 
 from augura_api.modules.semantic import vocab
 

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Lock, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Snapshots gelés (Saved evidence) — ré-ouverture en lecture seule. Masqué si vide.
+// Frozen snapshots (Saved evidence) — read-only re-opening. Hidden when empty.
 export function SavedEvidence({ entries, activeId, onOpen }) {
   const [open, setOpen] = useState(false)
   if (!entries?.length) return null

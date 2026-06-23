@@ -1,7 +1,7 @@
-"""Vérifie la connexion backend → Supabase de bout en bout, via la vraie couche
-de données (request_session pose app.tenant_id/app.user_id, RLS active sous augura_api).
+"""Checks the backend → Supabase connection end-to-end, through the real data
+layer (request_session sets app.tenant_id/app.user_id, RLS active under augura_api).
 
-Usage : AUGURA_* dans l'env (source apps/api/.env), puis `uv run python scripts/verify_supabase.py`.
+Usage: AUGURA_* in the env (source apps/api/.env), then `uv run python scripts/verify_supabase.py`.
 """
 
 import asyncio
@@ -26,9 +26,9 @@ async def main() -> None:
         docs, total_docs = await CorpusRepo(session).feed(CorpusFilters(), limit=50, offset=0)
         members = await DatasetRepo(session).cohort_members(LUCIS, "validation_v1")
         sims = await SimulationRepo(session).list_results(LUCIS, "validation_v1")
-        print("✓ Connexion Supabase OK (rôle augura_api, RLS active via app.tenant_id)")
+        print("✓ Supabase connection OK (role augura_api, RLS active via app.tenant_id)")
         print(f"  studies          : {[s.slug for s in studies]}")
-        print(f"  corpus documents : {total_docs} (échantillon {len(docs)})")
+        print(f"  corpus documents : {total_docs} (sample {len(docs)})")
         print(f"  cohort_members   : {len(members)}")
         print(f"  simulation_results: {len(sims)}")
 

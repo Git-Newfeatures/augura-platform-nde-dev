@@ -1,4 +1,4 @@
-"""Test du moteur DQ end-to-end sur des feuilles en mémoire (sans base)."""
+"""End-to-end test of the DQ engine on in-memory sheets (no database)."""
 
 from augura_api.modules.dq.engine import run_dq
 

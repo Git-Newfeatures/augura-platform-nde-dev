@@ -1,4 +1,4 @@
-"""Câblage du module studies dans l'app (sans base : auth échoue avant la DB)."""
+"""Wiring of the studies module into the app (no database: auth fails before the DB)."""
 
 import httpx
 
@@ -102,12 +102,12 @@ async def test_protected_routes_require_auth() -> None:
             assert r.status_code == 401, path
             assert r.headers["content-type"] == "application/problem+json"
             assert r.json()["code"] == "unauthorized"
-        # POST routes with a body : corps valide vide ⇒ l'auth (401) précède le métier.
+        # POST routes with a body: empty valid body ⇒ auth (401) precedes business logic.
         for path in ("/causal/dag", "/semantic/enrich/apply", "/semantic/enrich/propose"):
             r = await client.post(path, json={})
             assert r.status_code == 401, path
             assert r.json()["code"] == "unauthorized"
-        # GET routes avec paramètre de chemin : l'auth (401) précède la résolution.
+        # GET routes with a path parameter: auth (401) precedes resolution.
         for path in ("/semantic/enrich/proposals/00000000-0000-0000-0000-000000000000",):
             r = await client.get(path)
             assert r.status_code == 401, path

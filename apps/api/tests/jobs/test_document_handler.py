@@ -1,9 +1,9 @@
-"""handle_document : génère le dossier et persiste les octets EN BASE (jamais sur disque).
+"""handle_document: generates the document and persists the bytes IN THE DB (never on disk).
 
-Sur Modal le worker `run_job` et le conteneur ASGI sont des conteneurs distincts au
-système de fichiers éphémère : un dossier écrit sur disque par le worker est introuvable
-côté ASGI au moment du download (404). Le contenu doit donc vivre dans
-generated_documents.content, pas via core.storage.save_bytes.
+On Modal the `run_job` worker and the ASGI container are separate containers with an
+ephemeral filesystem: a document written to disk by the worker is not found on the
+ASGI side at download time (404). The content must therefore live in
+generated_documents.content, not via core.storage.save_bytes.
 """
 
 from types import SimpleNamespace
@@ -29,7 +29,7 @@ async def test_handle_document_persists_content_in_db_not_disk(
         return []
 
     def fake_render(**_kwargs: Any) -> str:
-        return "<html><body>dossier</body></html>"
+        return "<html><body>document</body></html>"
 
     captured: dict[str, Any] = {}
 
@@ -60,7 +60,7 @@ async def test_handle_document_persists_content_in_db_not_disk(
     )
     monkeypatch.setattr("augura_api.modules.analytics.create_artifact", fake_create_artifact)
     monkeypatch.setattr("augura_api.modules.analytics.log_usage", fake_log_usage)
-    # Filet : tout écrit sur disque doit faire échouer le test (régression du bug Modal).
+    # Safety net: any disk write must fail the test (Modal bug regression).
     monkeypatch.setattr("augura_api.core.storage.save_bytes", fake_save_bytes)
 
     from augura_api.jobs.handlers import handle_document
@@ -80,10 +80,10 @@ async def test_handle_document_persists_content_in_db_not_disk(
 
     await handle_document(ctx)  # type: ignore[arg-type]
 
-    assert disk_writes == []  # rien sur le disque éphémère
+    assert disk_writes == []  # nothing on the ephemeral disk
     assert captured["status"] == "ready"
-    assert captured["content"] == b"<html><body>dossier</body></html>"
-    # storage_path reste un identifiant logique stable (provenance), pas un fichier disque.
+    assert captured["content"] == b"<html><body>document</body></html>"
+    # storage_path stays a stable logical identifier (provenance), not a disk file.
     assert str(document_id) in captured["storage_path"]
     assert captured["storage_ref"] == captured["storage_path"]
 

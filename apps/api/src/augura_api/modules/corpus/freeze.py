@@ -1,11 +1,11 @@
-"""Gel reproductible des artefacts de preuve : hash de contenu SHA-256.
+"""Reproducible freeze of evidence artifacts: SHA-256 content hash.
 
-Le hash est calculé sur une sérialisation CANONIQUE de la charge (clés triées,
-UTF-8, sans espace insignifiant) : la même donnée produit toujours le même hash,
-quelle que soit la machine. À l'écriture on calcule et on stocke `content_hash` ;
-à la lecture on recalcule et on compare — une divergence = altération/corruption
-= erreur dure (jamais de retour silencieux). L'artefact est ainsi auto-vérifiable
-et portable (l'artefact DAG plus tard portera la même forme, sans dépendance base).
+The hash is computed over a CANONICAL serialization of the payload (sorted keys,
+UTF-8, no insignificant whitespace): the same data always produces the same hash,
+regardless of the machine. On write we compute and store `content_hash`;
+on read we recompute and compare — a divergence = tampering/corruption
+= hard error (never a silent return). The artifact is thus self-verifiable
+and portable (the DAG artifact will later carry the same shape, with no DB dependency).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ CONTENT_HASH_FIELD = "content_hash"
 
 
 class ContentIntegrityError(AppError):
-    """Le content_hash recalculé ne correspond pas au stocké (altération/corruption)."""
+    """The recomputed content_hash does not match the stored one (tampering/corruption)."""
 
     code = "content_integrity"
     http_status = 500
@@ -28,10 +28,10 @@ class ContentIntegrityError(AppError):
 
 
 def canonical_bytes(payload: dict[str, Any]) -> bytes:
-    """Sérialisation canonique de la charge, hors champ `content_hash`.
+    """Canonical serialization of the payload, excluding the `content_hash` field.
 
-    clés triées + UTF-8 + séparateurs compacts ⇒ représentation stable. L'ordre des
-    listes (ex. la liste de résultats) EST significatif et préservé tel quel.
+    sorted keys + UTF-8 + compact separators ⇒ stable representation. The order of
+    lists (e.g. the results list) IS significant and preserved as-is.
     """
     body = {k: v for k, v in payload.items() if k != CONTENT_HASH_FIELD}
     return json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode(
@@ -40,23 +40,23 @@ def canonical_bytes(payload: dict[str, Any]) -> bytes:
 
 
 def content_hash(payload: dict[str, Any]) -> str:
-    """SHA-256 (hex) de la charge canonicalisée."""
+    """SHA-256 (hex) of the canonicalized payload."""
     return hashlib.sha256(canonical_bytes(payload)).hexdigest()
 
 
 def verify_content_hash(payload: dict[str, Any]) -> str:
-    """Recalcule et compare au `content_hash` présent dans la charge.
+    """Recompute and compare against the `content_hash` present in the payload.
 
-    Renvoie le hash si tout concorde ; lève `ContentIntegrityError` si le champ est
-    absent ou si la valeur diverge — erreur dure, pas de retour silencieux.
+    Returns the hash if everything matches; raises `ContentIntegrityError` if the
+    field is absent or the value diverges — hard error, no silent return.
     """
     stored = payload.get(CONTENT_HASH_FIELD)
     if not isinstance(stored, str) or not stored:
-        raise ContentIntegrityError("content_hash absent de l'artefact")
+        raise ContentIntegrityError("content_hash missing from artifact")
     recomputed = content_hash(payload)
     if stored != recomputed:
         raise ContentIntegrityError(
-            "content_hash divergent — artefact altéré ou corrompu",
+            "content_hash divergent — artifact tampered with or corrupted",
             stored=stored,
             recomputed=recomputed,
         )

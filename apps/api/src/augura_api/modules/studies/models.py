@@ -1,7 +1,7 @@
-"""Modèles SQLAlchemy du module studies (ne sortent jamais du module — spec §4).
+"""SQLAlchemy models for the studies module (never leave the module — spec §4).
 
-Le schéma physique est créé par la migration baseline (bundle SQL) ; ces modèles
-servent aux requêtes, pas au DDL.
+The physical schema is created by the baseline migration (SQL bundle); these models
+serve queries, not DDL.
 """
 
 from datetime import datetime

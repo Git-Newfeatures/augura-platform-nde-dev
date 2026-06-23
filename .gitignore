@@ -9,13 +9,13 @@ dist/
 # Node
 node_modules/
 
-# Env & outils
+# Env & tools
 .env
 .env.*
 !.env.example
 .DS_Store
 
-# Artefacts générés localement (stockage dossiers/exports — core.storage)
+# Locally generated artifacts (folder/export storage — core.storage)
 apps/api/var/
 
 reference

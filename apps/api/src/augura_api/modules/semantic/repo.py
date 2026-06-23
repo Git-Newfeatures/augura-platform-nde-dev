@@ -1,4 +1,4 @@
-"""Accès base du module semantic — catalogues globaux (lecture seule)."""
+"""Database access for the semantic module — global catalogs (read-only)."""
 
 import json
 from typing import Any
@@ -21,9 +21,9 @@ from augura_api.modules.semantic.models import (
     UnitConversion,
 )
 
-# Les 14 tables de la couche sémantique gouvernée exposées par GET /semantic/bundle
-# (dans l'ordre du contrat front ; dq_predicates exclu — consommé par le stack DQ).
-# Noms en dur (jamais d'entrée utilisateur) → pas de risque d'injection.
+# The 14 tables of the governed semantic layer exposed by GET /semantic/bundle
+# (in frontend-contract order; dq_predicates excluded — consumed by the DQ stack).
+# Hard-coded names (never user input) → no injection risk.
 _BUNDLE_TABLES = (
     "taxonomy_concepts",
     "taxonomy_synonyms",
@@ -41,8 +41,8 @@ _BUNDLE_TABLES = (
     "table_archetypes",
 )
 
-# Bundle = un seul objet jsonb {table: [lignes brutes]} (port du RPC semantic_read_all,
-# mais inline sur le schéma public — pas de fonction stockée à maintenir).
+# Bundle = a single jsonb object {table: [raw rows]} (port of the semantic_read_all RPC,
+# but inlined on the public schema — no stored function to maintain).
 _BUNDLE_SQL = (
     "select jsonb_build_object(\n"
     + ",\n".join(
@@ -52,7 +52,7 @@ _BUNDLE_SQL = (
     + "\n)"
 )
 
-# Statut de release : ligne courante de semantic_releases + compte par table.
+# Release status: current row of semantic_releases + per-table count.
 _RELEASE_SQL = (
     "select jsonb_build_object("
     "'release', (select to_jsonb(r) from semantic_releases r "
@@ -66,7 +66,7 @@ _RELEASE_SQL = (
 
 
 def coerce_jsonb(value: Any) -> dict[str, Any]:
-    """asyncpg peut renvoyer le jsonb déjà désérialisé ou son texte ; on normalise."""
+    """asyncpg may return the jsonb already deserialized or as text; we normalize it."""
     if isinstance(value, str):
         return json.loads(value)
     return value
@@ -111,7 +111,7 @@ class SemanticRepo:
             stmt = stmt.where(DqConstraint.status == status)
         return list((await self.session.execute(stmt)).scalars().all())
 
-    # ── Ontologie/causal (B1) ──────────────────────────────────────────────
+    # ── Ontology/causal (B1) ───────────────────────────────────────────────
 
     async def list_relations(self, *, active: bool = True) -> list[OntologyRelation]:
         stmt = select(OntologyRelation)
@@ -121,7 +121,7 @@ class SemanticRepo:
         return list((await self.session.execute(stmt)).scalars().all())
 
     async def relations_for_concepts(self, concept_ids: list[str]) -> list[OntologyRelation]:
-        """Sous-graphe : relations actives dont le sujet OU l'objet ∈ concept_ids (B2)."""
+        """Subgraph: active relations whose subject OR object ∈ concept_ids (B2)."""
         stmt = (
             select(OntologyRelation)
             .where(
@@ -149,27 +149,27 @@ class SemanticRepo:
     async def list_relationships(self) -> list[TaxonomyRelationship]:
         return list((await self.session.execute(select(TaxonomyRelationship))).scalars().all())
 
-    # ── Bundle gouverné + statut de release (lecture en bloc) ───────────────
+    # ── Governed bundle + release status (block read) ───────────────────────
 
     async def read_bundle(self) -> dict[str, Any]:
-        """Les 14 tables sémantiques en un objet jsonb (GET /semantic/bundle)."""
+        """The 14 semantic tables as a single jsonb object (GET /semantic/bundle)."""
         res = await self.session.execute(text(_BUNDLE_SQL))
         return coerce_jsonb(res.scalar_one())
 
     async def release_status(self) -> dict[str, Any]:
-        """Release courante + compte par table (GET /semantic/release)."""
+        """Current release + per-table count (GET /semantic/release)."""
         res = await self.session.execute(text(_RELEASE_SQL))
         return coerce_jsonb(res.scalar_one())
 
-    # ── Écriture (B4 enrich) : exclusivement via la fonction SECURITY DEFINER ──
+    # ── Write (B4 enrich): exclusively via the SECURITY DEFINER function ───────
 
     async def apply_release(
         self, manifest: dict[str, Any], payload: dict[str, Any]
     ) -> dict[str, Any]:
-        """Applique un batch d'enrichissement + bascule la release courante.
+        """Applies an enrichment batch + switches the current release.
 
-        Le rôle applicatif n'a pas le write direct (RLS FOR SELECT) ; tout passe par
-        public.upsert_semantic_release (SECURITY DEFINER). Renvoie {version, concepts,
+        The application role has no direct write (RLS FOR SELECT); everything goes through
+        public.upsert_semantic_release (SECURITY DEFINER). Returns {version, concepts,
         relations}."""
         stmt = text(
             "select public.upsert_semantic_release("
@@ -179,7 +179,7 @@ class SemanticRepo:
         return coerce_jsonb(res.scalar_one())
 
     async def max_relation_seq(self, today: str) -> int:
-        """Plus grand NNN des relation_id ENRR_{today}_NNN (évite les collisions d'id)."""
+        """Largest NNN among relation_id ENRR_{today}_NNN (avoids id collisions)."""
         _pat = r"'ENRR_' || :d || '_(\d{3})'"
         stmt = text(
             f"select coalesce(max(substring(relation_id from {_pat})::int), 0) "
@@ -188,7 +188,7 @@ class SemanticRepo:
         return int((await self.session.execute(stmt)).scalar_one())
 
     async def max_qualifier_seq(self, today: str) -> int:
-        """Plus grand NNN des qualifier_id ENRQ_{today}_NNN (évite les collisions d'id)."""
+        """Largest NNN among qualifier_id ENRQ_{today}_NNN (avoids id collisions)."""
         _pat = r"'ENRQ_' || :d || '_(\d{3})'"
         stmt = text(
             f"select coalesce(max(substring(qualifier_id from {_pat})::int), 0) "
@@ -197,7 +197,7 @@ class SemanticRepo:
         return int((await self.session.execute(stmt)).scalar_one())
 
     async def existing_concept_ids(self, ids: list[str]) -> set[str]:
-        """Sous-ensemble des ids fournis qui existent dans la taxonomie (validation FK)."""
+        """Subset of the provided ids that exist in the taxonomy (FK validation)."""
         if not ids:
             return set()
         stmt = select(TaxonomyConcept.local_concept_id).where(
@@ -206,7 +206,7 @@ class SemanticRepo:
         return set((await self.session.execute(stmt)).scalars().all())
 
     async def get_relation_row(self, relation_id: str) -> dict[str, Any] | None:
-        """Récupère une relation sous forme dict brut (pour deactivate)."""
+        """Fetches a relation as a raw dict (for deactivate)."""
         stmt = text(
             "select to_jsonb(r) from ontology_relations r where relation_id = :rid"
         ).bindparams(rid=relation_id)

@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module agents."""
+"""HTTP adapter for the agents module."""
 
 from typing import Any
 
@@ -17,7 +17,7 @@ from augura_api.modules.corpus import search_corpus
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
-# Mappe le nom d'outil E1 (search_pubmed…) vers un source_id de corpus.
+# Maps the E1 tool name (search_pubmed…) to a corpus source_id.
 _TOOL_SOURCE = {
     "search_pubmed": "pubmed",
     "search_clinicaltrials": "clinicaltrials",
@@ -27,7 +27,7 @@ _TOOL_SOURCE = {
 
 
 def _service(settings: SettingsDep) -> AgentService:
-    # Client LLM construit après l'auth (CurrentTenantDep) ⇒ 401 avant 503 si pas de clé.
+    # LLM client built after auth (CurrentTenantDep) ⇒ 401 before 503 if no key.
     return AgentService(get_anthropic_client(settings), settings)
 
 
@@ -35,7 +35,7 @@ def _service(settings: SettingsDep) -> AgentService:
 async def chat(
     req: schemas.ChatRequest, tenant: CurrentTenantDep, settings: SettingsDep
 ) -> schemas.ChatResponse:
-    """Assistant inline : passerelle Messages Anthropic. 503 explicite si pas de clé."""
+    """Inline assistant: Anthropic Messages gateway. Explicit 503 if no key."""
     return await _service(settings).chat(req)
 
 

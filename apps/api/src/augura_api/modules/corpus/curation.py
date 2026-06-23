@@ -1,10 +1,10 @@
-"""Curation LLM des résultats live (re-ranking par abstract + rationale).
+"""LLM curation of live results (re-ranking by abstract + rationale).
 
-Frère de `pubmed.py` / `ctgov.py`. `Curator` est un Protocol injectable (tests sans
-réseau) ; `LLMCurator` réutilise `run_structured_agent` (outil forcé + validation
-Pydantic + 1 retry réparation). Le LLM ne renvoie QUE des ids ordonnés + rationale ;
-le mapping vers les enregistrements déjà récupérés est déterministe (`apply_curation`),
-donc aucune fabrication de contenu n'est possible.
+Sibling of `pubmed.py` / `ctgov.py`. `Curator` is an injectable Protocol (tests with
+no network); `LLMCurator` reuses `run_structured_agent` (forced tool + Pydantic
+validation + 1 repair retry). The LLM returns ONLY ordered ids + rationale;
+the mapping to the already-retrieved records is deterministic (`apply_curation`),
+so no content fabrication is possible.
 """
 
 from __future__ import annotations
@@ -17,16 +17,16 @@ from pydantic import BaseModel
 
 from augura_api.core.llm.runtime import LLMClient, run_structured_agent
 
-# Version du prompt de curation — épinglée dans la provenance des snapshots.
+# Curation prompt version — pinned in the snapshot provenance.
 CURATION_PROMPT_VERSION = "curate-v1"
 
-# Borne de tokens : on tronque le texte de chaque candidat (abstract / résumé CT.gov).
+# Token bound: we truncate each candidate's text (abstract / CT.gov summary).
 _MAX_TEXT = 1200
 
 
 @dataclass(frozen=True)
 class CurationCandidate:
-    """Candidat soumis au LLM : id stable + titre + texte jugeable (abstract ou résumé)."""
+    """Candidate submitted to the LLM: stable id + title + judgeable text (abstract or summary)."""
 
     id: str
     title: str
@@ -35,7 +35,7 @@ class CurationCandidate:
 
 @dataclass(frozen=True)
 class CuratedRef:
-    """Sortie de curation par item : l'ordre de la liste porte le classement."""
+    """Per-item curation output: the list order carries the ranking."""
 
     id: str
     rationale: str
@@ -44,9 +44,9 @@ class CuratedRef:
 def apply_curation[T](
     refs: list[CuratedRef], by_id: dict[str, T], *, max_results: int
 ) -> list[tuple[T, str]]:
-    """Mappe les refs ordonnées du LLM → (enregistrement, rationale), de façon
-    déterministe : ignore les ids hors `by_id` (hallucinés) et les doublons, cape à
-    `max_results`. Renvoie [] si rien ne matche (l'appelant décide du repli)."""
+    """Maps the LLM's ordered refs → (record, rationale), deterministically:
+    ignores ids outside `by_id` (hallucinated) and duplicates, caps at
+    `max_results`. Returns [] if nothing matches (the caller decides the fallback)."""
     seen: set[str] = set()
     out: list[tuple[T, str]] = []
     for ref in refs:
@@ -76,8 +76,8 @@ class _CurationOutput(BaseModel):
 
 _CURATION_TOOL: ToolParam = {
     "name": "curate_results",
-    "description": "Renvoie les résultats les plus pertinents, classés du plus au moins "
-    "pertinent, chacun avec un rationale court.",
+    "description": "Returns the most relevant results, ranked from most to least "
+    "relevant, each with a short rationale.",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -86,8 +86,8 @@ _CURATION_TOOL: ToolParam = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "string", "description": "id exact d'un candidat fourni"},
-                        "rationale": {"type": "string", "description": "1 phrase de justification"},
+                        "id": {"type": "string", "description": "exact id of a provided candidate"},
+                        "rationale": {"type": "string", "description": "1-sentence justification"},
                     },
                     "required": ["id"],
                 },
@@ -98,12 +98,12 @@ _CURATION_TOOL: ToolParam = {
 }
 
 _SYSTEM = (
-    "Tu es un·e documentaliste biomédical·e. À partir d'une question de recherche et "
-    "d'une liste de résultats (id, titre, texte), sélectionne et CLASSE les plus "
-    "pertinents, du plus au moins pertinent. À pertinence égale, remonte les preuves "
-    "les plus fortes (méta-analyses / revues systématiques / RCT > observationnel > "
-    "autre). N'invente JAMAIS d'id : n'utilise que les id fournis. Donne un rationale "
-    "d'une phrase par résultat retenu. Écarte les résultats hors sujet."
+    "You are a biomedical information specialist. Given a research question and "
+    "a list of results (id, title, text), select and RANK the most relevant ones, "
+    "from most to least relevant. At equal relevance, prioritize the strongest "
+    "evidence (meta-analyses / systematic reviews / RCT > observational > "
+    "other). NEVER invent an id: use only the ids provided. Give a one-sentence "
+    "rationale per selected result. Discard off-topic results."
 )
 
 
@@ -116,7 +116,7 @@ def _render(candidates: list[CurationCandidate]) -> str:
 
 
 class LLMCurator:
-    """Implémentation réelle : un appel `run_structured_agent` par source."""
+    """Real implementation: one `run_structured_agent` call per source."""
 
     def __init__(self, client: LLMClient, model: str) -> None:
         self._client = client
@@ -128,8 +128,8 @@ class LLMCurator:
         if not candidates:
             return []
         user = (
-            f"Question : {query}\nSource : {source}\n"
-            f"Sélectionne au plus {max_results} résultats parmi :\n\n{_render(candidates)}"
+            f"Question: {query}\nSource: {source}\n"
+            f"Select at most {max_results} results from:\n\n{_render(candidates)}"
         )
         result = await run_structured_agent(
             self._client,

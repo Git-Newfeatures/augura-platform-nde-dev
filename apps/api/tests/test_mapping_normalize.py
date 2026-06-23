@@ -1,4 +1,4 @@
-"""Tests du normaliseur lexical + similarité."""
+"""Tests for the lexical normalizer + similarity."""
 
 from augura_api.modules.mapping.normalize import normalize, string_similarity
 

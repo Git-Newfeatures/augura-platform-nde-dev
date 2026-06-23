@@ -1,4 +1,4 @@
-"""Schémas Pydantic — le contrat public du module (frontières inter-modules)."""
+"""Pydantic schemas — the module's public contract (inter-module boundaries)."""
 
 from datetime import datetime
 from typing import Any, Literal
@@ -32,8 +32,8 @@ class StudyCreate(BaseModel):
 
 
 class StudyUpdate(BaseModel):
-    """Mise à jour partielle d'une étude (cycle de vie + métadonnées).
-    Seuls les champs explicitement fournis sont écrits (model_dump exclude_unset)."""
+    """Partial update of a study (lifecycle + metadata).
+    Only explicitly provided fields are written (model_dump exclude_unset)."""
 
     name: str | None = None
     tagline: str | None = None

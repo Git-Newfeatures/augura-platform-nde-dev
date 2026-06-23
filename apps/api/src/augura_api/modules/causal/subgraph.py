@@ -1,8 +1,8 @@
-"""Sous-graphe causal déterministe (sans LLM).
+"""Deterministic causal subgraph (without LLM).
 
-Port de `reference/data-intake-nde/src/causal/ontology-loader.js` (jointure relations
-+ evidence + qualifiers) et de la collecte/cap de `dag-generator.js`. Aucune dérive :
-les arêtes proviennent exclusivement de l'ontologie B1 revue.
+Port of `reference/data-intake-nde/src/causal/ontology-loader.js` (join of relations
++ evidence + qualifiers) and of the collection/cap from `dag-generator.js`. No drift:
+edges come exclusively from the reviewed B1 ontology.
 """
 
 from collections import defaultdict
@@ -15,7 +15,7 @@ from augura_api.modules.semantic.models import (
     TaxonomyConcept,
 )
 
-MAX_CANDIDATES = 40  # au-delà, le prompt LLM devient ingérable (cf. dag-generator.js)
+MAX_CANDIDATES = 40  # beyond this, the LLM prompt becomes unmanageable (cf. dag-generator.js)
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,7 @@ class ConceptMeta:
 
 @dataclass(frozen=True)
 class Relation:
-    """Relation d'ontologie enrichie (evidence + qualifiers) prête pour le prompt."""
+    """Enriched ontology relation (evidence + qualifiers) ready for the prompt."""
 
     id: str
     subject_concept_id: str
@@ -69,7 +69,7 @@ def build_relations(
     evidence: list[OntologyRelationEvidence],
     qualifiers: list[OntologyRelationQualifier],
 ) -> list[Relation]:
-    """Joint relations actives + evidence + qualifiers (port de buildOntology)."""
+    """Joins active relations + evidence + qualifiers (port of buildOntology)."""
     ev_by_rel: dict[str, list[dict[str, str]]] = defaultdict(list)
     for e in evidence:
         ev_by_rel[e.relation_id].append(_evidence_dict(e))
@@ -111,7 +111,7 @@ def _index(relations: list[Relation]) -> _Index:
 def causal_subgraph(
     relations: list[Relation], concept_ids: list[str], *, hops: int = 2
 ) -> list[Relation]:
-    """BFS multi-sauts autour des concepts (port de getCausalSubgraph)."""
+    """Multi-hop BFS around the concepts (port of getCausalSubgraph)."""
     idx = _index(relations)
     seen: set[str] = set()
     result: list[Relation] = []
@@ -135,7 +135,7 @@ def causal_subgraph(
 
 
 def cap_candidates(candidates: list[Relation], concept_ids: list[str]) -> list[Relation]:
-    """Priorise les relations directes puis tronque à MAX_CANDIDATES (port dag-generator)."""
+    """Prioritizes direct relations then truncates to MAX_CANDIDATES (port dag-generator)."""
     if len(candidates) <= MAX_CANDIDATES:
         return candidates
     seeds = set(concept_ids)

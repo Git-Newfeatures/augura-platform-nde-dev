@@ -1,11 +1,11 @@
-"""Tier 2 (intégration) — gel/relecture vérifiée des snapshots, sessions, events.
+"""Tier 2 (integration) — verified freeze/re-read of snapshots, sessions, events.
 
-Tourne contre AUGURA_DATABASE_URL (sauté sinon). Vérifie : roundtrip freeze→read
-avec content_hash, détection d'altération (gate 6 au niveau base), relecture pure
-sans appel live (gate 8), et le journal sessions/events.
+Runs against AUGURA_DATABASE_URL (skipped otherwise). Verifies: freeze→read roundtrip
+with content_hash, tamper detection (gate 6 at the database level), pure re-read
+without live calls (gate 8), and the sessions/events log.
 
-NB : pas de `set role augura_app` ici (l'enforcement RLS par-étude est testé en
-Tier 3) — ces gates ne dépendent pas de la RLS.
+NB: no `set role augura_app` here (per-study RLS enforcement is tested in
+Tier 3) — these gates do not depend on RLS.
 """
 
 import os
@@ -41,7 +41,7 @@ USER = UserId(UUID("bbbbbbbb-0000-4000-8000-000000000002"))
 async def session() -> AsyncIterator[AsyncSession]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as s, s.begin():
@@ -57,8 +57,8 @@ def _tenant() -> CurrentTenant:
 
 
 def _req(study_id: UUID | None = None) -> SnapshotWriteRequest:
-    # query = la question utilisateur ; query_string = l'appel exact (efetch par id) :
-    # les deux DIFFÈRENT volontairement (gate 7 au niveau du gel).
+    # query = the user question; query_string = the exact call (efetch by id):
+    # the two DIFFER on purpose (gate 7 at freeze level).
     return SnapshotWriteRequest(
         query="35319473",
         sources=["pubmed"],
@@ -88,7 +88,7 @@ async def test_freeze_then_read_roundtrip(session: AsyncSession) -> None:
     assert got.id == snap.id
     assert got.content_hash == snap.content_hash
     assert got.verified is True
-    # gate 7 : le query_string gelé est l'appel exact, pas la question utilisateur.
+    # gate 7: the frozen query_string is the exact call, not the user question.
     assert got.query == "35319473"
     assert got.results[0].query_string == "efetch:id=35319473"
 
@@ -96,7 +96,7 @@ async def test_freeze_then_read_roundtrip(session: AsyncSession) -> None:
 async def test_read_verifies_hash_and_tamper_raises(session: AsyncSession) -> None:
     svc = LiteratureSnapshotService(LiveRepo(session))
     snap = await svc.freeze(_tenant(), _req())
-    # Altère un octet de la charge stockée sans recalculer le hash → divergence.
+    # Alter one byte of the stored payload without recomputing the hash → mismatch.
     await session.execute(
         text(
             "update literature_snapshots "
@@ -115,10 +115,10 @@ async def test_read_is_pure_db_no_live_calls(
     svc = LiteratureSnapshotService(LiveRepo(session))
     snap = await svc.freeze(_tenant(), _req())
 
-    # Tout appel HTTP live exploserait : prouve que la relecture est une lecture
-    # base pure (zéro appel PubMed/CT.gov). Le moteur base utilise asyncpg, pas httpx.
+    # Any live HTTP call would blow up: proves the re-read is a pure database
+    # read (zero PubMed/CT.gov calls). The DB engine uses asyncpg, not httpx.
     def _boom(*args: object, **kwargs: object) -> object:
-        raise AssertionError("appel HTTP live pendant la relecture du snapshot")
+        raise AssertionError("live HTTP call during snapshot re-read")
 
     monkeypatch.setattr(httpx.AsyncClient, "get", _boom)
     got = await svc.read_snapshot(_tenant(), snap.id)

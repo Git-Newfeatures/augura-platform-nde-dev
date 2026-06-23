@@ -1,38 +1,38 @@
-# Modules — convention de découpage
+# Modules — split convention
 
-Chaque module est une **tranche verticale** isolée (contrat import-linter
-« les modules de données ne s'importent pas entre eux »). Layout canonique :
+Each module is an isolated **vertical slice** (import-linter contract
+"data modules do not import each other"). Canonical layout:
 
 ```
-modules/<nom>/
-  __init__.py   # interface publique : ré-expose `router` + les fonctions consommées
-                # cross-module (ex. jobs: create_job/get_job ; corpus: search_corpus)
-  router.py     # adaptateur HTTP : routes FastAPI, dépend de core.deps (tenant/session)
-  service.py    # logique applicative ; orchestre le repo, applique les règles
-  repo.py       # accès données (SQLAlchemy), chaque méthode scopée tenant_id
-  models.py     # tables SQLAlchemy
-  schemas.py    # contrats Pydantic (entrée/sortie)
+modules/<name>/
+  __init__.py   # public interface: re-exposes `router` + the functions consumed
+                # cross-module (e.g. jobs: create_job/get_job; corpus: search_corpus)
+  router.py     # HTTP adapter: FastAPI routes, depends on core.deps (tenant/session)
+  service.py    # application logic; orchestrates the repo, applies the rules
+  repo.py       # data access (SQLAlchemy), each method scoped by tenant_id
+  models.py     # SQLAlchemy tables
+  schemas.py    # Pydantic contracts (input/output)
 ```
 
-## Construction service ⁄ repo (DI)
+## Service / repo construction (DI)
 
-Convention : **le routeur injecte un repo construit dans le service** —
-`XService(XRepo(session))` (cf. studies/corpus/datasets). Les modules plus anciens
-(simulation/documents/analytics) injectent encore la `session` et reconstruisent le
-repo par méthode ; comportement identique, à aligner sur la forme repo-injectée au
-prochain passage. Ne pas mélanger les deux dans un nouveau module.
+Convention: **the router injects a repo built into the service** —
+`XService(XRepo(session))` (cf. studies/corpus/datasets). The older modules
+(simulation/documents/analytics) still inject the `session` and rebuild the
+repo per method; identical behavior, to be aligned on the repo-injected form on the
+next pass. Do not mix the two in a new module.
 
-## Exceptions assumées
+## Accepted exceptions
 
-- **jobs** — infrastructure transverse (file d'attente). Logique dans `service.py`
-  (`create_job`/`get_job`, fonctions module-level idempotentes), pas de classe service ;
-  pas de `schemas` d'entrée riches. Consommé par simulation/documents ET par son routeur.
-- **agents** — couche d'orchestration LLM : pas de `repo.py`/`models.py` (ne possède pas
-  de table ; lit le corpus via l'interface publique de `corpus`). `service.py` +
+- **jobs** — cross-cutting infrastructure (queue). Logic in `service.py`
+  (`create_job`/`get_job`, idempotent module-level functions), no service class;
+  no rich input `schemas`. Consumed by simulation/documents AND by its own router.
+- **agents** — LLM orchestration layer: no `repo.py`/`models.py` (owns no
+  table; reads the corpus via the public interface of `corpus`). `service.py` +
   `streaming.py` + `tools.py`.
 
-## Autorisation
+## Authorization
 
-Les routes sensibles se gardent avec `core.deps.require_role("owner", …)` en dépendance
-(ex. `/analytics/admin`). Tout le reste passe par la chaîne `CurrentTenantDep` +
-`SessionDep` (RLS tenant active).
+Sensitive routes are guarded with `core.deps.require_role("owner", …)` as a dependency
+(e.g. `/analytics/admin`). Everything else goes through the `CurrentTenantDep` +
+`SessionDep` chain (tenant RLS active).

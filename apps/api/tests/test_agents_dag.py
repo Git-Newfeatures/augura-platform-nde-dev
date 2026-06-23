@@ -1,7 +1,7 @@
-"""Tests locaux de l'agent DAG — LLM mocké (aucune clé requise).
+"""Local tests for the DAG agent — mocked LLM (no key required).
 
-Couvre le happy path, le retry « réparation » sur sortie invalide, l'échec franc
-après réparation, et la validation des entrées.
+Covers the happy path, the "repair" retry on invalid output, hard failure
+after repair, and input validation.
 """
 
 from typing import Any
@@ -58,7 +58,7 @@ class _FakeClient:
 
 
 def _settings() -> Settings:
-    return Settings(env="dev")  # pyright: ignore[reportCallIssue] -- champs env
+    return Settings(env="dev")  # pyright: ignore[reportCallIssue] -- env fields
 
 
 async def test_build_dag_happy_path() -> None:
@@ -79,7 +79,7 @@ async def test_build_dag_repairs_invalid_output() -> None:
         schemas.DagRequest(intervention="x", outcome="y")
     )
     assert isinstance(out, schemas.DagResponse)
-    assert client.messages.calls == 2  # 1 invalide + 1 réparation
+    assert client.messages.calls == 2  # 1 invalid + 1 repair
 
 
 async def test_build_dag_fails_after_repair() -> None:

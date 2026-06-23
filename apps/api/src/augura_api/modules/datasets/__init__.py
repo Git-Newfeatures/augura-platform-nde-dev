@@ -1,4 +1,4 @@
-"""Interface publique du module datasets."""
+"""Public interface of the datasets module."""
 
 from augura_api.modules.datasets.router import router
 

@@ -1,14 +1,14 @@
-"""Vocabulaire gouverné (Semantic Layer v3 §10.5) — source unique des enums.
+"""Governed vocabulary (Semantic Layer v3 §10.5) — single source for the enums.
 
-Importé par l'enrichissement (B4) ET le causal (B2) pour qu'ils ne divergent plus.
-Bug historique corrigé : polarity valait `mixed`/`unknown` côté DAG mais `neutral`
-côté enrichissement. La valeur gouvernée est `neutral`.
+Imported by both enrichment (B4) AND causal (B2) so they no longer diverge.
+Historical bug fixed: polarity was `mixed`/`unknown` on the DAG side but `neutral`
+on the enrichment side. The governed value is `neutral`.
 """
 
-# §10.5 — polarité des relations.
+# §10.5 — relation polarity.
 POLARITY: list[str] = ["increases", "decreases", "neutral"]
 
-# augura_domain — domaines des concepts.
+# augura_domain — concept domains.
 AUGURA_DOMAINS: list[str] = [
     "therapeutics",
     "measurement",
@@ -21,7 +21,7 @@ AUGURA_DOMAINS: list[str] = [
     "pharmacology",
 ]
 
-# §10.5 — enums gouvernés des qualifiers.
+# §10.5 — governed qualifier enums.
 QUALIFIER_TYPES: list[str] = [
     "population",
     "comorbidity",
@@ -38,8 +38,8 @@ QUALIFIER_EFFECTS: list[str] = [
     "restricts_applicability",
 ]
 
-# Vocabulaires de codes standards acceptés pour les concepts Layer 1.
+# Accepted standard code vocabularies for Layer 1 concepts.
 STANDARD_CODE_VOCABULARIES: list[str] = ["LOINC", "SNOMED", "RxNorm", "OMOP", "ICD10CM"]
 
-# Buckets de force de relation.
+# Relation strength buckets.
 RELATION_STRENGTH: list[str] = ["strong", "moderate", "weak"]

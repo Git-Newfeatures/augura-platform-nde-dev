@@ -9,8 +9,8 @@ import { getCausalOntology } from '@/causal/ontology-loader'
 import { getStoredSynonyms, getStoredStandardCodes, initSemanticStore, isSemanticStoreReady } from '@/lib/semantic-store'
 import { EnrichmentPanel } from '@/workspace/EnrichmentPanel'
 
-// Navigateur de la couche sémantique (taxonomie + ontologie causale + version).
-// Porté depuis data-intake-nde. L'onglet Enrichissement expose le pipeline B4
+// Semantic layer browser (taxonomy + causal ontology + version).
+// Ported from data-intake-nde. The Enrichment tab exposes the B4 pipeline
 // (enrichPropose → review → enrichApply) via EnrichmentPanel.
 
 // ── Shared modal shell ────────────────────────────────────────────────────────

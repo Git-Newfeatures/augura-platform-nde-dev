@@ -1,8 +1,8 @@
-"""Interface publique du module analytics (logging consommé par les autres modules).
+"""Public interface of the analytics module (logging consumed by the other modules).
 
-Inclut la colonne vertébrale provenance/reproductibilité (spec §2) : artefacts
-versionnés & hashés (`create_artifact`/`get_artifact`/`lock_artifact`) et journal
-d'audit (`record_event` → outbox_events). Toute écriture émet un event de provenance.
+Includes the provenance/reproducibility backbone (spec §2): versioned & hashed
+artifacts (`create_artifact`/`get_artifact`/`lock_artifact`) and the audit log
+(`record_event` → outbox_events). Every write emits a provenance event.
 """
 
 from typing import Any
@@ -67,7 +67,7 @@ async def log_agent_run(
     return run.id
 
 
-# ── Provenance / artefacts (colonne vertébrale reproductibilité, spec §2) ─────
+# ── Provenance / artifacts (reproducibility backbone, spec §2) ─────
 
 
 async def record_event(
@@ -78,7 +78,7 @@ async def record_event(
     event_type: str,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Écrit un event d'audit immuable dans outbox_events (user/ts via payload)."""
+    """Write an immutable audit event into outbox_events (user/ts via payload)."""
     session.add(
         OutboxEvent(
             aggregate_type=aggregate_type,
@@ -103,8 +103,8 @@ async def create_artifact(
     locked: bool = False,
     storage_ref: str | None = None,
 ) -> Artifact:
-    """Crée un artefact versionné + hashé (SHA-256 du contenu canonique) et émet
-    l'event de provenance. content=None ⇒ on hashe le storage_ref (gros fichier externe)."""
+    """Create a versioned + hashed artifact (SHA-256 of the canonical content) and emit
+    the provenance event. content=None ⇒ hash the storage_ref (large external file)."""
     sha = content_hash(content if content is not None else {"storage_ref": storage_ref})
     artifact = Artifact(
         org_id=tenant_id,
@@ -145,7 +145,7 @@ async def get_artifact(
     study_id: StudyId | None = None,
     version: int | None = None,
 ) -> Artifact | None:
-    """Récupère un artefact (version donnée, ou la plus récente si version=None)."""
+    """Fetch an artifact (given version, or the most recent if version=None)."""
     stmt = select(Artifact).where(Artifact.org_id == tenant_id, Artifact.kind == kind)
     if study_id is not None:
         stmt = stmt.where(Artifact.study_id == study_id)
@@ -164,16 +164,16 @@ async def lock_artifact(
     artifact_id: UUID,
     locked_by: UserId | None = None,
 ) -> Artifact:
-    """Verrouille un artefact (lock de pré-spécification) et émet l'event. Idempotence
-    refusée : un artefact déjà verrouillé lève ConflictError."""
+    """Lock an artifact (pre-specification lock) and emit the event. Idempotence is
+    refused: an already-locked artifact raises ConflictError."""
     res = await session.execute(
         select(Artifact).where(Artifact.org_id == tenant_id, Artifact.id == artifact_id)
     )
     artifact = res.scalar_one_or_none()
     if artifact is None:
-        raise NotFoundError("artefact introuvable", artifact_id=str(artifact_id))
+        raise NotFoundError("artifact not found", artifact_id=str(artifact_id))
     if artifact.locked:
-        raise ConflictError("artefact déjà verrouillé", artifact_id=str(artifact_id))
+        raise ConflictError("artifact already locked", artifact_id=str(artifact_id))
     artifact.locked = True
     await session.flush()
     await record_event(

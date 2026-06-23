@@ -1,7 +1,7 @@
-"""Interface publique du module corpus.
+"""Public interface of the corpus module.
 
-Expose le router (composition) et `search_corpus` (retrieval réutilisé par
-l'agent E1 — appel inter-module via l'interface publique, spec §8).
+Exposes the router (composition) and `search_corpus` (retrieval reused by
+the E1 agent — cross-module call via the public interface, spec §8).
 """
 
 from typing import Any
@@ -19,7 +19,7 @@ async def search_corpus(
     match_count: int = 20,
     filter: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Recherche pgvector (match_chunks) via l'interface publique du module."""
+    """pgvector search (match_chunks) via the module's public interface."""
     return await CorpusRepo(session).search(embedding, match_count, filter or {})
 
 

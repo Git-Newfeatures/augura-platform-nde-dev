@@ -1,4 +1,4 @@
-"""Accès base du module analytics — agrégats d'usage, scopés tenant."""
+"""Analytics module data access — usage aggregates, tenant-scoped."""
 
 from datetime import datetime
 
@@ -50,8 +50,8 @@ class AnalyticsRepo:
     async def recent_activity(
         self, tenant_id: TenantId, *, limit: int = 30, study_id: str | None = None
     ) -> list[UsageEvent]:
-        """Fil d'activité tenant (audit trail), le plus récent d'abord. Filtre optionnel
-        sur metadata->>'study_id' quand un study_id est fourni."""
+        """Tenant activity feed (audit trail), most recent first. Optional filter
+        on metadata->>'study_id' when a study_id is provided."""
         stmt = select(UsageEvent).where(UsageEvent.org_id == tenant_id)
         if study_id:
             stmt = stmt.where(UsageEvent.metadata_["study_id"].astext == study_id)
@@ -62,7 +62,7 @@ class AnalyticsRepo:
     async def list_artifacts(
         self, tenant_id: TenantId, *, limit: int = 50, study_id: str | None = None
     ) -> list[Artifact]:
-        """Artefacts versionnés & hashés du tenant (provenance), le plus récent d'abord."""
+        """Tenant's versioned & hashed artifacts (provenance), most recent first."""
         stmt = select(Artifact).where(Artifact.org_id == tenant_id)
         if study_id:
             stmt = stmt.where(Artifact.study_id == study_id)

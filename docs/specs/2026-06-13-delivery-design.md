@@ -1,49 +1,49 @@
-# Augura Platform — Design de livraison (backend complet)
+# Augura Platform — Delivery design (complete backend)
 
-**Date** : 2026-06-13
-**Statut** : validé (go Quentin)
-**Portée** : transformer la spec d'architecture validée (`2026-06-11-augura-backend-architecture-design.md`) en un programme d'implémentation exécutable, phase par phase, jusqu'au backend de production complet + frontend migré + base exportable Supabase.
-**Référence** : ce document complète la spec ; il ne la remplace pas. La spec décrit l'état final ; ce document décrit *comment on y va* et fige le schéma concret + le contrat de données.
+**Date**: 2026-06-13
+**Status**: validated (go Quentin)
+**Scope**: turn the validated architecture spec (`2026-06-11-augura-backend-architecture-design.md`) into an executable implementation program, phase by phase, up to the complete production backend + migrated frontend + exportable Supabase database.
+**Reference**: this document complements the spec; it does not replace it. The spec describes the end state; this document describes *how we get there* and freezes the concrete schema + the data contract.
 
 ---
 
-## 1. Décisions de cadrage (2026-06-13)
+## 1. Scoping decisions (2026-06-13)
 
-| # | Sujet | Décision |
+| # | Topic | Decision |
 |---|-------|----------|
-| D1 | Périmètre de la livraison | **Tout**, agents LLM compris (les 7 modules + les 4 agents) |
-| D2 | Cible base de données | **Artefacts SQL/Alembic seulement** — aucune base existante touchée, aucun Docker/Postgres local lancé sur la machine de dev |
-| D3 | Frontend | **Migration `lucis-dashboard` → `apps/web`** sans couche mock ; `lucis-dashboard` reste figé en démo pure |
-| D4 | Auth | **Supabase Auth + vérification JWKS + RLS** bout-en-bout |
+| D1 | Delivery scope | **Everything**, LLM agents included (the 7 modules + the 4 agents) |
+| D2 | Database target | **SQL/Alembic artifacts only** — no existing database touched, no local Docker/Postgres started on the dev machine |
+| D3 | Frontend | **Migration `lucis-dashboard` → `apps/web`** without a mock layer; `lucis-dashboard` stays frozen as a pure demo |
+| D4 | Auth | **Supabase Auth + JWKS verification + RLS** end-to-end |
 
-Conséquence de D1 + D2 : le backend est livré comme **code + tests**. La vérification repose sur pyright strict + ruff + import-linter + pytest (logique/contrat/agents-LLM-mockés en local ; repos+RLS branchés sur la CI GitHub Actions avec un service `postgres`, pas exécutés en local). Pas de run end-to-end live tant que l'utilisateur n'a pas créé son instance Supabase et fourni les clés LLM.
+Consequence of D1 + D2: the backend is delivered as **code + tests**. Verification relies on strict pyright + ruff + import-linter + pytest (logic/contract/LLM-agents mocked locally; repos+RLS wired in the GitHub Actions CI with a `postgres` service, not run locally). No live end-to-end run until the user has created their Supabase instance and provided the LLM keys.
 
-## 2. Découpage en phases (spec §12 mappée sur D1)
+## 2. Phase breakdown (spec §12 mapped onto D1)
 
-| Phase | Contenu | Livrable de fin |
+| Phase | Content | End deliverable |
 |---|---|---|
-| **P1 — Scaffold** | `apps/api` (uv, src layout), CI (ruff/pyright strict/import-linter/pytest), `core/` (config fail-fast, logging structlog, errors RFC 9457), `modal_app.py` | `pytest` vert, verrous qualité verts, healthcheck servable |
-| **P2 — Socle data + auth + studies + web boot** | `core/db` (engine async, `SET LOCAL app.tenant_id`), `core/auth` (JWKS), `core/tenancy`, **Alembic = schéma complet + RLS**, module `studies` (CRUD + `study_state` versionné), client TS généré, migration `lucis-dashboard`→`apps/web` sans mocks, **bundle SQL Supabase** | front migré boote (login Supabase, liste d'études via API) ; `supabase/*.sql` exporté |
-| **P3 — datasets + corpus** | `datasets` (upload, profiling colonnes, mapping), tables cohorte + seed, `corpus` (documents/chunks, feed, coverage, sources, `match_chunks` pgvector) | endpoints data du front servis sur Postgres seedé |
-| **P4 — agents** | runtime Anthropic async typé ; `dag`, `gap-detection`, `variable-check` (forced-tool, Pydantic + retry réparation, `agent_cache`, `agent_runs`) ; `trace` E1 multi-tour SSE/NDJSON en dernier | golden tests de caractérisation verts contre les handlers JS |
-| **P5 — simulation + jobs** | infra `jobs` (idempotence), bootstrap à la demande (port `run_bootstrap.py`), power analytique calibré par outcome (fix T4) | simulation à la demande + lecture résultats |
-| **P6 — documents + analytics** | génération protocole/rapport (WeasyPrint/python-docx), `usage_events`, `outbox` audit, `admin-stats`, vues coûts tokens | dossiers exportables ; admin alimenté |
-| **P7 — parité + bascule** | golden + e2e Playwright verts, tests d'isolation RLS, `lucis-dashboard` figé en démo pure | critère de bascule atteint |
+| **P1 — Scaffold** | `apps/api` (uv, src layout), CI (ruff/strict pyright/import-linter/pytest), `core/` (fail-fast config, structlog logging, RFC 9457 errors), `modal_app.py` | green `pytest`, green quality gates, servable healthcheck |
+| **P2 — Data foundation + auth + studies + web boot** | `core/db` (async engine, `SET LOCAL app.tenant_id`), `core/auth` (JWKS), `core/tenancy`, **Alembic = complete schema + RLS**, `studies` module (CRUD + versioned `study_state`), generated TS client, `lucis-dashboard`→`apps/web` migration without mocks, **Supabase SQL bundle** | migrated frontend boots (Supabase login, study list via API); `supabase/*.sql` exported |
+| **P3 — datasets + corpus** | `datasets` (upload, column profiling, mapping), cohort tables + seed, `corpus` (documents/chunks, feed, coverage, sources, `match_chunks` pgvector) | frontend data endpoints served on seeded Postgres |
+| **P4 — agents** | typed async Anthropic runtime; `dag`, `gap-detection`, `variable-check` (forced-tool, Pydantic + repair retry, `agent_cache`, `agent_runs`); `trace` E1 multi-turn SSE/NDJSON last | green characterization golden tests against the JS handlers |
+| **P5 — simulation + jobs** | `jobs` infra (idempotency), on-demand bootstrap (port of `run_bootstrap.py`), analytic power calibrated per outcome (fix T4) | on-demand simulation + result reads |
+| **P6 — documents + analytics** | protocol/report generation (WeasyPrint/python-docx), `usage_events`, `outbox` audit, `admin-stats`, token-cost views | exportable dossiers; admin populated |
+| **P7 — parity + cutover** | green golden + Playwright e2e, RLS isolation tests, `lucis-dashboard` frozen as a pure demo | cutover criterion met |
 
-Chaque phase reçoit son propre plan écrit (skill `writing-plans`) juste avant exécution, puis est exécutée en TDD avec commits atomiques (sans trailer co-author, préférence Quentin). Rapport à chaque frontière de phase.
+Each phase gets its own written plan (`writing-plans` skill) just before execution, then is executed in TDD with atomic commits (no co-author trailer, Quentin's preference). Report at every phase boundary.
 
-## 3. Schéma de données complet (19 tables)
+## 3. Complete data schema (19 tables)
 
-Toutes les tables tenant-scopées portent une policy RLS fondée sur `current_setting('app.tenant_id')`. `documents`/`chunks` ont `org_id` **nullable** ⇒ corpus global lisible par tous les tenants.
+Every tenant-scoped table carries an RLS policy based on `current_setting('app.tenant_id')`. `documents`/`chunks` have a **nullable** `org_id` ⇒ global corpus readable by all tenants.
 
 ### Tenancy
-- **orgs** — `id, name, slug, cesl_profile jsonb, created_at`. Sert `/api/tenant`.
+- **orgs** — `id, name, slug, cesl_profile jsonb, created_at`. Serves `/api/tenant`.
 - **memberships** — `id, org_id→orgs, user_id (auth.users), role(owner|member|viewer), created_at`.
 
 ### Studies
-- **studies** — `id, org_id, name, slug, tagline, category, framework, n_subjects, lead, status, created_by, created_at, updated_at`. Remplace `cockpitData` + `augura_new_studies`.
+- **studies** — `id, org_id, name, slug, tagline, category, framework, n_subjects, lead, status, created_by, created_at, updated_at`. Replaces `cockpitData` + `augura_new_studies`.
 - **study_members** — `id, study_id, user_id, role`.
-- **study_state** — `id, study_id, version, state jsonb, created_by, created_at`. Remplace le `sessionStorage augura_session_v3_*` (profileReady, e1Profile, studyType, selectedEstimators, lockedEstimator, selectedOutcome, simResults, uploadedData, variableMappings, variableCheckResult, dagCache, cqExposure, cqPopulation…).
+- **study_state** — `id, study_id, version, state jsonb, created_by, created_at`. Replaces the `sessionStorage augura_session_v3_*` (profileReady, e1Profile, studyType, selectedEstimators, lockedEstimator, selectedOutcome, simResults, uploadedData, variableMappings, variableCheckResult, dagCache, cqExposure, cqPopulation…).
 
 ### Datasets
 - **datasets** — `id, org_id, study_id?, name, storage_path, row_count, status, created_at`.
@@ -52,66 +52,66 @@ Toutes les tables tenant-scopées portent une policy RLS fondée sur `current_se
 - **cohort_biomarkers** (= `validation_biomarkers`) — `id, org_id, dataset_id, cohort_name, member_id, timepoint_months, hba1c_pct, ldl_mgdl, hs_crp_mgl, adherence_pct`.
 
 ### Corpus
-- **documents** — `id, org_id?, source_id, evidence_type, jurisdiction, lifecycle, title, summary, url, published_at, ingested_at, priority_score, is_new`. Sert `pulse-feed`, `coverage-map`, `corpus-sources`.
-- **chunks** — `id, document_id, org_id?, content, embedding vector(1536), token_count`. Index **HNSW** sur `embedding`. Sert `match_chunks`.
+- **documents** — `id, org_id?, source_id, evidence_type, jurisdiction, lifecycle, title, summary, url, published_at, ingested_at, priority_score, is_new`. Serves `pulse-feed`, `coverage-map`, `corpus-sources`.
+- **chunks** — `id, document_id, org_id?, content, embedding vector(1536), token_count`. **HNSW** index on `embedding`. Serves `match_chunks`.
 
 ### Agents
 - **agent_runs** — `id, org_id, study_id?, agent_type, model, status, duration_ms, input_tokens, output_tokens, cost_usd, created_at`.
-- **agent_cache** — `id, agent_type, input_hash unique, response jsonb, created_at` (fix U2 : agents déterministes servis depuis le cache).
+- **agent_cache** — `id, agent_type, input_hash unique, response jsonb, created_at` (fix U2: deterministic agents served from cache).
 
 ### Simulation
-- **simulation_runs** — `id, org_id, study_id, params jsonb, job_id?, status, results jsonb, created_at`. Bootstrap à la demande.
-- **simulation_results** — `id, org_id, cohort_name, scenario, estimator, effect_size, ci_lower, ci_upper, power, p_value`. Read-model seedé pour le mode VALIDATED du front (3 scénarios × 4 estimateurs = 12 lignes).
+- **simulation_runs** — `id, org_id, study_id, params jsonb, job_id?, status, results jsonb, created_at`. On-demand bootstrap.
+- **simulation_results** — `id, org_id, cohort_name, scenario, estimator, effect_size, ci_lower, ci_upper, power, p_value`. Seeded read-model for the frontend's VALIDATED mode (3 scenarios × 4 estimators = 12 rows).
 
 ### Jobs
 - **jobs** — `id, org_id, type, status(queued|running|succeeded|failed), progress, payload jsonb, result_ref, error, idempotency_key unique, modal_call_id, created_at, updated_at`.
 
-### Documents générés
+### Generated documents
 - **generated_documents** — `id, org_id, study_id, type(protocol|report), storage_path, status, created_at`.
 
-### Analytics / observabilité
-- **usage_events** — `id, user_id?, org_id?, event_type, route, metadata jsonb, created_at`. Sert `admin-stats`.
+### Analytics / observability
+- **usage_events** — `id, user_id?, org_id?, event_type, route, metadata jsonb, created_at`. Serves `admin-stats`.
 - **outbox_events** — `id, aggregate_type, aggregate_id, event_type, payload jsonb, created_at, processed_at`. Audit trail.
 
-### Fonctions / vues
-- `match_chunks(query_embedding vector(1536), match_count int, filter jsonb)` — recherche pgvector.
-- `coverage_map` — vue/agrégat (jurisdiction × evidence_type → doc_count, gap_score, gap_severity), incluant les cellules à zéro.
+### Functions / views
+- `match_chunks(query_embedding vector(1536), match_count int, filter jsonb)` — pgvector search.
+- `coverage_map` — view/aggregate (jurisdiction × evidence_type → doc_count, gap_score, gap_severity), including zero cells.
 
-## 4. Contrat front → backend → table
+## 4. Frontend → backend → table contract
 
-| Front (mock actuel) | Endpoint FastAPI | Table(s) |
+| Frontend (current mock) | FastAPI endpoint | Table(s) |
 |---|---|---|
 | `GET /api/tenant?projectId=` | `GET /orgs/{slug}` | `orgs.cesl_profile` |
 | `GET /api/pulse-feed` | `GET /corpus/feed` (keyset) | `documents` |
-| `GET /api/coverage-map` · `/api/corpus-sources` | `GET /corpus/coverage` · `/corpus/sources` | `documents` (agrégé) |
-| `GET /api/study-designs` · `/api/cesl-sources` | `GET /catalogs/*` | catalogues statiques |
+| `GET /api/coverage-map` · `/api/corpus-sources` | `GET /corpus/coverage` · `/corpus/sources` | `documents` (aggregated) |
+| `GET /api/study-designs` · `/api/cesl-sources` | `GET /catalogs/*` | static catalogs |
 | `POST /api/dag` · `/gap-detection` · `/variable-check` | `POST /agents/{dag,gaps,variable-check}` | `agent_runs`, `agent_cache`, `study_state` |
 | `POST /api/trace` (SSE) | `POST /agents/profiling/stream` (SSE NDJSON) | `agent_runs`, `study_state` |
 | `POST /api/supabase` (match_chunks) | `POST /corpus/search` | `chunks` |
-| `POST /api/anthropic` · `/api/openai` | internalisés (plus de proxy générique exposé au navigateur) | — |
+| `POST /api/anthropic` · `/api/openai` | internalized (no more generic proxy exposed to the browser) | — |
 | Supabase REST `validation_members/biomarkers` | `GET /datasets/{id}/cohort` | `cohort_*` |
 | `simulation_results` (VALIDATED) | `GET /simulations/results` | `simulation_results` |
-| `POST /simulations` (à la demande) | `POST /simulations` → `202 {job_id}` | `simulation_runs`, `jobs` |
+| `POST /simulations` (on-demand) | `POST /simulations` → `202 {job_id}` | `simulation_runs`, `jobs` |
 | `sessionStorage augura_session_v3` | `GET/PUT /studies/{id}/state` | `study_state` |
 | `GET /api/admin-stats` | `GET /analytics/admin` | `usage_events` |
 
-## 5. Livrable Supabase (D2)
+## 5. Supabase deliverable (D2)
 
-Alembic = source de vérité. Un bundle dérivé, prêt à coller dans un nouveau projet Supabase, est généré sous `apps/api/supabase/` :
-- `schema.sql` — extensions (`pgvector`, `pgcrypto`), tables, index HNSW.
-- `policies.sql` — policies RLS + rôle de connexion non exempt.
-- `functions.sql` — `match_chunks`, vue `coverage_map`.
-- `seed.sql` — corpus + cohorte + `simulation_results`, dérivés des données locales existantes.
+Alembic = source of truth. A derived bundle, ready to paste into a new Supabase project, is generated under `apps/api/supabase/`:
+- `schema.sql` — extensions (`pgvector`, `pgcrypto`), tables, HNSW index.
+- `policies.sql` — RLS policies + non-exempt connection role.
+- `functions.sql` — `match_chunks`, `coverage_map` view.
+- `seed.sql` — corpus + cohort + `simulation_results`, derived from the existing local data.
 
-Aucune base existante n'est touchée. Aucun Docker n'est lancé sur la machine de dev.
+No existing database is touched. No Docker is started on the dev machine.
 
-## 6. Stratégie de vérification (sous contraintes D1+D2)
+## 6. Verification strategy (under the D1+D2 constraints)
 
-- **Local** : pyright strict, ruff, import-linter, pytest (logique métier, validation Pydantic, agents à LLM mocké, parsing DDL).
-- **CI (GitHub Actions)** : service `postgres` 16 + pgvector → tests repos + isolation RLS dédiés (un tenant ne lit jamais l'autre) ; application du bundle `supabase/*.sql` sur ce Postgres pour prouver qu'il est valide.
-- **Caractérisation** : `src/mocks/apiFixtures.js` → golden files ; le FastAPI doit répondre la même chose que les routes JS (écarts listés et assumés).
-- **Agents** : clés `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` requises pour un run live ; absentes du `.env.local` actuel ⇒ validés structurellement jusqu'à fourniture.
+- **Local**: strict pyright, ruff, import-linter, pytest (business logic, Pydantic validation, agents with mocked LLM, DDL parsing).
+- **CI (GitHub Actions)**: `postgres` 16 + pgvector service → dedicated repo tests + RLS isolation (one tenant never reads another); applying the `supabase/*.sql` bundle to this Postgres to prove it is valid.
+- **Characterization**: `src/mocks/apiFixtures.js` → golden files; FastAPI must return the same thing as the JS routes (gaps listed and accepted).
+- **Agents**: `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` keys required for a live run; absent from the current `.env.local` ⇒ validated structurally until provided.
 
-## 7. Hors périmètre de cette livraison
+## 7. Out of scope for this delivery
 
-Inchangé par rapport à la spec §13. En plus : pas de déploiement Modal live tant que l'utilisateur n'a pas authentifié Modal (le `modal_app.py` est livré et prêt).
+Unchanged from spec §13. In addition: no live Modal deployment until the user has authenticated Modal (the `modal_app.py` is delivered and ready).

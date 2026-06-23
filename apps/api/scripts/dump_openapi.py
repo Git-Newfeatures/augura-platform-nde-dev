@@ -1,4 +1,4 @@
-"""Dump déterministe du schéma OpenAPI (source du client TS + drift check)."""
+"""Deterministic dump of the OpenAPI schema (source of the TS client + drift check)."""
 
 import json
 

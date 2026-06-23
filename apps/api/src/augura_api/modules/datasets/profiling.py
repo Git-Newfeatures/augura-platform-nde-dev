@@ -1,7 +1,7 @@
-"""Profilage de colonnes — porté/condensé de l'MVP profiler.js.
+"""Column profiling — ported/condensed from the MVP profiler.js.
 
-Produit exactement les champs persistés dans dataset_columns. Le profiler DQ
-complet (quartiles, sentinelles, outliers) est porté en A3.
+Produces exactly the fields persisted in dataset_columns. The full DQ profiler
+(quartiles, sentinels, outliers) is ported in A3.
 """
 
 from __future__ import annotations

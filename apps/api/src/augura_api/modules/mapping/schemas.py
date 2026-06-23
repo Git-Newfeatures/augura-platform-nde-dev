@@ -1,4 +1,4 @@
-"""Contrat public du module mapping."""
+"""Public contract for the mapping module."""
 
 from uuid import UUID
 

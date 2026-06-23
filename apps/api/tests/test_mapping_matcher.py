@@ -1,4 +1,4 @@
-"""Tests de l'index + matcher + confidence."""
+"""Tests for the index + matcher + confidence."""
 
 from dataclasses import dataclass
 
@@ -47,7 +47,7 @@ def test_no_match_is_unmapped() -> None:
 
 
 def test_match_carries_layer_and_domain() -> None:
-    """Le candidat porte la couche + le domaine du concept (colonnes Layer/Domain du front)."""
+    """The candidate carries the layer + domain of the concept (front-end Layer/Domain columns)."""
     idx = _index()
     cands = match_column(normalize("HbA1c"), idx)
     assert cands and cands[0].layer == 1

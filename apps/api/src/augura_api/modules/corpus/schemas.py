@@ -1,4 +1,4 @@
-"""Contrat public du module corpus (mappé sur pulse-feed / coverage-map / sources)."""
+"""Public contract of the corpus module (mapped to pulse-feed / coverage-map / sources)."""
 
 from datetime import date, datetime
 from typing import Any
@@ -85,8 +85,8 @@ class SourceCoverageResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    # Le client fournit SOIT un texte `query` (embeddé côté serveur), SOIT un
-    # `query_embedding` pré-calculé (dim 1536). Au moins l'un des deux est requis.
+    # The client provides EITHER a `query` text (embedded server-side), OR a
+    # pre-computed `query_embedding` (dim 1536). At least one of the two is required.
     query: str | None = Field(default=None, min_length=1, max_length=1000)
     query_embedding: list[float] | None = None
     match_count: int = 20
@@ -105,8 +105,8 @@ class SearchHit(BaseModel):
 class LiteratureSearchRequest(BaseModel):
     query: str = Field(min_length=2, max_length=400)
     max_results: int = Field(default=10, ge=1, le=50)
-    # Élargit la requête en syntaxe PubMed (MeSH) via le LLM avant la recherche.
-    # Sans clé Anthropic, on retombe sur la requête brute.
+    # Expands the query into PubMed syntax (MeSH) via the LLM before searching.
+    # Without an Anthropic key, we fall back to the raw query.
     expand: bool = False
 
 
@@ -123,19 +123,19 @@ class LiteratureIngestRequest(BaseModel):
     pmids: list[str] = Field(min_length=1, max_length=50)
 
 
-# ── Recherche live (retrieve-and-freeze) — distinct de l'ingestion ci-dessus ──
-# Nouveau verbe : récupère + gèle un jeu de preuves (hash de contenu), SANS
-# ingérer dans le corpus, SANS embedding, SANS DATA_CHANGED_EVENT.
+# ── Live search (retrieve-and-freeze) — distinct from the ingestion above ──
+# New verb: retrieves + freezes an evidence set (content hash), WITHOUT
+# ingesting into the corpus, WITHOUT embedding, WITHOUT DATA_CHANGED_EVENT.
 
 VALID_RETRIEVE_SOURCES = ("pubmed", "ctgov")
 
 
 class LiteratureRetrieveRequest(BaseModel):
     query: str = Field(min_length=2, max_length=400)
-    # Défaut : les deux sources. Validé côté service (source inconnue → 400).
+    # Default: both sources. Validated on the service side (unknown source → 400).
     sources: list[str] | None = None
     max_results: int = Field(default=10, ge=1, le=50)
-    # Filtres v0 : fenêtre de date + types d'étude. Validés côté routeur (_build_filters).
+    # v0 filters: date window + study types. Validated on the router side (_build_filters).
     date_range: str = "any"
     study_types: list[str] = Field(default_factory=list)
 
@@ -148,7 +148,7 @@ class RetrievedItemOut(BaseModel):
     retrieval_date: date
     record: dict[str, Any]
     annotation: str | None = None
-    rationale: str | None = None  # justification de curation (None si non curé)
+    rationale: str | None = None  # curation justification (None if not curated)
 
 
 class SourceGroupOut(BaseModel):
@@ -166,12 +166,12 @@ class LiteratureRetrieveResponse(BaseModel):
     groups: list[SourceGroupOut]
 
 
-# ── Schéma canonique de preuve gelée (snapshot) ───────────────────────────────
+# ── Canonical frozen-evidence schema (snapshot) ───────────────────────────────
 
 
 class FrozenResult(BaseModel):
-    """Par citation : la source, l'id, le query_string EXACT (pas la question
-    utilisateur), la date de récupération, l'enregistrement gelé et l'annotation."""
+    """Per citation: the source, the id, the EXACT query_string (not the user
+    question), the retrieval date, the frozen record and the annotation."""
 
     source: str
     id: str
@@ -180,7 +180,7 @@ class FrozenResult(BaseModel):
     retrieval_date: date
     record: dict[str, Any]
     annotation: str | None = None  # kept / dismissed / null
-    rationale: str | None = None  # justification de curation gelée (provenance)
+    rationale: str | None = None  # frozen curation justification (provenance)
 
 
 class SnapshotWriteRequest(BaseModel):
@@ -188,13 +188,13 @@ class SnapshotWriteRequest(BaseModel):
     sources: list[str]
     model_version: str
     prompt_version: str
-    study_id: UUID | None = None  # None ⇒ snapshot standalone (créateur seul)
+    study_id: UUID | None = None  # None ⇒ standalone snapshot (creator only)
     results: list[FrozenResult]
 
 
 class LiteratureSnapshot(BaseModel):
-    """Par artefact : métadonnées de provenance + résultats gelés + content_hash.
-    `verified` est posé à la lecture après recalcul du hash."""
+    """Per artifact: provenance metadata + frozen results + content_hash.
+    `verified` is set on read after recomputing the hash."""
 
     id: UUID
     study_id: UUID | None = None
@@ -210,7 +210,7 @@ class LiteratureSnapshot(BaseModel):
 
 
 class SnapshotSummary(BaseModel):
-    """Vue légère pour la liste « Saved evidence » : pas de results ni de hash."""
+    """Lightweight view for the "Saved evidence" list: no results, no hash."""
 
     id: UUID
     study_id: UUID | None = None

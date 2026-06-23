@@ -1,4 +1,4 @@
-"""Tests du scorer DQ (déductions + score pondéré)."""
+"""Tests for the DQ scorer (deductions + weighted score)."""
 
 from augura_api.modules.dq.provenance import make_finding
 from augura_api.modules.dq.scorer import compute_dq_score

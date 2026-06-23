@@ -1,7 +1,7 @@
-"""Vérification structurelle du bundle SQL Supabase (sans base de données).
+"""Structural check of the Supabase SQL bundle (without a database).
 
-Garde contre les omissions / typos / dérive. L'exécution réelle du bundle est
-prouvée en CI contre un Postgres + pgvector (job `db-bundle`).
+Guards against omissions / typos / drift. The real execution of the bundle is
+proven in CI against a Postgres + pgvector (job `db-bundle`).
 """
 
 import re
@@ -39,7 +39,7 @@ EXPECTED_TABLES = {
     "unit_conversions",
     "table_archetypes",
     "dq_constraints",
-    # Ontologie/causal (B1) — globaux, lecture seule.
+    # Ontology/causal (B1) — global, read-only.
     "taxonomy_standard_codes",
     "taxonomy_therapeutic_areas",
     "taxonomy_relationships",
@@ -54,7 +54,7 @@ EXPECTED_TABLES = {
     "search_sessions",
     "literature_events",
     "literature_queries",
-    # Reference catalogs (frontend real-only cleanup) — globaux, lecture seule.
+    # Reference catalogs (frontend real-only cleanup) — global, read-only.
     "outcome_catalog",
     "estimand_catalog",
     "estimator_catalog",
@@ -69,7 +69,7 @@ EXPECTED_TABLES = {
     "variable_role_catalog",
 }
 
-# Catalogues de référence (frontend real-only cleanup) : globaux, lecture seule.
+# Reference catalogs (frontend real-only cleanup): global, read-only.
 REFERENCE_CATALOGS = {
     "outcome_catalog",
     "estimand_catalog",
@@ -85,7 +85,7 @@ REFERENCE_CATALOGS = {
     "variable_role_catalog",
 }
 
-# Tables tenant-scopées qui DOIVENT porter une policy RLS.
+# Tenant-scoped tables that MUST carry an RLS policy.
 RLS_REQUIRED = {
     "orgs",
     "memberships",
@@ -120,15 +120,15 @@ def _read(name: str) -> str:
 def test_bundle_files_present_and_non_empty() -> None:
     for name in ("schema.sql", "functions.sql", "policies.sql", "seed.sql"):
         text = _read(name)
-        assert text.strip(), f"{name} est vide"
+        assert text.strip(), f"{name} is empty"
 
 
 def test_schema_declares_every_expected_table() -> None:
     schema = _read("schema.sql")
     declared = set(re.findall(r"create table if not exists (\w+)", schema))
     assert declared == EXPECTED_TABLES, {
-        "manquantes": EXPECTED_TABLES - declared,
-        "en trop": declared - EXPECTED_TABLES,
+        "missing": EXPECTED_TABLES - declared,
+        "extra": declared - EXPECTED_TABLES,
     }
 
 
@@ -141,14 +141,14 @@ def test_schema_enables_pgvector_and_hnsw() -> None:
 
 def test_policies_enable_rls_on_every_tenant_table() -> None:
     policies = _read("policies.sql")
-    # Tables couvertes par les boucles array (il y en a plusieurs) + les ALTER explicites.
+    # Tables covered by the array loops (there are several) + the explicit ALTERs.
     array_blocks = re.findall(r"array\[(.*?)\]", policies, re.DOTALL)
     assert array_blocks
     looped = {name for block in array_blocks for name in re.findall(r"'(\w+)'", block)}
     explicit = set(re.findall(r"alter table (\w+) enable row level security", policies))
     covered = looped | explicit
     missing = RLS_REQUIRED - covered
-    assert not missing, f"RLS manquante sur : {missing}"
+    assert not missing, f"RLS missing on: {missing}"
     assert "force row level security" in policies
 
 
@@ -156,7 +156,7 @@ def test_functions_define_match_chunks_and_coverage_view() -> None:
     fns = _read("functions.sql")
     assert "create or replace function match_chunks" in fns
     assert "create or replace view v_coverage_map" in fns
-    assert "embedding <=> query_embedding" in fns  # distance cosinus pgvector
+    assert "embedding <=> query_embedding" in fns  # pgvector cosine distance
 
 
 def test_seed_includes_cesl_reference_catalogs() -> None:
@@ -170,7 +170,7 @@ def test_reference_tables_have_select_only_rls() -> None:
     for t in ("cesl_sources", "cesl_study_designs"):
         assert f"alter table {t} enable row level security" in policies
         assert f"create policy backend_read on {t}" in policies
-    # Read-only : la policy de référence est FOR SELECT (pas d'écriture tenant).
+    # Read-only: the reference policy is FOR SELECT (no tenant writes).
     assert "for select" in policies
 
 
@@ -181,7 +181,7 @@ def test_reference_catalogs_have_select_only_rls() -> None:
     explicit = set(re.findall(r"alter table (\w+) enable row level security", policies))
     covered = looped | explicit
     missing = REFERENCE_CATALOGS - covered
-    assert not missing, f"RLS backend_read manquante sur catalogues : {missing}"
+    assert not missing, f"backend_read RLS missing on catalogs: {missing}"
     assert "create policy backend_read" in policies
     assert "for select" in policies
 
@@ -212,7 +212,7 @@ def test_seed_includes_semantic_taxonomy() -> None:
         assert f"insert into {t} " in seed
 
 
-# ── Ontologie/causal (B1) : 8 tables globales, lecture seule, seedées. ──────
+# ── Ontology/causal (B1): 8 global tables, read-only, seeded. ──────
 ONTOLOGY_TABLES = (
     "taxonomy_standard_codes",
     "taxonomy_therapeutic_areas",
@@ -226,13 +226,13 @@ ONTOLOGY_TABLES = (
 
 
 def test_ontology_tables_have_select_only_rls() -> None:
-    # RLS posée via boucle format() : on vérifie l'appartenance au tableau bouclé
-    # + que la policy émise est bien FOR SELECT (lecture seule, pas d'écriture tenant).
+    # RLS set via a format() loop: we check membership in the looped array
+    # + that the emitted policy is indeed FOR SELECT (read-only, no tenant writes).
     policies = _read("policies.sql")
     array_blocks = re.findall(r"array\[(.*?)\]", policies, re.DOTALL)
     looped = {name for block in array_blocks for name in re.findall(r"'(\w+)'", block)}
     missing = set(ONTOLOGY_TABLES) - looped
-    assert not missing, f"RLS backend_read manquante sur ontologie : {missing}"
+    assert not missing, f"backend_read RLS missing on ontology: {missing}"
     assert "create policy backend_read on %i for select" in policies.lower()
 
 

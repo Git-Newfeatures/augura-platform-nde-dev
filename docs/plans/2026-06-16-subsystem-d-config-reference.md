@@ -95,7 +95,7 @@ def test_reference_tables_have_select_only_rls() -> None:
     for t in ("cesl_sources", "cesl_study_designs"):
         assert f"alter table {t} enable row level security" in policies
         assert f"create policy backend_read on {t}" in policies
-    # Read-only : la policy de référence est FOR SELECT (pas d'écriture tenant).
+    # Read-only: the reference policy is FOR SELECT (no tenant write).
     assert "for select" in policies
 ```
 
@@ -110,7 +110,7 @@ Append to `apps/api/supabase/schema.sql` (after the `artifacts` table, before an
 
 ```sql
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : reference — catalogues CESL globaux (non tenant-scopés, lecture seule)
+-- Module: reference — global CESL catalogs (not tenant-scoped, read-only)
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists cesl_sources (
@@ -138,11 +138,11 @@ create table if not exists cesl_study_designs (
 In `apps/api/supabase/policies.sql`, **before** the final `commit;`, add a dedicated read-only gate (mirrors the infra `backend_session` loop but `for select` only):
 
 ```sql
--- ── Catalogues de référence (cesl_sources, cesl_study_designs) ────────────
--- Globaux, lecture seule pour les sessions tenant. RLS activée + gate « session
--- backend » en LECTURE uniquement (FOR SELECT) : anon/PostgREST refusé, backend
--- (app.tenant_id posé) autorisé en lecture. Aucune policy d'écriture ⇒ INSERT/
--- UPDATE/DELETE refusés pour augura_app ; le seed entre via le rôle privilégié.
+-- ── Reference catalogs (cesl_sources, cesl_study_designs) ─────────────────
+-- Global, read-only for tenant sessions. RLS enabled + "backend session" gate
+-- in READ only (FOR SELECT): anon/PostgREST denied, backend
+-- (app.tenant_id set) allowed to read. No write policy ⇒ INSERT/
+-- UPDATE/DELETE denied for augura_app; the seed enters via the privileged role.
 do $$
 declare
     t text;
@@ -167,9 +167,9 @@ Append to `apps/api/supabase/seed.sql` (idempotent via `on conflict do nothing`)
 
 ```sql
 -- ─────────────────────────────────────────────────────────────────────────
--- Catalogues de référence CESL (config, pas des données de démo).
--- Reconstruits depuis les constantes du MVP (4 sources de l'agent E1 + designs).
--- À remplacer par l'export Supabase autoritaire si l'accès au projet MVP est fourni.
+-- CESL reference catalogs (config, not demo data).
+-- Reconstructed from the MVP constants (4 sources of the E1 agent + designs).
+-- To be replaced by the authoritative Supabase export if access to the MVP project is provided.
 -- ─────────────────────────────────────────────────────────────────────────
 
 insert into cesl_sources (code, label, doc_type, description, base_url, result_unit, sort_order, active) values
@@ -219,7 +219,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 Create `apps/api/tests/test_reference_service.py`:
 
 ```python
-"""Tests unitaires du service reference — mapping ORM→schéma sans base (faux repo)."""
+"""Unit tests for the reference service — ORM→schema mapping without a database (fake repo)."""
 
 from uuid import UUID
 
@@ -286,7 +286,7 @@ Expected: FAIL — `ModuleNotFoundError: augura_api.modules.reference`.
 Create `apps/api/src/augura_api/modules/reference/__init__.py`:
 
 ```python
-"""Module reference — profil tenant + catalogues CESL (lecture seule)."""
+"""reference module — tenant profile + CESL catalogs (read-only)."""
 ```
 
 - [ ] **Step 4: Create `models.py`**
@@ -294,7 +294,7 @@ Create `apps/api/src/augura_api/modules/reference/__init__.py`:
 Create `apps/api/src/augura_api/modules/reference/models.py`:
 
 ```python
-"""Modèles SQLAlchemy du module reference (DDL créé par le bundle SQL)."""
+"""SQLAlchemy models for the reference module (DDL created by the SQL bundle)."""
 
 from typing import Any
 from uuid import UUID
@@ -346,7 +346,7 @@ class CeslStudyDesign(Base):
 Create `apps/api/src/augura_api/modules/reference/schemas.py`:
 
 ```python
-"""Schémas Pydantic — contrat public du module reference."""
+"""Pydantic schemas — public contract of the reference module."""
 
 from typing import Any
 from uuid import UUID
@@ -389,11 +389,11 @@ class StudyDesignOut(BaseModel):
 Create `apps/api/src/augura_api/modules/reference/repo.py`:
 
 ```python
-"""Accès base du module reference.
+"""Database access for the reference module.
 
-`orgs` est lu scopé au tenant courant (la RLS `tenant_self` n'expose que sa
-ligne ; le filtre explicite est une défense en profondeur). Les catalogues CESL
-sont globaux (lecture seule, RLS « backend FOR SELECT »).
+`orgs` is read scoped to the current tenant (the `tenant_self` RLS exposes only
+its row; the explicit filter is defense in depth). The CESL catalogs
+are global (read-only, "backend FOR SELECT" RLS).
 """
 
 from sqlalchemy import select
@@ -431,7 +431,7 @@ class ReferenceRepo:
 Create `apps/api/src/augura_api/modules/reference/service.py`:
 
 ```python
-"""Logique métier du module reference. Le router est un adaptateur fin."""
+"""Business logic for the reference module. The router is a thin adapter."""
 
 from typing import Protocol
 
@@ -455,7 +455,7 @@ class ReferenceService:
     async def tenant_profile(self, tenant: CurrentTenant) -> schemas.TenantProfileOut:
         org = await self.repo.get_org(tenant.tenant_id)
         if org is None:
-            raise NotFoundError("organisation introuvable", tenant_id=str(tenant.tenant_id))
+            raise NotFoundError("organization not found", tenant_id=str(tenant.tenant_id))
         return schemas.TenantProfileOut.model_validate(org)
 
     async def cesl_sources(self) -> list[schemas.CeslSourceOut]:
@@ -522,7 +522,7 @@ Expected: FAIL — `/reference/tenant` etc. not in `paths`; the new auth path re
 Create `apps/api/src/augura_api/modules/reference/router.py`:
 
 ```python
-"""Adaptateur HTTP du module reference (porte unique FastAPI)."""
+"""HTTP adapter for the reference module (single FastAPI gateway)."""
 
 from fastapi import APIRouter
 
@@ -564,7 +564,7 @@ async def study_designs(
 Replace `apps/api/src/augura_api/modules/reference/__init__.py` with:
 
 ```python
-"""Interface publique du module reference — les autres modules n'importent que ceci."""
+"""Public interface of the reference module — other modules import only this."""
 
 from augura_api.modules.reference.router import router
 
@@ -617,10 +617,10 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 Create `apps/api/tests/integration/test_reference_repo.py`:
 
 ```python
-"""Tests d'intégration du module reference — catalogues globaux + org tenant + RLS.
+"""Integration tests for the reference module — global catalogs + tenant org + RLS.
 
-Sautés si AUGURA_DATABASE_URL est absent. En CI, tournent après le seed, sous le
-rôle augura_app (NON exempt de RLS).
+Skipped if AUGURA_DATABASE_URL is absent. In CI, they run after the seed, under the
+augura_app role (NOT exempt from RLS).
 """
 
 import os
@@ -645,7 +645,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def sm() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL absent — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)
@@ -678,8 +678,8 @@ async def test_reference_catalogs_are_readable_and_ordered(
 
 async def test_tenant_reads_only_its_own_org(sm: async_sessionmaker[AsyncSession]) -> None:
     tenant = TenantId(uuid4())
-    # INSERT de l'org scopé au tenant courant : la policy orgs `tenant_self`
-    # (using id = app.tenant_id, défaut WITH CHECK = USING) autorise cette ligne.
+    # INSERT of the org scoped to the current tenant: the orgs `tenant_self` policy
+    # (using id = app.tenant_id, default WITH CHECK = USING) allows this row.
     async with sm() as session, session.begin():
         await _scope(session, tenant, USER)
         await session.execute(
@@ -698,7 +698,7 @@ async def test_tenant_reads_only_its_own_org(sm: async_sessionmaker[AsyncSession
     other = TenantId(uuid4())
     async with sm() as session, session.begin():
         await _scope(session, other, USER)
-        assert await ReferenceRepo(session).get_org(tenant) is None  # RLS isole
+        assert await ReferenceRepo(session).get_org(tenant) is None  # RLS isolates
 
 
 async def test_reference_tables_are_read_only_for_tenant(

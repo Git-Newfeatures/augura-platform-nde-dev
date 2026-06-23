@@ -1,20 +1,20 @@
-"""literature snapshots : visibilité par-étude (Tier 3, gate 9)
+"""literature snapshots: per-study visibility (Tier 3, gate 9)
 
-0002 a posé une RLS d'isolation tenant simple (org_id) sur literature_snapshots.
-Cette migration la remplace par un accès gaté PAR ÉTUDE :
+0002 set a simple tenant-isolation RLS (org_id) on literature_snapshots.
+This migration replaces it with PER-STUDY gated access:
 
-  - study_id NON NULL ⇒ visible aux MEMBRES de l'étude (study_members), pas à tout
-    le tenant. Point critique (gate 9) : on gate par study_members, JAMAIS par
-    study_id seul — sinon un snapshot fuiterait entre études du même tenant. Un
-    non-membre échoue fermé (l'EXISTS est faux ⇒ ligne invisible).
-  - study_id NULL ⇒ snapshot standalone, visible de son seul créateur (created_by).
+  - study_id NOT NULL ⇒ visible to the study's MEMBERS (study_members), not the
+    whole tenant. Critical point (gate 9): we gate by study_members, NEVER by
+    study_id alone — otherwise a snapshot would leak between studies of the same
+    tenant. A non-member fails closed (the EXISTS is false ⇒ row invisible).
+  - study_id NULL ⇒ standalone snapshot, visible only to its creator (created_by).
 
-WITH CHECK : écriture pour le tenant courant uniquement, en tant que créateur, et —
-si rattaché à une étude — seulement si on en est membre. app.user_id non posé ⇒
-tout échoue fermé.
+WITH CHECK: write for the current tenant only, as the creator, and — if attached
+to a study — only if one is a member of it. app.user_id not set ⇒ everything fails
+closed.
 
-search_sessions / literature_events / literature_queries gardent l'isolation tenant
-de 0002 (inchangées ici).
+search_sessions / literature_events / literature_queries keep the tenant isolation
+from 0002 (unchanged here).
 
 Revision ID: 0003_literature_per_study_rls
 Revises: 0002_literature_live_search
@@ -34,11 +34,11 @@ _USER = "nullif(current_setting('app.user_id', true), '')::uuid"
 
 
 def upgrade() -> None:
-    # Remplace la policy d'isolation tenant simple de 0002 par le gating par-étude.
-    # Idempotent : on retire AUSSI une éventuelle policy déjà posée par le bundle
-    # canonique (0001_baseline → policies.sql) pour ne JAMAIS laisser deux policies
-    # permissives sur literature_snapshots (sinon l'isolation tenant seule élargirait
-    # l'accès et casserait gate 9). État final garanti : une seule policy par-étude.
+    # Replaces 0002's simple tenant-isolation policy with per-study gating.
+    # Idempotent: we ALSO drop any policy that may have been set by the canonical
+    # bundle (0001_baseline → policies.sql) so we NEVER leave two permissive policies
+    # on literature_snapshots (otherwise tenant isolation alone would widen access
+    # and break gate 9). Guaranteed final state: a single per-study policy.
     op.execute(
         "DROP POLICY IF EXISTS literature_snapshots_tenant_isolation ON literature_snapshots;"
     )

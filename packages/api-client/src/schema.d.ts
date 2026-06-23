@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Chat
-         * @description Assistant inline : passerelle Messages Anthropic. 503 explicite si pas de clé.
+         * @description Inline assistant: Anthropic Messages gateway. Explicit 503 if no key.
          */
         post: operations["chat_agents_chat_post"];
         delete?: never;
@@ -101,8 +101,8 @@ export interface paths {
         };
         /**
          * Activity
-         * @description Fil d'activité du tenant (audit trail) — accessible à tout membre, filtrable
-         *     par étude. Alimente l'onglet History et les notifications du front.
+         * @description Tenant activity feed (audit trail) — accessible to any member, filterable
+         *     by study. Feeds the History tab and the frontend notifications.
          */
         get: operations["activity_analytics_activity_get"];
         put?: never;
@@ -139,8 +139,8 @@ export interface paths {
         };
         /**
          * Artifacts
-         * @description Artefacts versionnés & hashés du tenant (provenance/reproductibilité) —
-         *     alimente l'onglet Lineage.
+         * @description Tenant's versioned & hashed artifacts (provenance/reproducibility) —
+         *     feeds the Lineage tab.
          */
         get: operations["artifacts_analytics_artifacts_get"];
         put?: never;
@@ -162,7 +162,7 @@ export interface paths {
         put?: never;
         /**
          * Dag
-         * @description DAG causal ancré dans l'ontologie B1, contextualisé par LLM (port de Nico).
+         * @description Causal DAG anchored in the B1 ontology, contextualized by the LLM (port of Nico).
          */
         post: operations["dag_causal_dag_post"];
         delete?: never;
@@ -216,9 +216,9 @@ export interface paths {
         put?: never;
         /**
          * Literature
-         * @description Agent de recherche de littérature : cherche sur PubMed (E-utilities NCBI) et
-         *     ingère les articles dans le corpus du tenant (Document + Chunk). Embedder/LLM
-         *     optionnels (sans clé : ingestion sans vecteur, requête non élargie).
+         * @description Literature search agent: searches PubMed (NCBI E-utilities) and
+         *     ingests the articles into the tenant's corpus (Document + Chunk). Embedder/LLM
+         *     optional (without a key: ingestion without a vector, query not expanded).
          */
         post: operations["literature_corpus_literature_post"];
         delete?: never;
@@ -238,8 +238,8 @@ export interface paths {
         put?: never;
         /**
          * Literature Ingest
-         * @description Ingère des enregistrements PubMed précis (par PMID) dans le corpus du tenant.
-         *     Sert « Add to corpus » sur des résultats de retrieve gardés (PubMed only).
+         * @description Ingests specific PubMed records (by PMID) into the tenant's corpus.
+         *     Serves "Add to corpus" on kept retrieve results (PubMed only).
          */
         post: operations["literature_ingest_corpus_literature_ingest_post"];
         delete?: never;
@@ -259,9 +259,9 @@ export interface paths {
         put?: never;
         /**
          * Literature Retrieve
-         * @description Récupère en direct (PubMed + CT.gov), groupé par source, streamé en NDJSON.
-         *     Ne touche PAS au corpus (aucune ingestion). known-item ⇒ source unique ; topique
-         *     ⇒ fan-out parallèle. Le query_string exact par résultat est porté pour le gel.
+         * @description Retrieves live (PubMed + CT.gov), grouped by source, streamed as NDJSON.
+         *     Does NOT touch the corpus (no ingestion). known-item ⇒ single source; topical
+         *     ⇒ parallel fan-out. The exact query_string per result is carried for the freeze.
          */
         post: operations["literature_retrieve_corpus_literature_retrieve_post"];
         delete?: never;
@@ -284,7 +284,7 @@ export interface paths {
         post: operations["create_session_corpus_literature_sessions_post"];
         /**
          * Clear Sessions
-         * @description Vide l'historique « Recent queries » du tenant (nettoyage en un clic).
+         * @description Clears the tenant's "Recent queries" history (one-click cleanup).
          */
         delete: operations["clear_sessions_corpus_literature_sessions_delete"];
         options?: never;
@@ -305,7 +305,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Session
-         * @description Supprime une entrée de l'historique « Recent queries » (suppression unitaire).
+         * @description Deletes a single entry from the "Recent queries" history (single deletion).
          */
         delete: operations["delete_session_corpus_literature_sessions__session_id__delete"];
         options?: never;
@@ -339,14 +339,14 @@ export interface paths {
         };
         /**
          * List Snapshots
-         * @description Liste les preuves gelées du tenant (vue légère, sans results ni recalcul de hash).
+         * @description Lists the tenant's frozen evidence (lightweight view, no results, no hash recompute).
          */
         get: operations["list_snapshots_corpus_literature_snapshots_get"];
         put?: never;
         /**
          * Create Snapshot
-         * @description Gèle le jeu de résultats + annotations : calcule le content_hash, épingle
-         *     model/prompt version, persiste. La réponse porte le hash (auto-vérifiable).
+         * @description Freezes the result set + annotations: computes the content_hash, pins the
+         *     model/prompt version, persists. The response carries the hash (self-verifiable).
          */
         post: operations["create_snapshot_corpus_literature_snapshots_post"];
         delete?: never;
@@ -364,8 +364,8 @@ export interface paths {
         };
         /**
          * Read Snapshot
-         * @description Relit un snapshot et VÉRIFIE le content_hash (erreur dure si divergence).
-         *     Lecture base pure : zéro appel PubMed/CT.gov (rejeu reproductible).
+         * @description Re-reads a snapshot and VERIFIES the content_hash (hard error on divergence).
+         *     Pure DB read: zero PubMed/CT.gov calls (reproducible replay).
          */
         get: operations["read_snapshot_corpus_literature_snapshots__snapshot_id__get"];
         put?: never;
@@ -473,8 +473,8 @@ export interface paths {
         put?: never;
         /**
          * Import Cohort
-         * @description Ingère une cohorte longitudinale (members + biomarkers) — la voie d'écriture
-         *     des tables cohort_*, lues par OutcomeSelection/SimulationEngine.
+         * @description Ingests a longitudinal cohort (members + biomarkers) — the write path
+         *     for the cohort_* tables, read by OutcomeSelection/SimulationEngine.
          */
         post: operations["import_cohort_datasets_cohorts_import_post"];
         delete?: never;
@@ -648,7 +648,9 @@ export interface paths {
         };
         /**
          * Download Document
-         * @description Sert les octets du dossier généré (scopé tenant). 404 tant que non `ready`.
+         * @description Serves the bytes of the generated document (tenant-scoped), read FROM THE DATABASE
+         *     (generated_documents.content) — consistent cross-container on Modal, unlike the
+         *     ephemeral local disk. 404 until the document is `ready`.
          */
         get: operations["download_document_documents__document_id__download_get"];
         put?: never;
@@ -923,7 +925,7 @@ export interface paths {
         };
         /**
          * Bundle
-         * @description Couche sémantique gouvernée (14 tables) en un bloc — hydrate le store front.
+         * @description Governed semantic layer (14 tables) as a single block — hydrates the frontend store.
          */
         get: operations["bundle_semantic_bundle_get"];
         put?: never;
@@ -962,7 +964,7 @@ export interface paths {
         put?: never;
         /**
          * Enrich Apply
-         * @description Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version.
+         * @description Persists an enrichment into the GLOBAL ontology (owner-gated). Version bump.
          */
         post: operations["enrich_apply_semantic_enrich_apply_post"];
         delete?: never;
@@ -980,8 +982,8 @@ export interface paths {
         };
         /**
          * Enrich Proposals
-         * @description Sert les propositions d'un job réussi (scopé tenant). Lues EN BASE
-         *     (jobs.result_json), pas sur disque — relisibles depuis n'importe quel conteneur Modal.
+         * @description Serves the proposals of a successful job (tenant-scoped). Read FROM THE DB
+         *     (jobs.result_json), not from disk — re-readable from any Modal container.
          */
         get: operations["enrich_proposals_semantic_enrich_proposals__job_id__get"];
         put?: never;
@@ -1003,7 +1005,7 @@ export interface paths {
         put?: never;
         /**
          * Enrich Propose
-         * @description Lance l'analyse de couverture + proposition LLM en job background (suivi par polling).
+         * @description Runs coverage analysis + LLM proposal as a background job (tracked via polling).
          */
         post: operations["enrich_propose_semantic_enrich_propose_post"];
         delete?: never;
@@ -1021,7 +1023,7 @@ export interface paths {
         };
         /**
          * Relations
-         * @description Ontologie causale (B1). `?concept_id=` → sous-graphe (sujet ou objet = id).
+         * @description Causal ontology (B1). `?concept_id=` → subgraph (subject or object = id).
          */
         get: operations["relations_semantic_relations_get"];
         put?: never;
@@ -1041,7 +1043,7 @@ export interface paths {
         };
         /**
          * Release
-         * @description Release sémantique courante + compte par table (onglet Versions).
+         * @description Current semantic release + per-table count (Versions tab).
          */
         get: operations["release_semantic_release_get"];
         put?: never;
@@ -1180,7 +1182,7 @@ export interface components {
     schemas: {
         /**
          * ActivityEvent
-         * @description Élément du fil d'activité (audit trail), accessible à tout membre du tenant.
+         * @description Activity-feed item (audit trail), accessible to any tenant member.
          */
         ActivityEvent: {
             /**
@@ -1240,8 +1242,8 @@ export interface components {
         };
         /**
          * ArtifactOut
-         * @description Artefact versionné & hashé (colonne vertébrale reproductibilité) — alimente
-         *     l'onglet Lineage. `content` est volontairement exclu (peut être volumineux).
+         * @description Versioned & hashed artifact (reproducibility backbone) — feeds the
+         *     Lineage tab. `content` is intentionally excluded (can be large).
          */
         ArtifactOut: {
             /**
@@ -1441,9 +1443,10 @@ export interface components {
         };
         /**
          * CohortImportRequest
-         * @description Ingestion d'une cohorte longitudinale (members + biomarkers). Remplace toute
-         *     cohorte existante de même nom pour le tenant. C'est la voie d'écriture qui manquait
-         *     aux tables cohort_members / cohort_biomarkers (lues par OutcomeSelection/Simulation).
+         * @description Ingestion of a longitudinal cohort (members + biomarkers). Replaces any
+         *     existing cohort with the same name for the tenant. This is the write path that was
+         *     missing for the cohort_members / cohort_biomarkers tables (read by
+         *     OutcomeSelection/Simulation).
          */
         CohortImportRequest: {
             /**
@@ -1824,7 +1827,7 @@ export interface components {
         };
         /**
          * DirectRelationIn
-         * @description Relation légère proposée par le DAG (sans id pré-assigné).
+         * @description Lightweight relation proposed by the DAG (no pre-assigned id).
          */
         DirectRelationIn: {
             /**
@@ -1902,7 +1905,7 @@ export interface components {
         };
         /**
          * EnrichApplyRequest
-         * @description Corps de POST /semantic/enrich/apply — un seul chemin renseigné à la fois.
+         * @description Body of POST /semantic/enrich/apply — only one path provided at a time.
          */
         EnrichApplyRequest: {
             add_qualifier?: components["schemas"]["AddQualifierIn"] | null;
@@ -2118,8 +2121,8 @@ export interface components {
         };
         /**
          * FrozenResult
-         * @description Par citation : la source, l'id, le query_string EXACT (pas la question
-         *     utilisateur), la date de récupération, l'enregistrement gelé et l'annotation.
+         * @description Per citation: the source, the id, the EXACT query_string (not the user
+         *     question), the retrieval date, the frozen record and the annotation.
          */
         FrozenResult: {
             /** Annotation */
@@ -2363,8 +2366,8 @@ export interface components {
         };
         /**
          * LiteratureSnapshot
-         * @description Par artefact : métadonnées de provenance + résultats gelés + content_hash.
-         *     `verified` est posé à la lecture après recalcul du hash.
+         * @description Per artifact: provenance metadata + frozen results + content_hash.
+         *     `verified` is set on read after recomputing the hash.
          */
         LiteratureSnapshot: {
             /** Content Hash */
@@ -2420,7 +2423,7 @@ export interface components {
         };
         /**
          * MappedConcept
-         * @description Un concept issu du mapping (POST /datasets/{id}/map) présent dans la donnée.
+         * @description A concept from the mapping (POST /datasets/{id}/map) present in the data.
          */
         MappedConcept: {
             /**
@@ -2655,7 +2658,7 @@ export interface components {
         };
         /**
          * RelationOut
-         * @description Relation causale de l'ontologie (B1) — sortie de GET /semantic/relations.
+         * @description Causal relation of the ontology (B1) — output of GET /semantic/relations.
          */
         RelationOut: {
             /** Active */
@@ -2677,7 +2680,7 @@ export interface components {
         };
         /**
          * ReleaseStatus
-         * @description Réponse de GET /semantic/release — release courante + compte par table.
+         * @description Response of GET /semantic/release — current release + per-table count.
          */
         ReleaseStatus: {
             /** Counts */
@@ -2760,11 +2763,11 @@ export interface components {
         };
         /**
          * SemanticBundle
-         * @description Réponse de GET /semantic/bundle — la couche sémantique gouvernée en bloc.
+         * @description Response of GET /semantic/bundle — the governed semantic layer as a single block.
          *
-         *     14 tables, lignes laissées en `dict` brut : le front les indexe lui-même
-         *     (semantic-store → taxonomy/ontology loaders). Typer chaque table n'apporterait
-         *     rien au contrat de lecture. Les 14 champs sont toujours présents (coalesce à []).
+         *     14 tables, rows left as raw `dict`: the frontend indexes them itself
+         *     (semantic-store → taxonomy/ontology loaders). Typing each table would add
+         *     nothing to the read contract. All 14 fields are always present (coalesce to []).
          */
         SemanticBundle: {
             /** Causal Predicates */
@@ -2913,7 +2916,7 @@ export interface components {
         };
         /**
          * SimulationRunOut
-         * @description Élément de la liste des runs (alimente la page Runs du front).
+         * @description Item of the runs list (feeds the frontend Runs page).
          */
         SimulationRunOut: {
             /**
@@ -2939,7 +2942,7 @@ export interface components {
         };
         /**
          * SnapshotSummary
-         * @description Vue légère pour la liste « Saved evidence » : pas de results ni de hash.
+         * @description Lightweight view for the "Saved evidence" list: no results, no hash.
          */
         SnapshotSummary: {
             /**
@@ -3102,8 +3105,8 @@ export interface components {
         };
         /**
          * StudyUpdate
-         * @description Mise à jour partielle d'une étude (cycle de vie + métadonnées).
-         *     Seuls les champs explicitement fournis sont écrits (model_dump exclude_unset).
+         * @description Partial update of a study (lifecycle + metadata).
+         *     Only explicitly provided fields are written (model_dump exclude_unset).
          */
         StudyUpdate: {
             /** Category */

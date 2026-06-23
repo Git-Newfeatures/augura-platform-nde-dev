@@ -1,42 +1,42 @@
 #!/usr/bin/env bash
-# Déploie le backend FastAPI sur Modal et (re)crée le secret prod `augura-api`
-# à partir d'apps/api/.env — les valeurs ne sont jamais écrites dans ce script
-# ni affichées (lues à l'exécution depuis .env, non versionné).
+# Deploys the FastAPI backend to Modal and (re)creates the prod secret `augura-api`
+# from apps/api/.env — the values are never written into this script
+# nor displayed (read at runtime from .env, which is not version-controlled).
 #
-# Prérequis (one-time) : `modal setup`  (auth navigateur) — ou exporter
-#   MODAL_TOKEN_ID / MODAL_TOKEN_SECRET dans l'env.
+# Prerequisites (one-time): `modal setup`  (browser auth) — or export
+#   MODAL_TOKEN_ID / MODAL_TOKEN_SECRET in the env.
 #
-# Usage :
+# Usage:
 #   bash scripts/deploy_modal.sh                       # CORS = regex *.vercel.app (prod + previews)
-#   bash scripts/deploy_modal.sh 'https://app.augura.io' # + un domaine custom explicite
+#   bash scripts/deploy_modal.sh 'https://app.augura.io' # + an explicit custom domain
 #
-# Le CORS couvre par défaut toutes les origines Vercel (prod + previews dynamiques)
-# via AUGURA_CORS_ORIGIN_REGEX. L'argument optionnel ajoute un domaine explicite.
+# By default CORS covers all Vercel origins (prod + dynamic previews)
+# via AUGURA_CORS_ORIGIN_REGEX. The optional argument adds an explicit domain.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-FRONT_ORIGIN="${1:-}"   # optionnel : domaine custom en plus des previews Vercel
-[ -f .env ] || { echo "apps/api/.env introuvable (valeurs prod requises)"; exit 1; }
+FRONT_ORIGIN="${1:-}"   # optional: custom domain on top of the Vercel previews
+[ -f .env ] || { echo "apps/api/.env not found (prod values required)"; exit 1; }
 
-# Charge AUGURA_* + clés LLM depuis .env sans les afficher.
+# Load AUGURA_* + LLM keys from .env without displaying them.
 set -a; set +x; . ./.env; set +a
 
-# JWT : HS256 (secret) si présent, sinon JWKS (RS256). L'app gère les deux.
+# JWT: HS256 (secret) if present, otherwise JWKS (RS256). The app handles both.
 declare -a EXTRA=()
 [ -n "${AUGURA_SUPABASE_JWT_SECRET:-}" ] && EXTRA+=("AUGURA_SUPABASE_JWT_SECRET=${AUGURA_SUPABASE_JWT_SECRET}")
 [ -n "${AUGURA_SUPABASE_JWKS_URL:-}" ]   && EXTRA+=("AUGURA_SUPABASE_JWKS_URL=${AUGURA_SUPABASE_JWKS_URL}")
 [ -n "${AUGURA_SUPABASE_JWT_ISSUER:-}" ] && EXTRA+=("AUGURA_SUPABASE_JWT_ISSUER=${AUGURA_SUPABASE_JWT_ISSUER}")
-# Clé Anthropic : .env la nomme ANTHROPIC_API_KEY (ou AUGURA_ANTHROPIC_API_KEY).
+# Anthropic key: .env names it ANTHROPIC_API_KEY (or AUGURA_ANTHROPIC_API_KEY).
 ANTHRO="${AUGURA_ANTHROPIC_API_KEY:-${ANTHROPIC_API_KEY:-}}"
 [ -n "$ANTHRO" ] && EXTRA+=("AUGURA_ANTHROPIC_API_KEY=${ANTHRO}")
 OPENAI="${AUGURA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 [ -n "$OPENAI" ] && EXTRA+=("AUGURA_OPENAI_API_KEY=${OPENAI}")
-# Contournement du 403 WAF CT.gov sur les IP datacenter Modal (absents ⇒ appel direct,
-# dégradation gracieuse). Relais (fonction Edge) PRIVILÉGIÉ ; proxy httpx en alternative.
+# Workaround for the CT.gov WAF 403 on Modal datacenter IPs (absent ⇒ direct call,
+# graceful degradation). Relay (Edge function) PREFERRED; httpx proxy as a fallback.
 [ -n "${AUGURA_CTGOV_RELAY_URL:-}" ] && EXTRA+=("AUGURA_CTGOV_RELAY_URL=${AUGURA_CTGOV_RELAY_URL}")
 [ -n "${AUGURA_CTGOV_PROXY_URL:-}" ] && EXTRA+=("AUGURA_CTGOV_PROXY_URL=${AUGURA_CTGOV_PROXY_URL}")
-# Supabase Storage (octets des datasets — cohérent cross-conteneur sur Modal). Absents ⇒
-# repli disque local éphémère : REQUIS en prod pour que le run DQ relise l'upload.
+# Supabase Storage (dataset bytes — consistent cross-container on Modal). Absent ⇒
+# fallback to ephemeral local disk: REQUIRED in prod so the DQ run can re-read the upload.
 [ -n "${AUGURA_SUPABASE_URL:-}" ]              && EXTRA+=("AUGURA_SUPABASE_URL=${AUGURA_SUPABASE_URL}")
 [ -n "${AUGURA_SUPABASE_SERVICE_ROLE_KEY:-}" ] && EXTRA+=("AUGURA_SUPABASE_SERVICE_ROLE_KEY=${AUGURA_SUPABASE_SERVICE_ROLE_KEY}")
 [ -n "${AUGURA_STORAGE_BUCKET:-}" ]            && EXTRA+=("AUGURA_STORAGE_BUCKET=${AUGURA_STORAGE_BUCKET}")
@@ -44,15 +44,15 @@ OPENAI="${AUGURA_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}"
 echo "[1/3] secret Modal 'augura-api' (env=prod, cors regex=*.vercel.app${FRONT_ORIGIN:+ + $FRONT_ORIGIN})"
 uv run modal secret create augura-api --force \
   AUGURA_ENV=prod \
-  AUGURA_DATABASE_URL="${AUGURA_DATABASE_URL:?AUGURA_DATABASE_URL manquant dans .env}" \
+  AUGURA_DATABASE_URL="${AUGURA_DATABASE_URL:?AUGURA_DATABASE_URL missing from .env}" \
   AUGURA_CORS_ORIGIN_REGEX='^https://.*\.vercel\.app$' \
   AUGURA_CORS_ORIGINS="${FRONT_ORIGIN}" \
   AUGURA_SUPABASE_JWT_AUDIENCE="${AUGURA_SUPABASE_JWT_AUDIENCE:-authenticated}" \
   "${EXTRA[@]}"
 
-echo "[2/3] déploiement"
+echo "[2/3] deployment"
 uv run modal deploy modal_app.py
 
-echo "[3/3] terminé. Récupère l'URL imprimée ci-dessus puis vérifie :"
+echo "[3/3] done. Take the URL printed above and verify:"
 echo "  curl https://<workspace>--augura-api-api.modal.run/healthz"
-echo "Ensuite, mets VITE_API_URL = cette URL dans Vercel (env Production) et redéploie le front."
+echo "Then set VITE_API_URL = that URL in Vercel (Production env) and redeploy the frontend."

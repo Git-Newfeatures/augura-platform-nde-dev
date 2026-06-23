@@ -1,4 +1,4 @@
-"""Modèle SQLAlchemy du module documents générés."""
+"""SQLAlchemy model of the generated documents module."""
 
 from datetime import datetime
 from uuid import UUID
@@ -20,8 +20,9 @@ class GeneratedDocument(Base):
     study_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True))
     type: Mapped[str] = mapped_column(Text)
     storage_path: Mapped[str | None] = mapped_column(Text)
-    # Octets du dossier généré (HTML), stockés en base — cohérent cross-conteneur sur
-    # Modal, contrairement au disque local éphémère. Servi par GET /documents/{id}/download.
+    # Bytes of the generated document (HTML), stored in the database — consistent
+    # cross-container on Modal, unlike the ephemeral local disk. Served by GET
+    # /documents/{id}/download.
     content: Mapped[bytes | None] = mapped_column(LargeBinary)
     status: Mapped[str] = mapped_column(Text, server_default=text("'pending'"))
     created_at: Mapped[datetime] = mapped_column(

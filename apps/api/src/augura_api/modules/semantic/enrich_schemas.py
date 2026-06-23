@@ -1,10 +1,10 @@
-"""Contrat public des routes d'enrichissement (B4) — apply + propose."""
+"""Public contract of the enrichment routes (B4) — apply + propose."""
 
 from pydantic import BaseModel
 
 
 class DirectRelationIn(BaseModel):
-    """Relation légère proposée par le DAG (sans id pré-assigné)."""
+    """Lightweight relation proposed by the DAG (no pre-assigned id)."""
 
     subject_concept_id: str
     object_concept_id: str
@@ -12,7 +12,7 @@ class DirectRelationIn(BaseModel):
     polarity: str = "neutral"
     default_strength: str = "moderate"
     mechanism_summary: str = ""
-    relation_id: str | None = None  # id provisoire DAG (réconcilié au retour)
+    relation_id: str | None = None  # provisional DAG id (reconciled on return)
 
 
 class DeactivateRelationIn(BaseModel):
@@ -29,7 +29,7 @@ class AddQualifierIn(BaseModel):
 
 
 class EnrichApplyRequest(BaseModel):
-    """Corps de POST /semantic/enrich/apply — un seul chemin renseigné à la fois."""
+    """Body of POST /semantic/enrich/apply — only one path provided at a time."""
 
     proposals: dict[str, object] | None = None
     selected_concept_ids: list[str] = []

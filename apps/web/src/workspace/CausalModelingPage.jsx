@@ -10,12 +10,12 @@ import { parsePICOT } from '@/semantic/picot-parser'
 import { enrichApply } from '@/workspace/dataClient'
 import { resetSemanticStore, initSemanticStore } from '@/lib/semantic-store'
 
-// Causal modeling (port de la vue /causal de Nico, recâblée sur le backend).
-// Flux : dataset mappé → POST /datasets/{id}/map (concepts) → POST /causal/dag.
-// Le rendu SVG est en lecture seule pour cette première itération (l'éditeur
-// drag/reclassify de IntakeDAG.jsx viendra ensuite).
+// Causal modeling (port of Nico's /causal view, rewired onto the backend).
+// Flow: mapped dataset → POST /datasets/{id}/map (concepts) → POST /causal/dag.
+// The SVG rendering is read-only for this first iteration (the drag/reclassify
+// editor from IntakeDAG.jsx comes next).
 
-// Couleurs de rôle (port fidèle de IntakeDAG.jsx).
+// Role colors (faithful port of IntakeDAG.jsx).
 const ROLE = {
   exposure: { fill: '#1F2937', stroke: '#1F2937', text: '#FFFFFF', label: 'Exposure' },
   outcome: { fill: '#0C447C', stroke: '#0C447C', text: '#FFFFFF', label: 'Outcome' },
@@ -28,7 +28,7 @@ const ROLE = {
 const NODE_W = 150
 const NODE_H = 46
 
-// Les arêtes proposées par le LLM portent l'id `proposed_<subj>_<obj>` (cf. builder).
+// Edges proposed by the LLM carry the id `proposed_<subj>_<obj>` (cf. builder).
 const isProposed = (e) => typeof e.id === 'string' && e.id.startsWith('proposed_')
 
 function edgeColor(e) {
@@ -166,29 +166,29 @@ function QualityBadge({ q }) {
   )
 }
 
-// ─── Acceptation des arêtes proposées ──────────────────────────────────────
+// ─── Accepting proposed edges ───────────────────────────────────────────────
 
-/** Mappe l'erreur backend vers un message lisible. */
+/** Maps the backend error to a readable message. */
 function mapAcceptError(err) {
   const msg = String(err?.message || err || '')
-  if (msg.includes('403') || err?.status === 403) return 'Réservé aux propriétaires (owner).'
+  if (msg.includes('403') || err?.status === 403) return 'Owners only.'
   if (msg.includes('unknown_concept_ids') || msg.includes('400'))
-    return "Concepts non encore créés (proposés) — à enrichir d'abord."
-  return msg || 'Une erreur inattendue est survenue.'
+    return 'Concepts not yet created (proposed) — enrich them first.'
+  return msg || 'An unexpected error occurred.'
 }
 
 /**
- * Section listant les arêtes proposées par le LLM, chacune avec un bouton
- * « Accepter » qui appelle enrichApply puis recharge le DAG.
+ * Section listing the edges proposed by the LLM, each with an "Accept"
+ * button that calls enrichApply then reloads the DAG.
  */
 function ProposedEdges({ edges, nodes, onAccepted }) {
-  // État par arête : null | 'accepting' | 'done' | string (erreur)
+  // Per-edge state: null | 'accepting' | 'done' | string (error)
   const [states, setStates] = useState({})
 
   const proposed = edges.filter(isProposed)
   if (proposed.length === 0) return null
 
-  // Index des labels de nœuds pour l'affichage.
+  // Index of node labels for display.
   const labelById = Object.fromEntries(nodes.map((n) => [n.id, n.label]))
 
   async function accept(e) {
@@ -208,7 +208,7 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
         ],
       })
       setStates((s) => ({ ...s, [e.id]: 'done' }))
-      // Rechargement du store sémantique puis regénération du DAG.
+      // Reload the semantic store then regenerate the DAG.
       resetSemanticStore()
       await initSemanticStore()
       onAccepted()
@@ -220,7 +220,7 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
   return (
     <Card className="border-amber-300/60 p-4">
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-amber-700">
-        Relations proposées ({proposed.length})
+        Proposed relations ({proposed.length})
       </div>
       <ul className="flex flex-col gap-2">
         {proposed.map((e) => {
@@ -247,7 +247,7 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
                 {isDone ? (
                   <span className="flex items-center gap-1 text-emerald-700">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Acceptée
+                    Accepted
                   </span>
                 ) : (
                   <Button
@@ -257,7 +257,7 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
                     disabled={isAccepting}
                     onClick={() => accept(e)}
                   >
-                    {isAccepting ? 'Enregistrement…' : 'Accepter'}
+                    {isAccepting ? 'Saving…' : 'Accept'}
                   </Button>
                 )}
               </span>
@@ -336,7 +336,7 @@ function Result({ dag, onAccepted }) {
         </Card>
       )}
 
-      {/* Section des arêtes proposées — uniquement si le DAG en contient. */}
+      {/* Proposed-edges section — only if the DAG contains any. */}
       <ProposedEdges edges={dag.edges} nodes={dag.nodes} onAccepted={onAccepted} />
     </div>
   )
@@ -379,8 +379,8 @@ export function CausalModelingPage() {
           concept_label: c.column,
           confidence: c.confidence,
         }))
-      // PICOT dérivé de la question (parser local) → enrichit le prompt B2.
-      // Défensif : tout échec retombe sur picot=null (comportement d'avant inchangé).
+      // PICOT derived from the question (local parser) → enriches the B2 prompt.
+      // Defensive: any failure falls back to picot=null (prior behavior unchanged).
       let picot = null
       try {
         if (question) {

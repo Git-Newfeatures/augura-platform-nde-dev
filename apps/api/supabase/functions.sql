@@ -1,12 +1,12 @@
--- Augura Platform — fonctions & vues
--- À appliquer APRÈS schema.sql.
+-- Augura Platform — functions & views
+-- To apply AFTER schema.sql.
 
 begin;
 
--- Recherche sémantique sur le corpus (port du RPC match_chunks du front).
--- Scope tenant : chunks du corpus global (org_id NULL) + ceux du tenant courant
--- (app.tenant_id, posé par le backend via SET LOCAL). Filtre optionnel par
--- source_id / evidence_type passé en jsonb.
+-- Semantic search over the corpus (port of the front's match_chunks RPC).
+-- Tenant scope: chunks from the global corpus (org_id NULL) + those of the current tenant
+-- (app.tenant_id, set by the backend via SET LOCAL). Optional filter by
+-- source_id / evidence_type passed as jsonb.
 create or replace function match_chunks(
     query_embedding vector(1536),
     match_count int default 20,
@@ -44,9 +44,9 @@ as $$
     limit match_count;
 $$;
 
--- Matrice de couverture (jurisdiction × evidence_type → doc_count).
--- Les cellules à zéro sont complétées côté service (corpus). gap_score/severity
--- sont dérivés dans le service à partir de doc_count.
+-- Coverage matrix (jurisdiction × evidence_type → doc_count).
+-- Zero cells are filled in service-side (corpus). gap_score/severity
+-- are derived in the service from doc_count.
 create or replace view v_coverage_map with (security_invoker = on) as
     select
         coalesce(jurisdiction, 'unknown') as jurisdiction,
@@ -56,14 +56,14 @@ create or replace view v_coverage_map with (security_invoker = on) as
     group by 1, 2;
 
 -- ─────────────────────────────────────────────────────────────────────────
--- upsert_semantic_release : applique un batch d'enrichissement (B4) à la couche
--- sémantique gouvernée et bascule la release courante. SECURITY DEFINER : le rôle
--- applicatif (RLS FOR SELECT seulement) écrit EXCLUSIVEMENT via cette fonction.
--- Idempotent (CREATE OR REPLACE + upserts par clé).
+-- upsert_semantic_release: applies an enrichment batch (B4) to the governed
+-- semantic layer and switches the current release. SECURITY DEFINER: the
+-- application role (RLS FOR SELECT only) writes EXCLUSIVELY via this function.
+-- Idempotent (CREATE OR REPLACE + upserts by key).
 -- ─────────────────────────────────────────────────────────────────────────
--- NB : le propriétaire de cette fonction doit être un rôle BYPASSRLS/privilégié
--- (service_role Supabase) pour que SECURITY DEFINER puisse écrire les catalogues
--- gouvernés malgré leur RLS FORCE … FOR SELECT.
+-- NB: the owner of this function must be a BYPASSRLS/privileged role
+-- (Supabase service_role) so that SECURITY DEFINER can write the governed
+-- catalogs despite their RLS FORCE … FOR SELECT.
 create or replace function public.upsert_semantic_release(
   p_manifest jsonb,
   p_payload jsonb
@@ -204,9 +204,9 @@ end;
 $$;
 
 revoke all on function public.upsert_semantic_release(jsonb, jsonb) from public;
--- Grant au rôle-groupe augura_app (augura_api en hérite via `grant augura_app to augura_api`,
--- cf. policies.sql) : c'est le rôle que portent le runtime ET les tests d'intégration.
--- Conditionnel car le rôle peut manquer sur un Postgres vierge avant policies.sql.
+-- Grant to the group role augura_app (augura_api inherits it via `grant augura_app to augura_api`,
+-- cf. policies.sql): this is the role carried by the runtime AND the integration tests.
+-- Conditional because the role may be missing on a fresh Postgres before policies.sql.
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'augura_app') then
     execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_app';

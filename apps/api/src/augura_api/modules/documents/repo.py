@@ -1,4 +1,4 @@
-"""Accès base du module documents — chaque méthode exige un TenantId."""
+"""Database access for the documents module — every method requires a TenantId."""
 
 from uuid import UUID
 

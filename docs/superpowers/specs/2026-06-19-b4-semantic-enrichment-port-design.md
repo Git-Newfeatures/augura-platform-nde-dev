@@ -1,99 +1,99 @@
-# Design — Port B4 : enrichissement sémantique « à la volée »
+# Design — B4 port: "on-the-fly" semantic enrichment
 
-**Date :** 2026-06-19
-**Statut :** approuvé (design), à planifier
-**Sous-système :** B4 (`enrich-propose/apply`) — dernière brique de la chaîne B (B1 ontologie → B2 `dag-llm` → B3 `picot-parse` → **B4 enrich** → B5 front).
+**Date:** 2026-06-19
+**Status:** approved (design), to be planned
+**Subsystem:** B4 (`enrich-propose/apply`) — last brick of the B chain (B1 ontology → B2 `dag-llm` → B3 `picot-parse` → **B4 enrich** → B5 frontend).
 
-## 1. Contexte & objectif
+## 1. Context & objective
 
-La DAG Generation (B2, `POST /causal/dag`) fonctionne : le LLM **propose** de nouveaux concepts/relations (`proposed_concepts` / `proposed_relations`, rendus en arêtes pointillées oranges), **mais rien ne les persiste**. La boucle d'enrichissement est ouverte : `modules/semantic/repo.py` est en lecture seule, il n'existe pas de route d'écriture, la RPC `upsert_semantic_release` est absente, et les surfaces front (`CausalEnrichPanel`/`EnrichmentSection`/`LearnFromQuestionPanel`) ont été volontairement omises (cf. `apps/web/src/workspace/SemanticLayerPage.jsx:12-13`).
+DAG Generation (B2, `POST /causal/dag`) works: the LLM **proposes** new concepts/relations (`proposed_concepts` / `proposed_relations`, rendered as dashed orange edges), **but nothing persists them**. The enrichment loop is open: `modules/semantic/repo.py` is read-only, no write route exists, the `upsert_semantic_release` RPC is absent, and the frontend surfaces (`CausalEnrichPanel`/`EnrichmentSection`/`LearnFromQuestionPanel`) were deliberately omitted (cf. `apps/web/src/workspace/SemanticLayerPage.jsx:12-13`).
 
-Objectif : **fermer la boucle** — permettre d'enrichir la couche sémantique gouvernée (proposer + appliquer), en portant fidèlement la fonctionnalité de l'ancien repo, adaptée aux conventions de la plateforme.
+Objective: **close the loop** — make it possible to enrich the governed semantic layer (propose + apply), by faithfully porting the old repo's feature, adapted to the platform's conventions.
 
-## 2. Provenance (source du port)
+## 2. Provenance (port source)
 
-- Repo : `Augura-Health/augura`, branche `data-intake-nde` (Nicolas Delporte). Working copy locale : `/Users/quentin/Desktop/Augure/lucis-dashboard`.
-- Commit : **`98c1023`** « feat(data-intake): DAG generation refinements, semantic governed vocab, new docs » (2026-06-17) — le dernier commit de Nicolas, **non repris** lors du portage initial (preuve : `apps/api/.../causal/prompt.py:141` porte encore l'enum polarity drifté `["increases","decreases","mixed","unknown"]` que `governed-vocab.js` corrige en `["increases","decreases","neutral"]`).
-- Fichiers source :
-  - `api/enrich-propose.js` — coverage analysis + génération de propositions LLM (SSE).
-  - `api/enrich-apply.js` — write-back versionné (4 chemins).
-  - `src/semantic/governed-vocab.js` — enums gouvernés partagés.
-  - `src/workspace/LearnFromQuestionPanel.jsx` (492 l.) — surface front de revue.
-  - `supabase/migrations/20260610000000_create_semantic_schema.sql:258` — fonction `upsert_semantic_release`.
+- Repo: `Augura-Health/augura`, branch `data-intake-nde` (Nicolas Delporte). Local working copy: `/Users/quentin/Desktop/Augure/lucis-dashboard`.
+- Commit: **`98c1023`** "feat(data-intake): DAG generation refinements, semantic governed vocab, new docs" (2026-06-17) — Nicolas's last commit, **not picked up** during the initial port (proof: `apps/api/.../causal/prompt.py:141` still carries the drifted polarity enum `["increases","decreases","mixed","unknown"]` that `governed-vocab.js` corrects to `["increases","decreases","neutral"]`).
+- Source files:
+  - `api/enrich-propose.js` — coverage analysis + LLM proposal generation (SSE).
+  - `api/enrich-apply.js` — versioned write-back (4 paths).
+  - `src/semantic/governed-vocab.js` — shared governed enums.
+  - `src/workspace/LearnFromQuestionPanel.jsx` (492 lines) — frontend review surface.
+  - `supabase/migrations/20260610000000_create_semantic_schema.sql:258` — `upsert_semantic_release` function.
 
-## 3. Décisions cadrantes (validées avec l'utilisateur)
+## 3. Framing decisions (validated with the user)
 
-1. **Gouvernance = globale, gated admin (port fidèle).** La couche sémantique est globale (tables en `public`, RLS `FOR SELECT` partagée par tous les tenants). L'enrichissement mute donc l'ontologie partagée ; l'**apply est réservé au rôle `owner`**. Garde-fous : workflow `pending_review`→`approved` + versioning `semantic_releases`. Écriture via fonction SQL `SECURITY DEFINER` (le rôle app n'a pas le write direct). **Pas** d'overlay par tenant.
-2. **Exécution du *propose* = job background.** Le pipeline (long, multi-appels LLM) tourne via le moteur de jobs existant ; la progression passe par `set_progress()` (remplace les events SSE) ; le front poll le job. L'**apply reste synchrone**.
-3. **Propositions stockées en artifact JSON** (via `core/storage.py`, comme `documents`) — **pas** de nouvelle table. L'apply reçoit le batch + la sélection dans le body (fidèle à l'original).
+1. **Governance = global, admin-gated (faithful port).** The semantic layer is global (tables in `public`, RLS `FOR SELECT` shared by all tenants). Enrichment therefore mutates the shared ontology; the **apply is reserved for the `owner` role**. Guardrails: `pending_review`→`approved` workflow + `semantic_releases` versioning. Write via a `SECURITY DEFINER` SQL function (the app role does not have direct write). **No** per-tenant overlay.
+2. **Execution of the *propose* = background job.** The pipeline (long, multi-LLM-call) runs via the existing job engine; progress goes through `set_progress()` (replaces the SSE events); the frontend polls the job. The **apply stays synchronous**.
+3. **Proposals stored as a JSON artifact** (via `core/storage.py`, like `documents`) — **no** new table. The apply receives the batch + the selection in the body (faithful to the original).
 
 ## 4. Architecture
 
-Port fidèle découpé en 3 phases livrables indépendamment. Tout le code backend nouveau vit dans la tranche verticale `modules/semantic/` (le contrat import-linter `causal → semantic` est déjà autorisé).
+Faithful port split into 3 independently deliverable phases. All the new backend code lives in the `modules/semantic/` vertical slice (the `causal → semantic` import-linter contract is already allowed).
 
 ### Phase 1 — Write-path (apply)
 
-**SQL.** Port de `upsert_semantic_release(p_manifest jsonb, p_payload jsonb)` :
-- Cible le schéma **`public`** (et non `semantic.*` comme l'original) et le **jeu de colonnes plateforme**.
-- Upsert idempotent par table (`jsonb_populate_recordset` + `on conflict … do update`) pour : `taxonomy_concepts`, `taxonomy_synonyms`, `taxonomy_standard_codes`, `ontology_relations`, `ontology_relation_evidence`, `ontology_relation_qualifiers` (les seules tables écrites par l'enrichissement).
-- Gère `semantic_releases` : insère la nouvelle ligne de release (depuis `p_manifest`) et bascule `is_current` (append-only, une seule courante) — la table plateforme a la forme `{semantic_release_version pk, taxonomy_version, causal_ontology_version, dq_ontology_version, omop_cdm_version, source, manifest jsonb, imported_at, is_current}`.
-- `SECURITY DEFINER`, propriétaire privilégié, `set search_path` explicite ; `grant execute` au rôle applicatif.
-- **Livraison** : ajout dans `apps/api/supabase/functions.sql` (source du bundle) **+** migration alembic `0002+` **idempotente** (`CREATE OR REPLACE FUNCTION`) **+** application à la DB live via MCP Supabase (invariant : le déploiement Modal n'applique ni migrations ni seed).
+**SQL.** Port of `upsert_semantic_release(p_manifest jsonb, p_payload jsonb)`:
+- Targets the **`public`** schema (and not `semantic.*` like the original) and the **platform column set**.
+- Idempotent per-table upsert (`jsonb_populate_recordset` + `on conflict … do update`) for: `taxonomy_concepts`, `taxonomy_synonyms`, `taxonomy_standard_codes`, `ontology_relations`, `ontology_relation_evidence`, `ontology_relation_qualifiers` (the only tables written by enrichment).
+- Handles `semantic_releases`: inserts the new release row (from `p_manifest`) and flips `is_current` (append-only, a single current one) — the platform table has the shape `{semantic_release_version pk, taxonomy_version, causal_ontology_version, dq_ontology_version, omop_cdm_version, source, manifest jsonb, imported_at, is_current}`.
+- `SECURITY DEFINER`, privileged owner, explicit `set search_path`; `grant execute` to the application role.
+- **Delivery**: addition in `apps/api/supabase/functions.sql` (bundle source) **+** **idempotent** alembic migration `0002+` (`CREATE OR REPLACE FUNCTION`) **+** application to the live DB via Supabase MCP (invariant: the Modal deployment applies neither migrations nor seed).
 
-**Route.** `POST /semantic/enrich/apply`, **`require_role("owner")`**. 4 chemins (port de `enrich-apply.js`) :
-- `proposals` + `selected_concept_ids` + `selected_relation_ids` → filtre les rows approuvés (cascade vers synonyms/codes/evidence/qualifiers), stampe `approved`/`active`, bump **minor** si concepts ajoutés sinon **patch**.
-- `direct_relations` → relations légères (sans IDs) depuis les proposals du DAG : valide que les concepts existent, assigne `ENRR_{date}_{NNN}`, evidence auto-stub si absente, bump **patch**. Renvoie un `relation_id_map` (réconciliation des IDs provisoires du DAG).
-- `deactivate_relation` → désactive une relation jugée fausse (bump patch, `review_status='deprecated'`).
-- `add_qualifier` → ajoute un qualifier restreignant l'applicabilité d'une relation (bump patch).
+**Route.** `POST /semantic/enrich/apply`, **`require_role("owner")`**. 4 paths (port of `enrich-apply.js`):
+- `proposals` + `selected_concept_ids` + `selected_relation_ids` → filters the approved rows (cascade to synonyms/codes/evidence/qualifiers), stamps `approved`/`active`, bumps **minor** if concepts added otherwise **patch**.
+- `direct_relations` → lightweight relations (without IDs) from the DAG proposals: validates that the concepts exist, assigns `ENRR_{date}_{NNN}`, auto-stubs evidence if absent, bumps **patch**. Returns a `relation_id_map` (reconciliation of the DAG's provisional IDs).
+- `deactivate_relation` → deactivates a relation deemed false (bump patch, `review_status='deprecated'`).
+- `add_qualifier` → adds a qualifier restricting the applicability of a relation (bump patch).
 
-**Repo.** Une **seule** méthode d'écriture `apply_release(manifest, payload)` qui appelle la RPC ; le reste de `repo.py` reste en lecture.
+**Repo.** A **single** write method `apply_release(manifest, payload)` that calls the RPC; the rest of `repo.py` stays read-only.
 
-### Phase 2 — Propose pipeline (+ governed-vocab, + fix polarity)
+### Phase 2 — Propose pipeline (+ governed-vocab, + polarity fix)
 
-**Enums gouvernés.** Nouveau module `modules/semantic/vocab.py` : `POLARITY=["increases","decreases","neutral"]`, `AUGURA_DOMAINS`, `QUALIFIER_TYPES`, `QUALIFIER_EFFECTS`, `STANDARD_CODE_VOCABULARIES`, `RELATION_STRENGTH`, `CAUSAL_PREDICATES` (miroir de la table). Importé par l'enrichissement **et** le causal → source unique, fin du drift.
+**Governed enums.** New module `modules/semantic/vocab.py`: `POLARITY=["increases","decreases","neutral"]`, `AUGURA_DOMAINS`, `QUALIFIER_TYPES`, `QUALIFIER_EFFECTS`, `STANDARD_CODE_VOCABULARIES`, `RELATION_STRENGTH`, `CAUSAL_PREDICATES` (mirror of the table). Imported by enrichment **and** causal → single source, end of the drift.
 
-**Fix polarity.** `modules/causal/prompt.py` (et `schemas.py`/`builder.py` si l'enum y est dupliqué) consomment `vocab.POLARITY`. Contrat modifié → **régénération du client api** (drift-check CI).
+**Polarity fix.** `modules/causal/prompt.py` (and `schemas.py`/`builder.py` if the enum is duplicated there) consume `vocab.POLARITY`. Contract changed → **regeneration of the api client** (CI drift-check).
 
-**Logique pure.** `modules/semantic/enrichment.py`, sans I/O (testable à LLM mocké) :
-- `match_tokens`, `directed_bfs`, `analyze_coverage` (port de la coverage analysis : concepts manquants + path gaps).
-- helpers de proposition : `group_missing_concepts`, `apply_prechecks` (reject self-loop/dup/orphan/predicate inconnu/L1-sans-code ; auto-stub evidence), `reassign_ids`, `stamp_rows`, `merge_into`.
-- Le schéma d'outil LLM `PROPOSAL_SCHEMA` (Pydantic) dérive de `vocab.py`.
+**Pure logic.** `modules/semantic/enrichment.py`, without I/O (testable with mocked LLM):
+- `match_tokens`, `directed_bfs`, `analyze_coverage` (port of the coverage analysis: missing concepts + path gaps).
+- proposal helpers: `group_missing_concepts`, `apply_prechecks` (reject self-loop/dup/orphan/unknown predicate/L1-without-code; auto-stub evidence), `reassign_ids`, `stamp_rows`, `merge_into`.
+- The LLM tool schema `PROPOSAL_SCHEMA` (Pydantic) derives from `vocab.py`.
 
-**Job.** Nouveau kind `"enrich_propose"` + `handle_enrich_propose(ctx)` dans `jobs/handlers.py` :
-- lit le bundle sémantique (concepts, synonyms, relations, predicates),
-- exécute les batchs (Batch 1 concepts manquants, Batch 2 path gaps, Batch 3 bootstrap des nouveaux concepts ; + raccourci `selected_concepts`) via `core/llm/runtime.run_structured_agent`,
-- `set_progress()` à chaque étape (setup/coverage/propose/precheck) — c'est le « log live » porté,
-- persiste le batch de propositions (concepts/relations/evidence/qualifiers + `coverage_summary` + `precheck_log`) en **artifact JSON** (`core/storage.py`) ; renvoie le `result_ref`.
+**Job.** New kind `"enrich_propose"` + `handle_enrich_propose(ctx)` in `jobs/handlers.py`:
+- reads the semantic bundle (concepts, synonyms, relations, predicates),
+- runs the batches (Batch 1 missing concepts, Batch 2 path gaps, Batch 3 bootstrap of the new concepts; + `selected_concepts` shortcut) via `core/llm/runtime.run_structured_agent`,
+- `set_progress()` at each step (setup/coverage/propose/precheck) — this is the ported "live log",
+- persists the batch of proposals (concepts/relations/evidence/qualifiers + `coverage_summary` + `precheck_log`) as a **JSON artifact** (`core/storage.py`); returns the `result_ref`.
 
-**Route.** `POST /semantic/enrich/propose` (body : `{questions[]}` ou `{selected_concepts[]}`) → `create_job("enrich_propose", params)` + `enqueue_job` → renvoie `job_id`. Le front poll `GET /jobs/{id}` ; au succès, récupère l'artifact de propositions.
+**Route.** `POST /semantic/enrich/propose` (body: `{questions[]}` or `{selected_concepts[]}`) → `create_job("enrich_propose", params)` + `enqueue_job` → returns `job_id`. The frontend polls `GET /jobs/{id}`; on success, fetches the proposals artifact.
 
 ### Phase 3 — Frontend
 
-- Port de `LearnFromQuestionPanel.jsx` → composant de revue monté dans `SemanticLayerPage` : déclenche le job propose, affiche la progression (polling du job), liste concepts/relations proposés avec sélection (cases à cocher + cascade), POST `apply`. **Aucun mock/fallback** (tout vient du backend réel).
-- `CausalModelingPage` : bouton « accepter » sur les arêtes `proposed_*` → `apply` via `direct_relations`, puis `resetSemanticStore()` (déjà défini, jamais câblé) + re-fetch du bundle.
+- Port of `LearnFromQuestionPanel.jsx` → review component mounted in `SemanticLayerPage`: triggers the propose job, shows the progress (job polling), lists proposed concepts/relations with selection (checkboxes + cascade), POSTs `apply`. **No mock/fallback** (everything comes from the real backend).
+- `CausalModelingPage`: "accept" button on the `proposed_*` edges → `apply` via `direct_relations`, then `resetSemanticStore()` (already defined, never wired) + re-fetch of the bundle.
 
 ## 5. Tests
 
-- **Unitaires** (pytest, LLM mocké) — `enrichment.py` : coverage, `directed_bfs`, pre-checks (chaque rejet), dedup, reassign IDs, auto-stub evidence. Cœur logique, fort ROI.
-- **Intégration** (`@pytest.mark.integration`, exige `AUGURA_DATABASE_URL`) — `upsert_semantic_release` : insert + conflict update + bascule `is_current` ; isolation RLS (le rôle app écrit *via* la fonction, pas en direct).
-- **Apply** — gating `owner` (403 sinon) ; chemins `direct_relations` / `deactivate_relation` / `add_qualifier`.
-- **Job** — `handle_enrich_propose` à LLM mocké : produit un batch cohérent, `set_progress` appelé, artifact écrit.
+- **Unit** (pytest, mocked LLM) — `enrichment.py`: coverage, `directed_bfs`, pre-checks (each rejection), dedup, reassign IDs, auto-stub evidence. Logic core, high ROI.
+- **Integration** (`@pytest.mark.integration`, requires `AUGURA_DATABASE_URL`) — `upsert_semantic_release`: insert + conflict update + `is_current` flip; RLS isolation (the app role writes *via* the function, not directly).
+- **Apply** — `owner` gating (403 otherwise); `direct_relations` / `deactivate_relation` / `add_qualifier` paths.
+- **Job** — `handle_enrich_propose` with mocked LLM: produces a coherent batch, `set_progress` called, artifact written.
 
-## 6. Contrats & CI
+## 6. Contracts & CI
 
-`ruff format --check` + `ruff check` + `pyright` (strict) + `lint-imports` (causal→semantic OK) + `pytest`. **Régénération** `apps/api/scripts/dump_openapi.py` → `openapi.json` puis `npm --prefix packages/api-client run generate` (nouvelles routes + enum polarity). Migration **idempotente** + application DB live via MCP Supabase. Front : `npm run lint` + `npm run build`.
+`ruff format --check` + `ruff check` + `pyright` (strict) + `lint-imports` (causal→semantic OK) + `pytest`. **Regeneration** `apps/api/scripts/dump_openapi.py` → `openapi.json` then `npm --prefix packages/api-client run generate` (new routes + polarity enum). **Idempotent** migration + live DB application via Supabase MCP. Frontend: `npm run lint` + `npm run build`.
 
-## 7. Hors périmètre (YAGNI)
+## 7. Out of scope (YAGNI)
 
-- Overlay/enrichissement par tenant (décision : ontologie globale).
-- Streaming SSE (décision : job + polling).
-- Table dédiée de propositions (décision : artifact JSON).
-- UI de gestion des releases/rollback (la table existe, le `GET /semantic/release` aussi ; pas de nouvelle UI de versioning ici).
-- Réécriture des raffinements DAG non liés à l'enrichissement présents dans `98c1023` (on ne porte que ce qui sert l'enrichissement + le fix polarity).
+- Per-tenant overlay/enrichment (decision: global ontology).
+- SSE streaming (decision: job + polling).
+- Dedicated proposals table (decision: JSON artifact).
+- Releases/rollback management UI (the table exists, so does `GET /semantic/release`; no new versioning UI here).
+- Rewrite of the non-enrichment-related DAG refinements present in `98c1023` (we only port what serves enrichment + the polarity fix).
 
-## 8. Risques / points d'attention
+## 8. Risks / attention points
 
-- **`upsert_semantic_release` doit cibler `public`** (l'original vise `semantic.*`) et matcher exactement les colonnes plateforme — divergence de schéma = bug silencieux. Vérifier colonne par colonne contre `schema.sql`.
-- **Écriture sous RLS** : valider que `SECURITY DEFINER` + `grant execute` au rôle `augura_api` suffit (le rôle est non-BYPASSRLS, RLS `FOR SELECT` seulement).
-- **Changement d'enum polarity** : casse potentielle de données DAG existantes typées `mixed`/`unknown` — vérifier qu'aucune donnée live ne dépend de ces valeurs avant bascule.
-- **Apply après deploy** : la fonction SQL doit être appliquée à la DB live séparément (Modal ne migre pas).
+- **`upsert_semantic_release` must target `public`** (the original targets `semantic.*`) and match the platform columns exactly — a schema divergence = a silent bug. Verify column by column against `schema.sql`.
+- **Writing under RLS**: validate that `SECURITY DEFINER` + `grant execute` to the `augura_api` role is enough (the role is non-BYPASSRLS, RLS `FOR SELECT` only).
+- **Polarity enum change**: potential breakage of existing DAG data typed `mixed`/`unknown` — verify that no live data depends on these values before switching.
+- **Apply after deploy**: the SQL function must be applied to the live DB separately (Modal does not migrate).

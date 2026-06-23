@@ -1,28 +1,28 @@
-# Augura — Architecture système (DESIGN.md)
+# Augura — System architecture (DESIGN.md)
 
-Document d'architecture de la plateforme Augura. Pour les commandes et conventions du dépôt, voir [CLAUDE.md](CLAUDE.md). Spécifications de référence : `docs/specs/2026-06-11-augura-backend-architecture-design.md` et `docs/specs/2026-06-13-delivery-design.md`.
+Architecture document for the Augura platform. For repo commands and conventions, see [CLAUDE.md](CLAUDE.md). Reference specs: `docs/specs/2026-06-11-augura-backend-architecture-design.md` and `docs/specs/2026-06-13-delivery-design.md`.
 
-## 1. Vue d'ensemble
+## 1. Overview
 
-Augura est une plateforme de **conception d'études cliniques** : recherche de littérature, ingestion/qualité des données, couche sémantique (taxonomie + ontologie causale), modélisation causale (DAG), simulation réglementaire, et génération de dossiers.
+Augura is a **clinical study design** platform: literature search, data ingestion/quality, semantic layer (taxonomy + causal ontology), causal modeling (DAG), regulatory simulation, and dossier generation.
 
-Choix structurant : **monolithe modulaire**. Un seul service FastAPI, découpé en modules verticaux fortement isolés (contrats vérifiés par `import-linter`), plutôt qu'une constellation de microservices. On gagne la simplicité de déploiement d'un monolithe tout en gardant des frontières internes nettes qui autoriseraient une extraction ultérieure.
+Structuring choice: **modular monolith**. A single FastAPI service, split into strongly isolated vertical modules (contracts verified by `import-linter`), rather than a constellation of microservices. We gain the deployment simplicity of a monolith while keeping clean internal boundaries that would allow a later extraction.
 
-Principes directeurs :
-- **Multi-tenant par défaut** : isolation des données via RLS Postgres, défense en profondeur (le code scope *et* la base scope).
-- **Fail-fast** : toute config requise manquante fait échouer le boot (`core/config.py`).
-- **Réel uniquement** : pas de données mockées côté front ni de fallbacks fabriqués — tout transite par l'API.
-- **Contrat typé de bout en bout** : l'OpenAPI du backend génère le client TS (`packages/api-client`), drift-checké en CI.
+Guiding principles:
+- **Multi-tenant by default**: data isolation via Postgres RLS, defense in depth (the code scopes *and* the database scopes).
+- **Fail-fast**: any missing required config fails the boot (`core/config.py`).
+- **Real only**: no mocked data on the frontend nor fabricated fallbacks — everything goes through the API.
+- **Typed contract end to end**: the backend's OpenAPI generates the TS client (`packages/api-client`), drift-checked in CI.
 
-## 2. Topologie
+## 2. Topology
 
 ```mermaid
 flowchart LR
   subgraph Client
-    B[Navigateur]
+    B[Browser]
   end
   subgraph Vercel
-    W["apps/web — React/Vite (branche Quentin)"]
+    W["apps/web — React/Vite (branch Quentin)"]
   end
   subgraph Modal
     A["apps/api — FastAPI (app augura-api)"]
@@ -37,169 +37,169 @@ flowchart LR
   B --> W
   W -- "Bearer JWT" --> A
   B -- "login" --> AUTH
-  A -- "vérif JWT (JWKS/HS256)" --> AUTH
+  A -- "JWT verify (JWKS/HS256)" --> AUTH
   A -- "SQLAlchemy async / asyncpg" --> PG
-  A -- "agents LLM" --> EXT1
-  A -- "recherche littérature" --> EXT2
+  A -- "LLM agents" --> EXT1
+  A -- "literature search" --> EXT2
 ```
 
-- Le **front** (Vercel) authentifie l'utilisateur via Supabase Auth, récupère un JWT, et appelle l'**API** (Modal) en `Authorization: Bearer`.
-- L'**API** vérifie le JWT (JWKS RS256 ou secret HS256), résout le tenant, puis parle à **Postgres** sous contexte RLS.
-- Prod backend : `https://quentin-45919--augura-api-api.modal.run`. Prod DB : projet Supabase `Augura_Prod` (`fqmoylmvjoafihiuiiuj`).
+- The **frontend** (Vercel) authenticates the user via Supabase Auth, retrieves a JWT, and calls the **API** (Modal) with `Authorization: Bearer`.
+- The **API** verifies the JWT (JWKS RS256 or HS256 secret), resolves the tenant, then talks to **Postgres** under RLS context.
+- Prod backend: `https://quentin-45919--augura-api-api.modal.run`. Prod DB: Supabase project `Augura_Prod` (`fqmoylmvjoafihiuiiuj`).
 
-## 3. Backend — monolithe modulaire
+## 3. Backend — modular monolith
 
-### 3.1 Couches
+### 3.1 Layers
 
 ```
 apps/api/src/augura_api/
-  main.py            # create_app() : monte middlewares + tous les routers
-  core/              # transverse, INDÉPENDANT des modules
-    auth.py          # JWT Supabase → Principal(user_id, email)
-    tenancy.py       # resolve_tenant() : Principal + lookup memberships → CurrentTenant
+  main.py            # create_app(): mounts middlewares + all routers
+  core/              # cross-cutting, INDEPENDENT of the modules
+    auth.py          # Supabase JWT → Principal(user_id, email)
+    tenancy.py       # resolve_tenant(): Principal + memberships lookup → CurrentTenant
     deps.py          # CurrentTenantDep, SessionDep, require_role()
-    db.py            # sessionmaker + GUCs RLS (set_user_stmt / set_tenant_stmt)
+    db.py            # sessionmaker + RLS GUCs (set_user_stmt / set_tenant_stmt)
     config.py        # Settings (env AUGURA_*), fail-fast
-    errors.py        # exceptions → réponses HTTP normalisées
+    errors.py        # exceptions → normalized HTTP responses
     logging.py       # structlog + RequestIdMiddleware
-    storage.py       # artefacts générés (local en dev, bucket/volume en prod)
-    llm/             # clients Anthropic/OpenAI
-  modules/<nom>/     # tranches verticales (voir 3.3)
+    storage.py       # generated artifacts (local in dev, bucket/volume in prod)
+    llm/             # Anthropic/OpenAI clients
+  modules/<name>/    # vertical slices (see 3.3)
 ```
 
-Contrats `import-linter` (dans `pyproject.toml`, vérifiés par `uv run lint-imports`) :
-- `core` n'importe **jamais** `modules` ni `jobs` (le socle ne dépend pas des features).
-- Les modules de données (`studies`, `corpus`, `datasets`) sont **mutuellement indépendants**. `agents` est la couche d'orchestration : il peut consommer l'interface publique de `corpus`.
+`import-linter` contracts (in `pyproject.toml`, verified by `uv run lint-imports`):
+- `core` **never** imports `modules` nor `jobs` (the foundation does not depend on features).
+- The data modules (`studies`, `corpus`, `datasets`) are **mutually independent**. `agents` is the orchestration layer: it may consume the public interface of `corpus`.
 
-### 3.2 Cycle de vie d'une requête
+### 3.2 Request lifecycle
 
 ```mermaid
 sequenceDiagram
-  participant W as Front
+  participant W as Frontend
   participant API as FastAPI
   participant Core as core (auth/tenancy/db)
   participant PG as Postgres (RLS)
 
   W->>API: GET /datasets (Bearer JWT)
-  API->>Core: get_principal() — vérifie le JWT → Principal(user_id)
+  API->>Core: get_principal() — verifies the JWT → Principal(user_id)
   API->>Core: get_current_tenant() — set app.user_id, lookup memberships
-  alt aucune membership
-    Core-->>W: 403 « aucune appartenance »
-  else membership trouvée
-    Core->>PG: SET app.user_id + app.tenant_id (GUCs transaction-local)
-    API->>PG: requêtes du repo (filtrées par les policies RLS)
-    PG-->>W: données du seul tenant courant
+  alt no membership
+    Core-->>W: 403 "no membership"
+  else membership found
+    Core->>PG: SET app.user_id + app.tenant_id (transaction-local GUCs)
+    API->>PG: repo queries (filtered by the RLS policies)
+    PG-->>W: data of the current tenant only
   end
 ```
 
-Le tenant **n'est pas dans le token** : il est résolu à chaque requête via la table `memberships`. Cela permet à un utilisateur d'appartenir à plusieurs orgs sans réémettre de JWT, et garde l'autorité d'appartenance côté DB.
+The tenant **is not in the token**: it is resolved on each request via the `memberships` table. This lets a user belong to several orgs without reissuing a JWT, and keeps the membership authority on the DB side.
 
-### 3.3 Catalogue des modules
+### 3.3 Module catalog
 
-| Module | Responsabilité | Notes |
+| Module | Responsibility | Notes |
 |---|---|---|
-| `studies` | Études cliniques (entité racine) | tranche verticale canonique |
-| `corpus` | Recherche de littérature (retrieve-and-freeze) | snapshots gelés par `content_hash` ; PubMed/NCBI |
-| `datasets` | Datasets / upload / cohortes | upload sans gating de rôle |
-| `dq` | Qualité des données (contraintes, bundles) | |
-| `mapping` | Mapping des variables vers la taxonomie | |
-| `documents` | Génération de documents/dossiers | s'appuie sur `jobs` |
-| `simulation` | Simulation réglementaire (puissance, biais) | seuils ICH E9 / HAS / DiGA |
-| `analytics` | Analytique & admin | **`require_role("owner")`** |
-| `reference` | Catalogues de référence (CESL, estimateurs) | seedé |
-| `jobs` | File d'attente transverse | fonctions module-level (`create_job`/`get_job`), pas de classe service |
-| `agents` | Orchestration LLM | pas de `repo`/`models` ; lit `corpus` ; `service`+`streaming`+`tools` |
-| `semantic` (B1) | Taxonomie + ontologie causale | `GET /semantic/concepts`, `GET /semantic/relations` |
-| `causal` (B2) | Génération de DAG causal | `POST /causal/dag` — sous-graphe ontologie + contextualisation LLM |
+| `studies` | Clinical studies (root entity) | canonical vertical slice |
+| `corpus` | Literature search (retrieve-and-freeze) | snapshots frozen by `content_hash`; PubMed/NCBI |
+| `datasets` | Datasets / upload / cohorts | upload without role gating |
+| `dq` | Data quality (constraints, bundles) | |
+| `mapping` | Mapping variables to the taxonomy | |
+| `documents` | Document/dossier generation | builds on `jobs` |
+| `simulation` | Regulatory simulation (power, bias) | ICH E9 / HAS / DiGA thresholds |
+| `analytics` | Analytics & admin | **`require_role("owner")`** |
+| `reference` | Reference catalogs (CESL, estimators) | seeded |
+| `jobs` | Cross-cutting queue | module-level functions (`create_job`/`get_job`), no service class |
+| `agents` | LLM orchestration | no `repo`/`models`; reads `corpus`; `service`+`streaming`+`tools` |
+| `semantic` (B1) | Taxonomy + causal ontology | `GET /semantic/concepts`, `GET /semantic/relations` |
+| `causal` (B2) | Causal DAG generation | `POST /causal/dag` — ontology subgraph + LLM contextualization |
 
-### 3.4 Couche sémantique (B1) & causale (B2)
+### 3.4 Semantic (B1) & causal (B2) layer
 
-- **B1 / `semantic`** : taxonomie clinique plate (`taxonomy_concepts`, synonymes, unités, valeurs valides, codes standards, aires thérapeutiques) **+ ontologie causale** (`causal_predicates`, `ontology_relations`, `ontology_relation_evidence`, `ontology_relation_qualifiers`). Toutes en lecture seule (RLS `backend_read`), peuplées par `seed.sql`. Exposé par `GET /semantic/relations`.
-- **B2 / `causal`** : `POST /causal/dag` extrait un **sous-graphe** pertinent de l'ontologie B1 (`subgraph.py`) puis le **contextualise via un agent Anthropic** (`builder.py`/`prompt.py`) pour produire un DAG `{nodes, edges, adjustment_set, collider_ids, rationale}`. Le LLM n'invente pas la structure ; il s'appuie sur l'ontologie stockée.
+- **B1 / `semantic`**: flat clinical taxonomy (`taxonomy_concepts`, synonyms, units, valid values, standard codes, therapeutic areas) **+ causal ontology** (`causal_predicates`, `ontology_relations`, `ontology_relation_evidence`, `ontology_relation_qualifiers`). All read-only (RLS `backend_read`), populated by `seed.sql`. Exposed by `GET /semantic/relations`.
+- **B2 / `causal`**: `POST /causal/dag` extracts a relevant **subgraph** from the B1 ontology (`subgraph.py`) then **contextualizes it via an Anthropic agent** (`builder.py`/`prompt.py`) to produce a DAG `{nodes, edges, adjustment_set, collider_ids, rationale}`. The LLM does not invent the structure; it relies on the stored ontology.
 
-## 4. Données & multi-tenancy
+## 4. Data & multi-tenancy
 
-### 4.1 Modèle tenant
+### 4.1 Tenant model
 
-- `orgs(id, name, slug unique, cesl_profile, …)` et `memberships(org_id, user_id, role ∈ {owner,member,viewer}, unique(org_id,user_id))`.
-- `memberships.user_id` = `auth.users.id` (= `sub` du JWT), **sans FK dure** vers `auth.users` (par design : l'auth vit côté Supabase).
-- RLS : GUCs transaction-local `app.user_id` (policy « member_self » sur `memberships`) et `app.tenant_id` (isolation tenant des tables métier).
+- `orgs(id, name, slug unique, cesl_profile, …)` and `memberships(org_id, user_id, role ∈ {owner,member,viewer}, unique(org_id,user_id))`.
+- `memberships.user_id` = `auth.users.id` (= JWT `sub`), **without a hard FK** to `auth.users` (by design: auth lives on the Supabase side).
+- RLS: transaction-local GUCs `app.user_id` ("member_self" policy on `memberships`) and `app.tenant_id` (tenant isolation of the business tables).
 
-### 4.2 Le bundle SQL
+### 4.2 The SQL bundle
 
-`apps/api/supabase/` :
-- `schema.sql` — tables & index (autorité du schéma).
-- `functions.sql` — fonctions SQL.
-- `policies.sql` — activation RLS + policies (isolation tenant + lecture des catalogues globaux).
-- `seed.sql` — catalogues de référence (taxonomie, ontologie, CESL). **Aucune donnée de démo.**
+`apps/api/supabase/`:
+- `schema.sql` — tables & indexes (schema authority).
+- `functions.sql` — SQL functions.
+- `policies.sql` — RLS enablement + policies (tenant isolation + read of the global catalogs).
+- `seed.sql` — reference catalogs (taxonomy, ontology, CESL). **No demo data.**
 
-### 4.3 Stratégie de migration
+### 4.3 Migration strategy
 
 ```mermaid
 flowchart TD
-  base["alembic 0001_baseline → applique schema.sql + functions.sql + policies.sql"]
-  inc["alembic 0002..0004 — incréments IDEMPOTENTS"]
-  seed["seed.sql — appliqué SÉPARÉMENT (hors alembic, hors deploy Modal)"]
+  base["alembic 0001_baseline → applies schema.sql + functions.sql + policies.sql"]
+  inc["alembic 0002..0004 — IDEMPOTENT increments"]
+  seed["seed.sql — applied SEPARATELY (outside alembic, outside Modal deploy)"]
   base --> inc
   base -.-> seed
 ```
 
-Invariant clef : **toute migration `0002+` doit être idempotente** (`CREATE … IF NOT EXISTS`, `DROP … IF EXISTS`), parce que le baseline réapplique `schema.sql`. La CI `db-bundle` rejoue tout le bundle sur un Postgres+pgvector neuf et vérifie schéma + seed + isolation RLS.
+Key invariant: **every migration `0002+` must be idempotent** (`CREATE … IF NOT EXISTS`, `DROP … IF EXISTS`), because the baseline reapplies `schema.sql`. The `db-bundle` CI replays the whole bundle on a fresh Postgres+pgvector and verifies schema + seed + RLS isolation.
 
 ## 5. Frontend
 
-- **React 19 + Vite + Tailwind 4 + radix-ui + react-router 7** (build/déploiement Vercel).
-- `src/shell/sections.js` : **source unique** de la navigation top-level (Studies, Data, Literature, Variables & Models, Causal modeling, Semantic layer, Audit, Dossiers), rendue par `WorkspaceNav.jsx`.
-- `src/workspace/*` : pages de premier niveau (`DatasetsPage`, `SemanticLayerPage`, `CausalModelingPage`, …).
-- `src/LucisApp.jsx` : workspace par étude (`/studies/:id/*`).
-- `src/api.js` : un seul point d'entrée HTTP, ajoute le `Bearer <JWT>` à chaque appel ; base = `VITE_API_URL` sinon repli sur le backend Modal de prod. `src/supabase.js` : client d'auth.
-- Types consommés depuis `packages/api-client` (générés depuis l'OpenAPI).
+- **React 19 + Vite + Tailwind 4 + radix-ui + react-router 7** (Vercel build/deployment).
+- `src/shell/sections.js`: **single source** of the top-level navigation (Studies, Data, Literature, Variables & Models, Causal modeling, Semantic layer, Audit, Dossiers), rendered by `WorkspaceNav.jsx`.
+- `src/workspace/*`: top-level pages (`DatasetsPage`, `SemanticLayerPage`, `CausalModelingPage`, …).
+- `src/LucisApp.jsx`: per-study workspace (`/studies/:id/*`).
+- `src/api.js`: a single HTTP entry point, adds the `Bearer <JWT>` to every call; base = `VITE_API_URL` otherwise falls back to the prod Modal backend. `src/supabase.js`: auth client.
+- Types consumed from `packages/api-client` (generated from the OpenAPI).
 
-## 6. Authentification & sécurité
+## 6. Authentication & security
 
-- **Auth** : Supabase Auth émet le JWT ; l'API le vérifie (JWKS RS256 ou secret HS256 selon le projet). `Principal` = `{user_id = sub, email}`.
-- **Autorisation** : appartenance (membership) obligatoire pour toute route tenant ; `require_role("owner")` pour les routes sensibles (analytics/admin).
-- **Isolation** : RLS Postgres en défense en profondeur — même si le code oubliait un filtre, les policies bornent les lignes au tenant courant.
-- **CORS** : liste explicite + regex (previews Vercel) ; **fail-fast** si non configuré en prod (`allow_credentials=True` interdit le wildcard).
+- **Auth**: Supabase Auth issues the JWT; the API verifies it (JWKS RS256 or HS256 secret depending on the project). `Principal` = `{user_id = sub, email}`.
+- **Authorization**: membership required for any tenant route; `require_role("owner")` for sensitive routes (analytics/admin).
+- **Isolation**: Postgres RLS as defense in depth — even if the code forgot a filter, the policies bound the rows to the current tenant.
+- **CORS**: explicit list + regex (Vercel previews); **fail-fast** if not configured in prod (`allow_credentials=True` forbids the wildcard).
 
-## 7. Déploiement & environnements
+## 7. Deployment & environments
 
 ```mermaid
 flowchart LR
   subgraph Backend
-    PY[pyproject.toml] --> IMG[Image Modal debian-slim 3.12]
-    SEC["Secret Modal augura-api (AUGURA_*)"] --> FN["@modal.asgi_app api()"]
+    PY[pyproject.toml] --> IMG[Modal image debian-slim 3.12]
+    SEC["Modal secret augura-api (AUGURA_*)"] --> FN["@modal.asgi_app api()"]
     IMG --> FN
     FN --> URL[quentin-45919--augura-api-api.modal.run]
   end
   subgraph Frontend
-    GIT["push branche Quentin"] --> VER[Build Vercel] --> CDN[front prod]
+    GIT["push branch Quentin"] --> VER[Vercel build] --> CDN[prod frontend]
   end
 ```
 
-- **Backend (Modal)** : `bash apps/api/scripts/deploy_modal.sh` recrée le secret `augura-api` depuis `.env`, construit l'image depuis `pyproject.toml` (source de vérité unique des deps), et déploie l'ASGI app. **Ne lance ni migrations ni seed** — la DB se gère à part.
-- **Frontend (Vercel)** : déclenché par le push de la branche déployée (`Quentin`).
-- **DB (Supabase)** : opérations privilégiées via le SQL editor / MCP Supabase (le `.env` ne porte que le rôle applicatif `augura_api`).
-- **CI** (`.github/workflows/ci.yml`) : job `api` (`ruff format --check`, `ruff check`, `pyright`, `lint-imports`, `pytest`) + job `db-bundle` (bundle SQL sur Postgres+pgvector réel) + drift-check de l'OpenAPI client.
+- **Backend (Modal)**: `bash apps/api/scripts/deploy_modal.sh` recreates the `augura-api` secret from `.env`, builds the image from `pyproject.toml` (single source of truth for deps), and deploys the ASGI app. **Runs neither migrations nor seed** — the DB is managed separately.
+- **Frontend (Vercel)**: triggered by the push of the deployed branch (`Quentin`).
+- **DB (Supabase)**: privileged operations via the SQL editor / Supabase MCP (the `.env` only carries the application role `augura_api`).
+- **CI** (`.github/workflows/ci.yml`): `api` job (`ruff format --check`, `ruff check`, `pyright`, `lint-imports`, `pytest`) + `db-bundle` job (SQL bundle on a real Postgres+pgvector) + drift-check of the OpenAPI client.
 
-## 8. Invariants & décisions
+## 8. Invariants & decisions
 
-1. **Migrations `0002+` idempotentes** ; `seed.sql` appliqué séparément.
-2. **`core` indépendant des `modules`/`jobs`** ; modules de données mutuellement indépendants (import-linter).
-3. **Réel uniquement** côté front (zéro mock/fallback).
-4. **Config fail-fast** ; clés LLM absentes ⇒ `503` explicite, pas d'échec opaque.
-5. **OpenAPI = contrat** ; `schema.d.ts` jamais édité à la main.
+1. **Migrations `0002+` idempotent**; `seed.sql` applied separately.
+2. **`core` independent of `modules`/`jobs`**; data modules mutually independent (import-linter).
+3. **Real only** on the frontend (zero mock/fallback).
+4. **Fail-fast config**; missing LLM keys ⇒ explicit `503`, not an opaque failure.
+5. **OpenAPI = contract**; `schema.d.ts` never edited by hand.
 
-## 9. Limites connues & feuille de route
+## 9. Known limits & roadmap
 
-- **Bootstrap org/membership** : aucun code ne crée d'org/membership automatiquement → un nouveau compte sans membership est bloqué (403). Provisioning manuel actuellement ; auto-bootstrap (org partagée vs org perso) à décider puis implémenter (fonction `SECURITY DEFINER` appelée dans `get_current_tenant`).
-- **Onglets Privacy / Validation / Lineage** (dataset detail) : placeholders, sans backend.
-- **DI hétérogène** : `simulation`/`documents`/`analytics` injectent encore la `session` et reconstruisent le repo par méthode ; à aligner sur la forme `XService(XRepo(session))` au prochain passage.
-- **Parité taxonomie/ontologie** : enrichissement progressif une fois le chemin de données prouvé par le seed.
+- **Org/membership bootstrap**: no code creates an org/membership automatically → a new account without a membership is blocked (403). Manual provisioning currently; auto-bootstrap (shared org vs personal org) to be decided then implemented (`SECURITY DEFINER` function called in `get_current_tenant`).
+- **Privacy / Validation / Lineage tabs** (dataset detail): placeholders, no backend.
+- **Heterogeneous DI**: `simulation`/`documents`/`analytics` still inject the `session` and rebuild the repo per method; to be aligned on the `XService(XRepo(session))` form on the next pass.
+- **Taxonomy/ontology parity**: progressive enrichment once the data path is proven by the seed.
 
-## 10. Références
+## 10. References
 
-- `CLAUDE.md` — commandes, env, conventions, pièges opérationnels.
-- `apps/api/src/augura_api/modules/README.md` — convention de découpage des modules.
-- `docs/specs/2026-06-11-augura-backend-architecture-design.md` — spec d'architecture backend.
-- `docs/specs/2026-06-13-delivery-design.md` — design de livraison.
+- `CLAUDE.md` — commands, env, conventions, operational gotchas.
+- `apps/api/src/augura_api/modules/README.md` — module split convention.
+- `docs/specs/2026-06-11-augura-backend-architecture-design.md` — backend architecture spec.
+- `docs/specs/2026-06-13-delivery-design.md` — delivery design.

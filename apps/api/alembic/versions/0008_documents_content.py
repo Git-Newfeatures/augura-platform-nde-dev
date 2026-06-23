@@ -1,12 +1,12 @@
-"""generated_documents.content : octets du dossier généré stockés en base
+"""generated_documents.content: bytes of the generated dossier stored in the database
 
-Même bug que 0007_jobs_result_json, côté dossiers : `handle_document` écrivait le HTML
-sur le disque local du conteneur (core.storage). Sur Modal le worker `run_job` et le
-conteneur ASGI qui sert GET /documents/{id}/download sont distincts et le FS est
-éphémère ⇒ FileNotFoundError/404 intermittent. On stocke désormais les octets EN BASE
-(generated_documents.content), immédiatement cohérent cross-conteneur. Idempotent
-(ADD COLUMN IF NOT EXISTS) : la colonne vit aussi dans le bundle canonique schema.sql
-exécuté par 0001_baseline.
+Same bug as 0007_jobs_result_json, on the dossiers side: `handle_document` wrote the
+HTML to the container's local disk (core.storage). On Modal the `run_job` worker and
+the ASGI container that serves GET /documents/{id}/download are distinct and the FS is
+ephemeral ⇒ intermittent FileNotFoundError/404. We now store the bytes IN THE DATABASE
+(generated_documents.content), immediately consistent cross-container. Idempotent
+(ADD COLUMN IF NOT EXISTS): the column also lives in the canonical bundle schema.sql
+executed by 0001_baseline.
 
 Revision ID: 0008_documents_content
 Revises: 0007_jobs_result_json

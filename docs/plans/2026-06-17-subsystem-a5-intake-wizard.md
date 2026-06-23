@@ -29,7 +29,7 @@
 
 - [ ] **Step 1: `apps/web/src/intake/intakeApi.js`** (reuses `api.js` — `apiFetch` for multipart, `apiJson` for JSON):
 ```js
-// Helpers pour le pipeline d'intake (upload → map → DQ), câblés sur le backend FastAPI.
+// Helpers for the intake pipeline (upload → map → DQ), wired to the FastAPI backend.
 import { apiFetch, apiJson } from '../api'
 
 export async function uploadDataset(file, { name, studyId } = {}) {

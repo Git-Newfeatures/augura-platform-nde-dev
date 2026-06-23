@@ -1,4 +1,4 @@
-"""Tests du profiler DQ complet (quartiles, sentinelles, vecteurs)."""
+"""Tests for the full DQ profiler (quartiles, sentinels, vectors)."""
 
 from augura_api.modules.dq.profiler import profile_column
 

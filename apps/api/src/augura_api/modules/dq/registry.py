@@ -1,4 +1,4 @@
-"""Dispatch des checks DQ + audit d'exécution."""
+"""DQ check dispatch + run audit."""
 
 from __future__ import annotations
 

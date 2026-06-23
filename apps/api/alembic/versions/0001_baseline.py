@@ -1,10 +1,10 @@
-"""baseline — applique le bundle SQL canonique (schéma + fonctions + RLS)
+"""baseline — applies the canonical SQL bundle (schema + functions + RLS)
 
-Le schéma est défini une seule fois dans apps/api/supabase/*.sql (source de
-vérité, aussi exportable tel quel vers Supabase). Cette migration baseline
-l'exécute pour que `alembic upgrade head` construise la base — le schéma est
-ainsi « trigger par le backend Python ». Le seed (seed.sql) n'est PAS une
-migration : c'est de la donnée, appliquée séparément.
+The schema is defined once in apps/api/supabase/*.sql (source of truth, also
+exportable as-is to Supabase). This baseline migration runs it so that
+`alembic upgrade head` builds the database — the schema is thus "driven by the
+Python backend". The seed (seed.sql) is NOT a migration: it is data, applied
+separately.
 
 Revision ID: 0001_baseline
 Revises:
@@ -20,13 +20,13 @@ down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# apps/api/supabase (parents : [0]=versions [1]=alembic [2]=apps/api)
+# apps/api/supabase (parents: [0]=versions [1]=alembic [2]=apps/api)
 _SUPABASE = Path(__file__).resolve().parents[2] / "supabase"
 _DDL_FILES = ("schema.sql", "functions.sql", "policies.sql")
 
 
 def _strip_tx(sql: str) -> str:
-    """Retire les begin;/commit; (Alembic gère déjà la transaction)."""
+    """Strip begin;/commit; (Alembic already manages the transaction)."""
     keep = [ln for ln in sql.splitlines() if ln.strip().lower() not in ("begin;", "commit;")]
     return "\n".join(keep)
 
@@ -39,5 +39,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Baseline : réinitialisation franche du schéma public.
+    # Baseline: clean reset of the public schema.
     op.execute("drop schema public cascade; create schema public;")

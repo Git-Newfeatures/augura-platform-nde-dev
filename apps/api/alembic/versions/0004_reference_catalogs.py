@@ -1,8 +1,8 @@
-"""reference catalogs : tables de config pour le nettoyage front real-only
+"""reference catalogs: config tables for the real-only frontend cleanup
 
-Catalogues globaux (lecture seule, RLS backend_read) consommés par le front à la
-place des constantes codées en dur. Idempotent (IF NOT EXISTS) : ces objets vivent
-aussi dans le bundle canonique schema.sql + policies.sql exécuté par 0001_baseline.
+Global catalogs (read-only, RLS backend_read) consumed by the frontend in place
+of hard-coded constants. Idempotent (IF NOT EXISTS): these objects also live in
+the canonical bundle schema.sql + policies.sql executed by 0001_baseline.
 
 Revision ID: 0004_reference_catalogs
 Revises: 0003_literature_per_study_rls

@@ -28,7 +28,7 @@ def configure_logging(level: str) -> None:
 
 
 class RequestIdMiddleware:
-    """Propage X-Request-ID (entrant ou généré) dans la réponse et le contexte de log."""
+    """Propagates X-Request-ID (incoming or generated) into the response and log context."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app

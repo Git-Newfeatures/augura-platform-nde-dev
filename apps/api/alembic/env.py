@@ -1,4 +1,4 @@
-"""Environnement Alembic — driver sync (psycopg2), URL issue des settings."""
+"""Alembic environment — sync driver (psycopg2), URL derived from settings."""
 
 from logging.config import fileConfig
 
@@ -18,7 +18,7 @@ target_metadata = Base.metadata
 def _sync_url() -> str:
     settings = get_settings()
     if settings.database_url is None:
-        raise RuntimeError("AUGURA_DATABASE_URL requis pour exécuter les migrations.")
+        raise RuntimeError("AUGURA_DATABASE_URL required to run migrations.")
     url = settings.database_url
     for prefix in ("postgresql+asyncpg://", "postgresql://", "postgres://"):
         if url.startswith(prefix):

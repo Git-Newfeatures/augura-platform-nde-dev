@@ -1,16 +1,16 @@
-"""Stockage des octets d'artefacts (datasets uploadés, exports).
+"""Storage for artifact bytes (uploaded datasets, exports).
 
-Deux backends derrière une interface async minimale (`save_bytes`/`read_bytes`/`exists`),
-choisis selon les settings :
+Two backends behind a minimal async interface (`save_bytes`/`read_bytes`/`exists`),
+chosen based on the settings:
 
-- **Supabase Storage** (prod) quand `supabase_url` ET `supabase_service_role_key` sont
-  définis : objets dans un bucket privé via l'API REST Storage. Cohérent cross-conteneur,
-  contrairement au disque local éphémère et par-conteneur de Modal.
-- **Disque local** (dev/test/CI sans secret) sous `settings.artifacts_dir`.
+- **Supabase Storage** (prod) when `supabase_url` AND `supabase_service_role_key` are
+  set: objects in a private bucket via the Storage REST API. Consistent cross-container,
+  unlike Modal's ephemeral, per-container local disk.
+- **Local disk** (dev/test/CI with no secret) under `settings.artifacts_dir`.
 
-`storage_path` est TOUJOURS un chemin relatif déterministe (portable, jamais une URL absolue
-de machine) : sous le backend disque il est résolu depuis `artifacts_dir` ; côté Supabase
-c'est la clé de l'objet dans le bucket. Le même ref fonctionne pour les deux backends.
+`storage_path` is ALWAYS a deterministic relative path (portable, never an absolute machine
+URL): under the disk backend it is resolved from `artifacts_dir`; on the Supabase side
+it is the object's key in the bucket. The same ref works for both backends.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ _TIMEOUT = httpx.Timeout(30.0)
 
 
 def _safe(component: str) -> str:
-    """Neutralise un composant de chemin (anti path-traversal)."""
+    """Neutralizes a path component (path-traversal guard)."""
     cleaned = _SAFE.sub("_", component.strip()) or "_"
     return cleaned[:128]
 
@@ -37,11 +37,11 @@ def _root(settings: Settings) -> Path:
 
 
 def build_ref(org_id: str, name: str) -> str:
-    """Construit un storage_path relatif déterministe (org/<org>/<name>)."""
+    """Builds a deterministic relative storage_path (org/<org>/<name>)."""
     return f"org/{_safe(org_id)}/{_safe(name)}"
 
 
-# ─── sélection du backend ──────────────────────────────────────────────────────
+# ─── backend selection ──────────────────────────────────────────────────────────
 
 
 def _use_supabase(settings: Settings) -> bool:
@@ -57,7 +57,7 @@ def _object_url(settings: Settings, ref: str) -> str:
 
 
 def _auth_headers(settings: Settings) -> dict[str, str]:
-    # La clé service_role sert à la fois d'`apikey` (passerelle Kong) et de bearer.
+    # The service_role key serves as both the `apikey` (Kong gateway) and the bearer.
     key = settings.supabase_service_role_key or ""
     return {"Authorization": f"Bearer {key}", "apikey": key}
 
@@ -65,30 +65,30 @@ def _auth_headers(settings: Settings) -> dict[str, str]:
 async def _supabase_put(settings: Settings, ref: str, data: bytes) -> None:
     headers = {
         **_auth_headers(settings),
-        "x-upsert": "true",  # ré-upload du même ref ⇒ remplace au lieu d'un 409
+        "x-upsert": "true",  # re-uploading the same ref ⇒ replaces instead of a 409
         "Content-Type": "application/octet-stream",
     }
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.post(_object_url(settings, ref), content=data, headers=headers)
     if resp.status_code // 100 != 2:
-        raise OSError(f"upload Supabase Storage échoué ({resp.status_code}): {resp.text}")
+        raise OSError(f"Supabase Storage upload failed ({resp.status_code}): {resp.text}")
 
 
 async def _supabase_get(settings: Settings, ref: str) -> bytes:
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(_object_url(settings, ref), headers=_auth_headers(settings))
     if resp.status_code == 404:
-        raise FileNotFoundError(f"objet Storage introuvable : {ref}")
+        raise FileNotFoundError(f"Storage object not found: {ref}")
     if resp.status_code // 100 != 2:
-        raise OSError(f"download Supabase Storage échoué ({resp.status_code}): {resp.text}")
+        raise OSError(f"Supabase Storage download failed ({resp.status_code}): {resp.text}")
     return resp.content
 
 
-# ─── interface publique (async, agnostique du backend) ──────────────────────────
+# ─── public interface (async, backend-agnostic) ─────────────────────────────────
 
 
 async def save_bytes(settings: Settings, *, org_id: str, name: str, data: bytes) -> str:
-    """Écrit `data` et renvoie le storage_path relatif (à stocker en base)."""
+    """Writes `data` and returns the relative storage_path (to be stored in the DB)."""
     ref = build_ref(org_id, name)
     if _use_supabase(settings):
         await _supabase_put(settings, ref, data)
@@ -100,14 +100,14 @@ async def save_bytes(settings: Settings, *, org_id: str, name: str, data: bytes)
 
 
 async def read_bytes(settings: Settings, storage_path: str) -> bytes:
-    """Lit un artefact à partir de son storage_path relatif. Lève FileNotFoundError si absent.
-    Sur le backend disque, refuse toute échappée hors du répertoire d'artefacts."""
+    """Reads an artifact from its relative storage_path. Raises FileNotFoundError if absent.
+    On the disk backend, rejects any escape outside the artifacts directory."""
     if _use_supabase(settings):
         return await _supabase_get(settings, storage_path)
     root = _root(settings).resolve()
     target = (root / storage_path).resolve()
     if not str(target).startswith(str(root)):
-        raise FileNotFoundError("chemin d'artefact hors du répertoire autorisé")
+        raise FileNotFoundError("artifact path outside the allowed directory")
     return target.read_bytes()
 
 

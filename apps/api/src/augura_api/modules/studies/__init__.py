@@ -1,4 +1,4 @@
-"""Interface publique du module studies — les autres modules n'importent que ceci."""
+"""Public interface for the studies module — other modules import only this."""
 
 from augura_api.modules.studies.router import router
 

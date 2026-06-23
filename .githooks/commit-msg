@@ -1,21 +1,21 @@
 #!/bin/sh
-# commit-msg — retire automatiquement les trailers d'attribution IA des messages
-# de commit (Claude / Anthropic / "Generated with Claude Code").
+# commit-msg — automatically strips AI-attribution trailers from commit
+# messages (Claude / Anthropic / "Generated with Claude Code").
 #
-# Garde-fou anti-récidive : ces trailers ne doivent JAMAIS apparaître dans
-# l'historique (cf. CLAUDE.md › Conventions). Les vrais Co-Authored-By humains
-# sont préservés.
+# Anti-recurrence safeguard: these trailers must NEVER appear in the
+# history (see CLAUDE.md > Conventions). Genuine human Co-Authored-By lines
+# are preserved.
 #
-# Activation (une fois par clone) : git config core.hooksPath .githooks
+# Activation (once per clone): git config core.hooksPath .githooks
 
 msg_file="$1"
 tmp="$msg_file.augura.tmp"
 
-# 1) Supprime les lignes d'attribution IA (insensible à la casse).
+# 1) Remove AI-attribution lines (case-insensitive).
 grep -viE 'co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|generated with \[?claude code' \
   "$msg_file" > "$tmp"
 
-# 2) Retire les lignes vides résiduelles en fin de message.
+# 2) Strip residual blank lines at the end of the message.
 awk '
   { lines[NR] = $0 }
   END {

@@ -1,7 +1,7 @@
-"""Adaptateur HTTP du module datasets.
+"""HTTP adapter of the datasets module.
 
-Les routes `/datasets/cohorts...` sont déclarées AVANT `/datasets/{dataset_id}`
-pour ne pas être capturées comme un identifiant.
+The `/datasets/cohorts...` routes are declared BEFORE `/datasets/{dataset_id}`
+so they are not captured as an identifier.
 """
 
 from uuid import UUID
@@ -47,8 +47,8 @@ async def list_cohorts(
 async def import_cohort(
     payload: schemas.CohortImportRequest, tenant: CurrentTenantDep, session: SessionDep
 ) -> schemas.CohortImportResult:
-    """Ingère une cohorte longitudinale (members + biomarkers) — la voie d'écriture
-    des tables cohort_*, lues par OutcomeSelection/SimulationEngine."""
+    """Ingests a longitudinal cohort (members + biomarkers) — the write path
+    for the cohort_* tables, read by OutcomeSelection/SimulationEngine."""
     return await _service(session).import_cohort(tenant, payload)
 
 

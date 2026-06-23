@@ -6,19 +6,19 @@ import { EmptyState } from '@/workspace/CollectionStates'
 import { ResultsList } from './ResultsList'
 import { listSnapshots, getSnapshot, flattenItem, resultId } from './literatureClient'
 
-// Vue « Saved evidence » scopée à une étude : liste les snapshots gelés rattachés
-// à l'étude (POST « Save to study » → study_id), et les ré-ouvre en lecture seule
-// (résultats identiques, content_hash vérifié côté backend). Aucune mutation ici.
+// Study-scoped "Saved evidence" view: lists the frozen snapshots linked to the
+// study (POST "Save to study" → study_id), and re-opens them read-only
+// (identical results, content_hash verified backend-side). No mutation here.
 export function StudyLiterature({ studyId }) {
-  const [list, setList] = useState(null)        // null = en cours de chargement
+  const [list, setList] = useState(null)        // null = loading
   const [openId, setOpenId] = useState(null)
-  const [snap, setSnap] = useState(null)        // détail du snapshot ouvert
+  const [snap, setSnap] = useState(null)        // detail of the opened snapshot
   const [loadingSnap, setLoadingSnap] = useState(false)
 
   const refresh = useCallback(async () => {
     try { setList(await listSnapshots(studyId)) } catch { setList([]) }
   }, [studyId])
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch async au mount/changement d'étude (setState post-await, useCallback stable)
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount/study change (setState post-await, useCallback stable)
   useEffect(() => { refresh() }, [refresh])
 
   const open = async (id) => {
@@ -39,7 +39,7 @@ export function StudyLiterature({ studyId }) {
     </div>
   )
 
-  // ── Détail d'un snapshot (lecture seule) ────────────────────────────────────
+  // ── Detail of a snapshot (read-only) ────────────────────────────────────────
   if (openId) {
     const sources = snap?.sources || ['pubmed', 'ctgov']
     const flat = (snap?.results || []).map(flattenItem)
@@ -93,7 +93,7 @@ export function StudyLiterature({ studyId }) {
     )
   }
 
-  // ── Liste des snapshots de l'étude ──────────────────────────────────────────
+  // ── List of the study's snapshots ───────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
       {head}

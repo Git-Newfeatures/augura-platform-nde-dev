@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module studies (porte unique : tout passe par FastAPI)."""
+"""HTTP adapter for the studies module (single gate: everything goes through FastAPI)."""
 
 from uuid import UUID
 

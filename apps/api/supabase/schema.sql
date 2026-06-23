@@ -1,13 +1,13 @@
--- Augura Platform — schéma de base de données (Supabase-ready)
--- Source de vérité du schéma. À appliquer dans un NOUVEAU projet Supabase
--- (SQL Editor) ou via la migration Alembic baseline qui exécute ce fichier.
--- Réf : docs/specs/2026-06-13-delivery-design.md §3.
+-- Augura Platform — database schema (Supabase-ready)
+-- Source of truth for the schema. To apply in a NEW Supabase project
+-- (SQL Editor) or via the baseline Alembic migration that runs this file.
+-- Ref: docs/specs/2026-06-13-delivery-design.md §3.
 --
--- Ordre d'application : schema.sql → functions.sql → seed.sql → policies.sql
--- (le seed passe AVANT l'activation RLS pour éviter toute friction d'insertion)
+-- Application order: schema.sql → functions.sql → seed.sql → policies.sql
+-- (the seed runs BEFORE enabling RLS to avoid any insertion friction)
 --
--- 19 tables, groupées par module. Toutes les tables tenant-scopées portent
--- une colonne org_id ; les policies RLS (policies.sql) s'y adossent.
+-- 19 tables, grouped by module. All tenant-scoped tables carry
+-- an org_id column; the RLS policies (policies.sql) rely on it.
 
 begin;
 
@@ -15,7 +15,7 @@ create extension if not exists pgcrypto;   -- gen_random_uuid()
 create extension if not exists vector;     -- pgvector (embeddings)
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : tenancy
+-- Module: tenancy
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists orgs (
@@ -26,8 +26,8 @@ create table if not exists orgs (
     created_at   timestamptz not null default now()
 );
 
--- user_id référence auth.users(id) côté Supabase. Pas de FK dure ici pour que
--- le bundle reste applicable même si le schéma auth n'est pas encore présent.
+-- user_id references auth.users(id) on the Supabase side. No hard FK here so that
+-- the bundle stays applicable even if the auth schema is not yet present.
 create table if not exists memberships (
     id         uuid primary key default gen_random_uuid(),
     org_id     uuid not null references orgs(id) on delete cascade,
@@ -39,7 +39,7 @@ create table if not exists memberships (
 create index if not exists ix_memberships_user on memberships(user_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : studies
+-- Module: studies
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists studies (
@@ -69,7 +69,7 @@ create table if not exists study_members (
     unique (study_id, user_id)
 );
 
--- État de workflow versionné (remplace le sessionStorage augura_session_v3_*).
+-- Versioned workflow state (replaces the sessionStorage augura_session_v3_*).
 create table if not exists study_state (
     id         uuid primary key default gen_random_uuid(),
     study_id   uuid not null references studies(id) on delete cascade,
@@ -82,7 +82,7 @@ create table if not exists study_state (
 create index if not exists ix_study_state_study on study_state(study_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : datasets (+ cohortes)
+-- Module: datasets (+ cohorts)
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists datasets (
@@ -124,7 +124,7 @@ create table if not exists dataset_columns (
 create index if not exists ix_dataset_columns_dataset on dataset_columns(dataset_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : dq (A3a) — bundles de qualité des données (tenant-scopé)
+-- Module: dq (A3a) — data-quality bundles (tenant-scoped)
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists dq_bundles (
@@ -140,7 +140,7 @@ create table if not exists dq_bundles (
 );
 create index if not exists dq_bundles_dataset_idx on dq_bundles (dataset_id, created_at desc);
 
--- Cohorte démographique (= validation_members côté front).
+-- Demographic cohort (= validation_members on the front side).
 create table if not exists cohort_members (
     id               uuid primary key default gen_random_uuid(),
     org_id           uuid not null references orgs(id) on delete cascade,
@@ -156,7 +156,7 @@ create table if not exists cohort_members (
 create index if not exists ix_cohort_members_lookup
     on cohort_members(org_id, cohort_name);
 
--- Cohorte biomarqueurs longitudinaux (= validation_biomarkers côté front).
+-- Longitudinal biomarker cohort (= validation_biomarkers on the front side).
 create table if not exists cohort_biomarkers (
     id               uuid primary key default gen_random_uuid(),
     org_id           uuid not null references orgs(id) on delete cascade,
@@ -173,7 +173,7 @@ create index if not exists ix_cohort_biomarkers_lookup
     on cohort_biomarkers(org_id, cohort_name, member_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : corpus (org_id NULLABLE ⇒ corpus global partagé)
+-- Module: corpus (org_id NULLABLE ⇒ shared global corpus)
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists documents (
@@ -204,12 +204,12 @@ create table if not exists chunks (
     embedding   vector(1536),
     token_count integer
 );
--- Index HNSW pour la recherche par similarité cosinus (pgvector).
+-- HNSW index for cosine similarity search (pgvector).
 create index if not exists ix_chunks_embedding_hnsw
     on chunks using hnsw (embedding vector_cosine_ops);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : agents (observabilité + cache)
+-- Module: agents (observability + cache)
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists agent_runs (
@@ -228,7 +228,7 @@ create table if not exists agent_runs (
 );
 create index if not exists ix_agent_runs_org on agent_runs(org_id, created_at desc);
 
--- Cache des réponses d'agents déterministes (fix U2).
+-- Cache of deterministic agent responses (fix U2).
 create table if not exists agent_cache (
     id         uuid primary key default gen_random_uuid(),
     agent_type text not null,
@@ -239,7 +239,7 @@ create table if not exists agent_cache (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : simulation
+-- Module: simulation
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists simulation_runs (
@@ -255,7 +255,7 @@ create table if not exists simulation_runs (
 );
 create index if not exists ix_simulation_runs_org on simulation_runs(org_id);
 
--- Read-model précalculé pour le mode VALIDATED du front (3 scénarios × 4 estimateurs).
+-- Precomputed read-model for the front's VALIDATED mode (3 scenarios × 4 estimators).
 create table if not exists simulation_results (
     id          uuid primary key default gen_random_uuid(),
     org_id      uuid not null references orgs(id) on delete cascade,
@@ -267,7 +267,7 @@ create table if not exists simulation_results (
     ci_upper    numeric,
     power       numeric,
     p_value     numeric,
-    -- Métriques bootstrap (scatter Bias-vs-MSE) + paramètres de cohorte par scénario.
+    -- Bootstrap metrics (Bias-vs-MSE scatter) + cohort parameters per scenario.
     bias        numeric,
     variance    numeric,
     mse         numeric,
@@ -278,7 +278,7 @@ create table if not exists simulation_results (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : jobs
+-- Module: jobs
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists jobs (
@@ -300,8 +300,8 @@ create table if not exists jobs (
 );
 create index if not exists ix_jobs_org_status on jobs(org_id, status);
 
--- FK simulation_runs.job_id -> jobs(id) : posée ici car jobs est créé APRÈS
--- simulation_runs. Idempotente (re-run du bundle sans erreur).
+-- FK simulation_runs.job_id -> jobs(id): set here because jobs is created AFTER
+-- simulation_runs. Idempotent (re-run of the bundle without error).
 do $$ begin
     if not exists (select 1 from pg_constraint where conname = 'simulation_runs_job_id_fkey') then
         alter table simulation_runs
@@ -312,7 +312,7 @@ end $$;
 create index if not exists ix_simulation_runs_job on simulation_runs(job_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : documents générés
+-- Module: generated documents
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists generated_documents (
@@ -321,8 +321,8 @@ create table if not exists generated_documents (
     study_id     uuid references studies(id) on delete set null,
     type         text not null check (type in ('protocol', 'report')),
     storage_path text,
-    -- Octets du dossier généré, stockés EN BASE : sur Modal le worker et l'ASGI sont
-    -- des conteneurs distincts au FS éphémère, donc le disque local n'est pas partagé.
+    -- Bytes of the generated file, stored IN THE DATABASE: on Modal the worker and the ASGI are
+    -- distinct containers with an ephemeral FS, so the local disk is not shared.
     content      bytea,
     status       text not null default 'pending'
                  check (status in ('pending', 'generating', 'ready', 'failed')),
@@ -331,7 +331,7 @@ create table if not exists generated_documents (
 create index if not exists ix_generated_documents_org on generated_documents(org_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : analytics / observabilité
+-- Module: analytics / observability
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists usage_events (
@@ -357,9 +357,9 @@ create table if not exists outbox_events (
 create index if not exists ix_outbox_unprocessed
     on outbox_events(created_at) where processed_at is null;
 
--- Artefacts versionnés & hashés — colonne vertébrale reproductibilité (spec §2).
--- Tout objet reproductible (snapshot dataset, rapport QC, mapping, DAG, SAP, run)
--- y est stocké : contenu canonique + SHA-256 + provenance + lock de pré-spécification.
+-- Versioned & hashed artifacts — reproducibility backbone (spec §2).
+-- Every reproducible object (dataset snapshot, QC report, mapping, DAG, SAP, run)
+-- is stored here: canonical content + SHA-256 + provenance + pre-specification lock.
 create table if not exists artifacts (
     id          uuid primary key default gen_random_uuid(),
     org_id      uuid not null references orgs(id) on delete cascade,
@@ -367,12 +367,12 @@ create table if not exists artifacts (
     kind        text not null
                 check (kind in ('dataset_snapshot', 'qc_report', 'mapping', 'dag',
                                 'sap', 'run_manifest', 'simulation_run', 'document')),
-    version     integer not null default 0,        -- v0 = machine-proposé, v1 = humain-approuvé…
-    sha256      text not null,                     -- hash du contenu canonique
-    content     jsonb,                             -- corps inline (edge list, SAP, manifest…)
-    storage_ref text,                              -- ou pointeur Storage si volumineux
+    version     integer not null default 0,        -- v0 = machine-proposed, v1 = human-approved…
+    sha256      text not null,                     -- hash of the canonical content
+    content     jsonb,                             -- inline body (edge list, SAP, manifest…)
+    storage_ref text,                              -- or Storage pointer if large
     provenance  jsonb not null default '{}'::jsonb, -- {source, prompt_hash, model_id, parent_version, diff…}
-    locked      boolean not null default false,    -- artefact figé (DAG/SAP approuvé)
+    locked      boolean not null default false,    -- frozen artifact (approved DAG/SAP)
     created_by  uuid,
     created_at  timestamptz not null default now(),
     unique (study_id, kind, version)
@@ -381,7 +381,7 @@ create index if not exists ix_artifacts_org on artifacts(org_id);
 create index if not exists ix_artifacts_study_kind on artifacts(study_id, kind);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : reference — catalogues CESL globaux (non tenant-scopés, lecture seule)
+-- Module: reference — global CESL catalogs (non tenant-scoped, read-only)
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists cesl_sources (
@@ -497,8 +497,8 @@ create table if not exists variable_role_catalog (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : semantic (A1) — taxonomie DQ globale (lecture seule). DDL porté de
--- l'MVP semantic schema → public. Versioning/ontologie causale = subsystem B.
+-- Module: semantic (A1) — global DQ taxonomy (read-only). DDL ported from
+-- the MVP semantic schema → public. Versioning/causal ontology = subsystem B.
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists taxonomy_concepts (
@@ -608,10 +608,10 @@ create index if not exists taxonomy_synonyms_synonym_idx on taxonomy_synonyms (l
 create index if not exists taxonomy_measurement_units_concept_idx on taxonomy_measurement_units (concept_id);
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : semantic (B1) — ontologie/causal globale (lecture seule). DDL porté
--- de l'MVP semantic schema → public, FKs vers taxonomy_concepts conservées.
--- Substrat consommé par B2 (dag-llm) et B4 (enrich). Ordre : parents FK d'abord
--- (codes/areas/relationships → concepts ; causal_predicates → ontology_relations
+-- Module: semantic (B1) — global ontology/causal (read-only). DDL ported
+-- from the MVP semantic schema → public, FKs to taxonomy_concepts kept.
+-- Substrate consumed by B2 (dag-llm) and B4 (enrich). Order: FK parents first
+-- (codes/areas/relationships → concepts; causal_predicates → ontology_relations
 -- → evidence/qualifiers).
 -- ─────────────────────────────────────────────────────────────────────────
 
@@ -700,8 +700,8 @@ create index if not exists ontology_relations_object_idx on ontology_relations (
 create index if not exists ontology_relation_evidence_relation_idx
   on ontology_relation_evidence (relation_id);
 
--- Historique de version de la couche sémantique gouvernée (sert GET /semantic/release).
--- Append-only, une seule ligne is_current ; la ligne courante est seedée (cf. 0005).
+-- Version history of the governed semantic layer (serves GET /semantic/release).
+-- Append-only, a single is_current row; the current row is seeded (cf. 0005).
 create table if not exists semantic_releases (
   semantic_release_version text primary key,
   taxonomy_version         text not null,
@@ -715,22 +715,22 @@ create table if not exists semantic_releases (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Module : corpus — recherche live (retrieve-and-freeze)
--- Miroir de la migration alembic 0002_literature_live_search. Verbe distinct de
--- l'ingestion : récupère + gèle un jeu de preuves (content_hash), sans toucher au
--- corpus. Refs externes (org_id, study_id, created_by) = UUID nus (les orgs/users
--- vivent côté auth Supabase) ; seule events.session_id est une FK intra-tables.
+-- Module: corpus — live search (retrieve-and-freeze)
+-- Mirror of alembic migration 0002_literature_live_search. Verb distinct from
+-- ingestion: fetches + freezes an evidence set (content_hash), without touching the
+-- corpus. External refs (org_id, study_id, created_by) = bare UUIDs (orgs/users
+-- live on the Supabase auth side); only events.session_id is an intra-table FK.
 -- ─────────────────────────────────────────────────────────────────────────
 
 create table if not exists literature_snapshots (
     id           uuid primary key default gen_random_uuid(),
     org_id       uuid not null,
-    study_id     uuid,           -- NULL ⇒ snapshot standalone (créateur seul, cf. RLS)
+    study_id     uuid,           -- NULL ⇒ standalone snapshot (creator only, cf. RLS)
     created_by   uuid not null,
-    -- payload = l'artefact canonique EXACT qui a été haché (autorité du hash) :
+    -- payload = the EXACT canonical artifact that was hashed (hash authority):
     -- {query, sources, model_version, prompt_version, study_id, created_by,
-    --  created_at, results:[…]}. Les colonnes ci-dessus le dénormalisent pour la
-    -- RLS / l'indexation / le tri ; le hash ne fait foi que sur payload.
+    --  created_at, results:[…]}. The columns above denormalize it for
+    -- RLS / indexing / sorting; the hash is authoritative only over payload.
     payload      jsonb not null,
     content_hash text not null,
     created_at   timestamptz not null default now()

@@ -1,4 +1,4 @@
-"""LiteratureSnapshotService.list_snapshots : mappe les lignes en SnapshotSummary."""
+"""LiteratureSnapshotService.list_snapshots: maps rows to SnapshotSummary."""
 
 from datetime import UTC, datetime
 from typing import cast

@@ -1,4 +1,4 @@
-"""Tests unitaires du sous-graphe causal déterministe (sans LLM, sans base)."""
+"""Unit tests for the deterministic causal subgraph (no LLM, no database)."""
 
 from augura_api.modules.causal.subgraph import (
     Relation,
@@ -74,26 +74,26 @@ def test_build_relations_joins_evidence_and_qualifiers() -> None:
 
 
 def test_subgraph_zero_hop_is_direct_neighbours() -> None:
-    # hops=0 fait un tour (port fidèle de `for h in 0..=hops`) : voisins directs de A.
+    # hops=0 makes one pass (faithful port of `for h in 0..=hops`): direct neighbours of A.
     sub = causal_subgraph(_relations(), ["A"], hops=0)
-    # A est sujet de R3 (A→Y) et objet de R1 (W→A) ; R2 (W→Y) pas encore atteint.
+    # A is subject of R3 (A→Y) and object of R1 (W→A); R2 (W→Y) not yet reached.
     assert {r.id for r in sub} == {"R1", "R3"}
 
 
 def test_subgraph_one_hop_reaches_next_ring() -> None:
     sub = causal_subgraph(_relations(), ["A"], hops=1)
-    # 2e tour depuis W et Y → R2 (W→Y) rejoint le sous-graphe ; R4 (Z→Q) hors d'atteinte.
+    # 2nd pass from W and Y → R2 (W→Y) joins the subgraph; R4 (Z→Q) out of reach.
     assert {r.id for r in sub} == {"R1", "R2", "R3"}
 
 
 def test_subgraph_default_excludes_unreachable() -> None:
-    sub = causal_subgraph(_relations(), ["A"])  # hops=2 par défaut
+    sub = causal_subgraph(_relations(), ["A"])  # hops=2 by default
     assert "R4" not in {r.id for r in sub}
 
 
 def test_cap_prioritises_direct_relations() -> None:
     rels = _relations()
-    capped = cap_candidates(rels, ["A"])  # sous le plafond → renvoyé tel quel
+    capped = cap_candidates(rels, ["A"])  # below the cap → returned as-is
     assert capped == rels
 
 

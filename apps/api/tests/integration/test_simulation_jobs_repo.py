@@ -1,7 +1,7 @@
-"""Tests d'intégration simulation + jobs — résultats seedés + idempotence des jobs.
+"""Integration tests simulation + jobs — seeded results + job idempotence.
 
-Sous le rôle augura_app (RLS active). Le seed fournit 12 lignes simulation_results
-pour validation_v1 (3 scénarios × 4 estimateurs).
+Under the augura_app role (RLS active). The seed provides 12 simulation_results rows
+for validation_v1 (3 scenarios × 4 estimators).
 """
 
 import os
@@ -27,7 +27,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def session() -> AsyncIterator[AsyncSession]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         async with async_sessionmaker(engine, expire_on_commit=False)() as s, s.begin():
@@ -41,7 +41,7 @@ async def session() -> AsyncIterator[AsyncSession]:
 
 async def test_validated_results_seeded(session: AsyncSession) -> None:
     rows = await SimulationRepo(session).list_results(LUCIS, "validation_v1")
-    assert len(rows) == 12  # 3 scénarios × 4 estimateurs
+    assert len(rows) == 12  # 3 scenarios × 4 estimators
     assert {r.scenario for r in rows} == {"baseline", "conservative", "high_risk"}
 
 
@@ -53,7 +53,7 @@ async def test_create_job_is_idempotent(session: AsyncSession) -> None:
     second = await create_job(
         session, LUCIS, type="bootstrap", payload={"effect": 0.2}, idempotency_key=key
     )
-    assert first.id == second.id  # même clé → même job (pas de double bootstrap)
+    assert first.id == second.id  # same key → same job (no double bootstrap)
     assert first.status == "queued"
 
 

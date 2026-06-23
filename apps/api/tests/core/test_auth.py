@@ -24,11 +24,11 @@ def _claims(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-# ── HS256 (secret partagé) ────────────────────────────────────────────────
+# ── HS256 (shared secret) ─────────────────────────────────────────────────
 
 
 def _hs_settings() -> Settings:
-    return Settings(  # pyright: ignore[reportCallIssue] -- champs env
+    return Settings(  # pyright: ignore[reportCallIssue] -- env fields
         env="dev",
         supabase_jwt_secret="test-secret-please-ignore-0123456789abcdef",
         supabase_jwt_audience="authenticated",
@@ -75,7 +75,7 @@ def test_non_uuid_sub_is_rejected() -> None:
         )
 
 
-# ── RS256 via JWKS (mode Supabase asymétrique) ────────────────────────────
+# ── RS256 via JWKS (asymmetric Supabase mode) ─────────────────────────────
 
 
 async def test_authenticate_rs256_via_jwks() -> None:
@@ -96,7 +96,7 @@ async def test_authenticate_rs256_via_jwks() -> None:
     async def fetcher() -> dict[str, Any]:
         return {"keys": [jwk]}
 
-    settings = Settings(  # pyright: ignore[reportCallIssue] -- champs env
+    settings = Settings(  # pyright: ignore[reportCallIssue] -- env fields
         env="dev", supabase_jwks_url="https://example.test/jwks"
     )
     principal = await authenticate(token, settings, jwks_fetcher=fetcher)

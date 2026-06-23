@@ -1,4 +1,4 @@
-"""Intégration : upload dataset → parse → profile → persistance (+ RLS)."""
+"""Integration: dataset upload → parse → profile → persistence (+ RLS)."""
 
 import os
 from collections.abc import AsyncIterator
@@ -24,7 +24,7 @@ USER = UserId(UUID("11111111-1111-4111-8111-111111111111"))
 async def sm() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url = os.environ.get("AUGURA_DATABASE_URL")
     if not url:
-        pytest.skip("AUGURA_DATABASE_URL absent — test d'intégration sauté")
+        pytest.skip("AUGURA_DATABASE_URL not set — integration test skipped")
     engine = create_async_engine(to_asyncpg_url(url))
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)

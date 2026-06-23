@@ -1,4 +1,4 @@
-"""Modèles SQLAlchemy du module datasets (+ cohortes)."""
+"""SQLAlchemy models of the datasets module (+ cohorts)."""
 
 from datetime import datetime
 from typing import Any

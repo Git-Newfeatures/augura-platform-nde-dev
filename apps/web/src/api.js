@@ -1,22 +1,22 @@
-// Client API d'Augura — fondation du rebranchement front → FastAPI.
-// Chaque appel porte le JWT Supabase courant en Authorization: Bearer (porte
-// unique, spec §7). Base : VITE_API_URL (domaine Modal en prod, localhost en dev).
+// Augura API client — foundation of the frontend → FastAPI rewiring.
+// Every call carries the current Supabase JWT in Authorization: Bearer (single
+// gate, spec §7). Base: VITE_API_URL (Modal domain in prod, localhost in dev).
 //
-// Les vues sont rebranchées une à une sur ces helpers (studies, corpus, datasets,
-// agents, simulations…) en remplacement des anciens fetch('/api/*') + lectures
-// Supabase REST directes. Les types canoniques vivent dans packages/api-client.
+// Views are rewired one by one onto these helpers (studies, corpus, datasets,
+// agents, simulations…) replacing the old fetch('/api/*') + direct Supabase
+// REST reads. The canonical types live in packages/api-client.
 import { supabase } from './supabase'
 
-// Repli prod = backend Modal. Surchargé par VITE_API_URL quand il est défini
-// (http://localhost:8000 en dev via .env.local, ou une env var du projet Vercel).
-// Évite que le build prod tape en relatif sur l'origine du front → 404.
+// Prod fallback = Modal backend. Overridden by VITE_API_URL when it is set
+// (http://localhost:8000 in dev via .env.local, or a Vercel project env var).
+// Prevents the prod build from hitting the front origin relatively → 404.
 const FALLBACK_API_BASE = 'https://quentin-45919--augura-api-api.modal.run'
 const API_BASE = import.meta.env.VITE_API_URL || FALLBACK_API_BASE
 
 if (!import.meta.env.VITE_API_URL) {
   console.warn(
-    `[augura] VITE_API_URL non défini — repli sur le backend Modal par défaut (${FALLBACK_API_BASE}). ` +
-      'Définis VITE_API_URL pour cibler un autre backend (ex. http://localhost:8000 en dev).',
+    `[augura] VITE_API_URL not set — falling back to the default Modal backend (${FALLBACK_API_BASE}). ` +
+      'Set VITE_API_URL to target a different backend (e.g. http://localhost:8000 in dev).',
   )
 }
 

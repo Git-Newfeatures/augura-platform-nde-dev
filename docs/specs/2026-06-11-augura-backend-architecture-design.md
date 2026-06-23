@@ -1,201 +1,201 @@
-# Augura Platform — Architecture backend
+# Augura Platform — Backend architecture
 
-**Date** : 2026-06-11
-**Statut** : validé (brainstorm Quentin × Claude)
-**Portée** : architecture du nouveau backend de production d'Augura et du monorepo qui l'héberge. Ce document est la référence du plan d'implémentation.
+**Date**: 2026-06-11
+**Status**: validated (brainstorm Quentin × Claude)
+**Scope**: architecture of Augura's new production backend and of the monorepo that hosts it. This document is the reference for the implementation plan.
 
 ---
 
-## 1. Contexte et motivation
+## 1. Context and motivation
 
-Augura (repo actuel `lucis-dashboard`) est une plateforme d'aide à la conception d'études cliniques : workflow multi-phases (profiling E1 → risques → outcome → DAG causal → design → simulation → résultats), agents LLM adossés à un corpus de preuves (PubMed, MAUDE, FDA Guidance, ClinicalTrials.gov) indexé en pgvector.
+Augura (current repo `lucis-dashboard`) is a clinical-study design support platform: a multi-phase workflow (E1 profiling → risks → outcome → causal DAG → design → simulation → results), LLM agents backed by an evidence corpus (PubMed, MAUDE, FDA Guidance, ClinicalTrials.gov) indexed in pgvector.
 
-L'architecture actuelle est une fracture JS/Python non assumée :
+The current architecture is an unacknowledged JS/Python split:
 
-- 11 fonctions serverless Vercel en JS (`api/*.js`) : agents (trace E1 en SSE, dag, gap-detection, variable-check), proxies Anthropic/OpenAI, recherche vectorielle ;
-- des scripts Python offline (`simulation/run_bootstrap.py` : bootstrap N=1000, numpy/scipy/statsmodels) sans lien avec l'API ;
-- limites atteintes : timeout Vercel 300 s sur `trace.js`, aucun mécanisme de jobs longs ni de cron, RLS désactivé (bug T1), état du workflow en sessionStorage navigateur, mode démo entremêlé au code de production, fixtures mock manuelles par route.
+- 11 Vercel serverless functions in JS (`api/*.js`): agents (E1 trace in SSE, dag, gap-detection, variable-check), Anthropic/OpenAI proxies, vector search;
+- offline Python scripts (`simulation/run_bootstrap.py`: bootstrap N=1000, numpy/scipy/statsmodels) with no link to the API;
+- limits reached: Vercel 300 s timeout on `trace.js`, no mechanism for long-running jobs or cron, RLS disabled (bug T1), workflow state in browser sessionStorage, demo mode intertwined with production code, manual mock fixtures per route.
 
-Décision : reconstruire le backend en **monolithe modulaire Python/FastAPI**, dans un **nouveau monorepo**, déployé sur **Modal**, avec **Supabase** (nouvelle instance) comme base de données et auth. Migration **big bang** outillée par des tests de caractérisation. Le repo actuel `lucis-dashboard` devient une **démo frontend pure** (mocks), sans lien avec le backend de production.
+Decision: rebuild the backend as a **Python/FastAPI modular monolith**, in a **new monorepo**, deployed on **Modal**, with **Supabase** (new instance) as the database and auth. **Big bang** migration tooled by characterization tests. The current repo `lucis-dashboard` becomes a **pure frontend demo** (mocks), with no link to the production backend.
 
-## 2. Décisions actées
+## 2. Settled decisions
 
-| # | Sujet | Décision |
+| # | Topic | Decision |
 |---|-------|----------|
-| 1 | Périmètre | Remplacer intégralement le backend d'Augura (fonctions Vercel + scripts Python) |
-| 2 | Stratégie | Big bang dans un nouveau projet ; parité prouvée avant bascule |
-| 3 | Démo | Aucun mode démo dans le backend ; la démo = frontend autonome (lucis-dashboard figé) |
-| 4 | Nouvelles capacités | Simulation à la demande · corpus self-service · génération de documents · multi-études & collaboration |
-| 5 | Front de production | Migré dans le monorepo (`apps/web`), débarrassé des mocks |
-| 6 | Base de données | Nouvelle instance Supabase dédiée prod + environnement dev distinct, migrations versionnées dès le jour 1 |
-| 7 | Accès aux données | Tout passe par FastAPI (porte unique) ; RLS conservé en défense en profondeur |
-| 8 | Auth | Supabase Auth côté front ; FastAPI vérifie le JWT (JWKS) ; scoping tenant côté serveur |
-| 9 | Structure interne | Monolithe modulaire en tranches verticales ; frontières vérifiées par import-linter |
-| 10 | Couche données | SQLAlchemy 2.0 async (asyncpg) + Alembic |
-| 11 | Runtime agents | SDK Anthropic async + runtime maison typé (port de `agents/runtime/anthropic.js`) ; ni pydantic-ai ni LangGraph |
+| 1 | Scope | Fully replace Augura's backend (Vercel functions + Python scripts) |
+| 2 | Strategy | Big bang in a new project; parity proven before cutover |
+| 3 | Demo | No demo mode in the backend; the demo = standalone frontend (frozen lucis-dashboard) |
+| 4 | New capabilities | On-demand simulation · self-service corpus · document generation · multi-study & collaboration |
+| 5 | Production frontend | Migrated into the monorepo (`apps/web`), stripped of mocks |
+| 6 | Database | New dedicated prod Supabase instance + separate dev environment, versioned migrations from day 1 |
+| 7 | Data access | Everything goes through FastAPI (single door); RLS kept as defense in depth |
+| 8 | Auth | Supabase Auth on the frontend; FastAPI verifies the JWT (JWKS); server-side tenant scoping |
+| 9 | Internal structure | Modular monolith in vertical slices; boundaries verified by import-linter |
+| 10 | Data layer | SQLAlchemy 2.0 async (asyncpg) + Alembic |
+| 11 | Agents runtime | Async Anthropic SDK + in-house typed runtime (port of `agents/runtime/anthropic.js`); neither pydantic-ai nor LangGraph |
 
-## 3. Pourquoi Python (vs Node.js / Go)
+## 3. Why Python (vs Node.js / Go)
 
-1. **Le cœur métier est déjà en Python et il est intransportable** : estimateurs ATE/ATT/LME/IPW, bootstrap paramétrique, power analysis = scipy/statsmodels/sklearn. Aucun équivalent crédible en JS ; gonum (Go) est embryonnaire. Tout autre choix impose deux runtimes à vie.
-2. **L'écosystème IA est first-class** : SDK Anthropic, validation Pydantic des sorties structurées d'agents, LangSmith, pipelines d'embeddings.
-3. **Le contrat de types** : Pydantic v2 → OpenAPI → client TypeScript généré. Validation runtime + documentation + génération en un geste.
-4. **La « lenteur » de Python est hors sujet ici** : backend I/O-bound (latence dominée par les LLM et la DB) → asyncio suffit largement ; compute-bound vectorisé numpy (C sous le capot). Go ne gagnerait que sur du throughput HTTP massif CPU-light, qui n'est pas le profil d'Augura (B2B, faible volume).
-5. **Modal est Python-natif** : API ASGI en une décoration, jobs longs sans Celery/Redis, cron intégré, GPU accessible.
+1. **The business core is already in Python and it is not transportable**: ATE/ATT/LME/IPW estimators, parametric bootstrap, power analysis = scipy/statsmodels/sklearn. No credible equivalent in JS; gonum (Go) is embryonic. Any other choice imposes two runtimes for life.
+2. **The AI ecosystem is first-class**: Anthropic SDK, Pydantic validation of agents' structured outputs, LangSmith, embedding pipelines.
+3. **The type contract**: Pydantic v2 → OpenAPI → generated TypeScript client. Runtime validation + documentation + generation in a single move.
+4. **Python's "slowness" is irrelevant here**: I/O-bound backend (latency dominated by the LLMs and the DB) → asyncio is more than enough; compute-bound vectorized numpy (C under the hood). Go would only win on massive CPU-light HTTP throughput, which is not Augura's profile (B2B, low volume).
+5. **Modal is Python-native**: ASGI API in one decorator, long-running jobs without Celery/Redis, integrated cron, accessible GPU.
 
-Concessions reconnues : Node aurait donné le partage de types sans génération et des cold starts plus courts ; Go un binaire statique et une RAM minime. Aucun ne compense le point 1.
+Acknowledged concessions: Node would have given type sharing without generation and shorter cold starts; Go a static binary and minimal RAM. None of them offsets point 1.
 
 ## 4. Monorepo
 
 ```
 augura-platform/
 ├── apps/
-│   ├── api/                          # monolithe FastAPI
+│   ├── api/                          # FastAPI monolith
 │   │   ├── src/augura_api/
-│   │   │   ├── core/                 # socle technique, zéro logique métier
-│   │   │   │   ├── config.py         # pydantic-settings, fail-fast au boot
-│   │   │   │   ├── db.py             # engine async, session/requête, SET LOCAL tenant
-│   │   │   │   ├── auth.py           # vérification JWT Supabase (JWKS)
-│   │   │   │   ├── tenancy.py        # dépendance CurrentTenant
-│   │   │   │   ├── errors.py         # hiérarchie AppError + handlers RFC 9457
+│   │   │   ├── core/                 # technical foundation, zero business logic
+│   │   │   │   ├── config.py         # pydantic-settings, fail-fast at boot
+│   │   │   │   ├── db.py             # async engine, session/request, SET LOCAL tenant
+│   │   │   │   ├── auth.py           # Supabase JWT verification (JWKS)
+│   │   │   │   ├── tenancy.py        # CurrentTenant dependency
+│   │   │   │   ├── errors.py         # AppError hierarchy + RFC 9457 handlers
 │   │   │   │   ├── logging.py        # structlog JSON + request_id
-│   │   │   │   ├── llm/              # client Anthropic/OpenAI, runtime agents, SSE
-│   │   │   │   └── events.py         # événements de domaine → outbox
+│   │   │   │   ├── llm/              # Anthropic/OpenAI client, agents runtime, SSE
+│   │   │   │   └── events.py         # domain events → outbox
 │   │   │   ├── modules/
 │   │   │   │   ├── studies/  datasets/  corpus/  agents/
 │   │   │   │   ├── simulation/  documents/  analytics/
-│   │   │   │   └── (chaque module : __init__.py · router.py · service.py
+│   │   │   │   └── (each module: __init__.py · router.py · service.py
 │   │   │   │        · schemas.py · repo.py · models.py)
-│   │   │   ├── jobs/                 # entrypoints Modal Functions (adaptateurs fins)
+│   │   │   ├── jobs/                 # Modal Functions entrypoints (thin adapters)
 │   │   │   └── main.py               # composition root
-│   │   ├── alembic/                  # migrations versionnées (schéma + policies RLS)
+│   │   ├── alembic/                  # versioned migrations (schema + RLS policies)
 │   │   ├── tests/
 │   │   ├── modal_app.py              # ASGI app + Functions + Cron
-│   │   └── pyproject.toml            # uv ; pyright strict ; ruff
-│   └── web/                          # front React 19 + Vite migré, sans mock layer
+│   │   └── pyproject.toml            # uv ; strict pyright ; ruff
+│   └── web/                          # migrated React 19 + Vite frontend, without mock layer
 ├── packages/
-│   └── api-client/                   # TS généré depuis l'OpenAPI — jamais édité à la main
-└── .github/workflows/                # CI : lint, typecheck, tests, drift check, deploy
+│   └── api-client/                   # TS generated from OpenAPI — never hand-edited
+└── .github/workflows/                # CI: lint, typecheck, tests, drift check, deploy
 ```
 
-### Règles de frontières (ce qui rend le monolithe « modulable »)
+### Boundary rules (what makes the monolith "modular")
 
-- Un module n'importe que `core` et l'interface publique (`__init__.py`) des autres modules — jamais leurs internals. `import-linter` casse la CI en cas de violation.
-- `core` n'importe aucun module.
-- `router.py` et `jobs/*` sont des adaptateurs fins (HTTP / Modal) ; la logique vit dans `service.py`.
-- `repo.py` est l'unique point d'accès DB du module ; chaque méthode exige un `TenantId`.
-- Les modèles SQLAlchemy ne sortent jamais d'un module ; les frontières échangent des schemas Pydantic.
-- Un module devenu trop gros est extractible en service séparé sans réécriture : son contrat public existe déjà.
+- A module imports only `core` and the public interface (`__init__.py`) of other modules — never their internals. `import-linter` breaks CI on violation.
+- `core` imports no module.
+- `router.py` and `jobs/*` are thin adapters (HTTP / Modal); the logic lives in `service.py`.
+- `repo.py` is the module's sole DB access point; each method requires a `TenantId`.
+- SQLAlchemy models never leave a module; boundaries exchange Pydantic schemas.
+- A module that has grown too large is extractable into a separate service without rewriting: its public contract already exists.
 
-## 5. Modules et responsabilités
+## 5. Modules and responsibilities
 
-| Module | Responsabilité | Notes |
+| Module | Responsibility | Notes |
 |--------|----------------|-------|
-| `studies` | Cycle de vie des études, état du workflow persisté et versionné, membres/rôles par étude | Remplace le sessionStorage ; débloque multi-appareils et collaboration |
-| `datasets` | Upload cohortes (Supabase Storage), parsing/validation pandas hors event loop, profil de colonnes, mapping variables | |
-| `corpus` | Ingestion self-service (PDF → extraction → chunking → embeddings → pgvector), retrieval SQL direct, corpus global partagé + corpus privé par tenant | `match_chunks` devient une requête SQLAlchemy/pgvector |
-| `agents` | E1 profiling (SSE multi-tour), DAG, gap-detection, variable-check sur un runtime commun | Sorties validées Pydantic + 1 retry « réparation » ; protocole NDJSON identique à l'actuel |
-| `simulation` | Bootstrap à la demande (job Modal), approximation analytique synchrone calibrée **par outcome** (fix T4), lecture des résultats | Port de `run_bootstrap.py` |
-| `documents` | Génération protocole/rapport : état d'étude → LLM + template → PDF (WeasyPrint) / Word (python-docx) → Storage → URL signée | Asynchrone (job) |
-| `analytics` | Usage events authentifiés, audit trail via outbox, stats admin, coûts tokens par run d'agent | Remplace le soft-auth |
+| `studies` | Study lifecycle, persisted and versioned workflow state, members/roles per study | Replaces sessionStorage; unlocks multi-device and collaboration |
+| `datasets` | Cohort upload (Supabase Storage), pandas parsing/validation off the event loop, column profile, variable mapping | |
+| `corpus` | Self-service ingestion (PDF → extraction → chunking → embeddings → pgvector), direct SQL retrieval, shared global corpus + private per-tenant corpus | `match_chunks` becomes a SQLAlchemy/pgvector query |
+| `agents` | E1 profiling (multi-turn SSE), DAG, gap-detection, variable-check on a common runtime | Pydantic-validated outputs + 1 "repair" retry; NDJSON protocol identical to the current one |
+| `simulation` | On-demand bootstrap (Modal job), synchronous analytic approximation calibrated **per outcome** (fix T4), result reads | Port of `run_bootstrap.py` |
+| `documents` | Protocol/report generation: study state → LLM + template → PDF (WeasyPrint) / Word (python-docx) → Storage → signed URL | Asynchronous (job) |
+| `analytics` | Authenticated usage events, audit trail via outbox, admin stats, token costs per agent run | Replaces the soft-auth |
 
-## 6. Modèle de données (tables principales)
+## 6. Data model (main tables)
 
-- **Tenancy** : `orgs`, `memberships` (user ↔ org, rôle owner/member/viewer)
-- **Études** : `studies`, `study_members`, `study_state` (workflow versionné, JSONB)
-- **Données** : `datasets`, `dataset_columns`
-- **Corpus** : `documents`, `chunks` (embedding pgvector, index HNSW ; `tenant_id` nullable → corpus global)
-- **Jobs** : `jobs` (type, status queued/running/succeeded/failed, progress, payload, result_ref, error, `idempotency_key`, `modal_call_id`)
-- **Simulation** : `simulation_runs` (params JSONB, lien job, résultats)
-- **Documents générés** : `generated_documents` (type, storage_path, statut)
-- **Observabilité métier** : `usage_events`, `outbox_events`, `agent_runs` (durée, tokens, coût)
+- **Tenancy**: `orgs`, `memberships` (user ↔ org, owner/member/viewer role)
+- **Studies**: `studies`, `study_members`, `study_state` (versioned workflow, JSONB)
+- **Data**: `datasets`, `dataset_columns`
+- **Corpus**: `documents`, `chunks` (pgvector embedding, HNSW index; nullable `tenant_id` → global corpus)
+- **Jobs**: `jobs` (type, status queued/running/succeeded/failed, progress, payload, result_ref, error, `idempotency_key`, `modal_call_id`)
+- **Simulation**: `simulation_runs` (JSONB params, job link, results)
+- **Generated documents**: `generated_documents` (type, storage_path, status)
+- **Business observability**: `usage_events`, `outbox_events`, `agent_runs` (duration, tokens, cost)
 
-Toutes les tables tenant-scopées portent une policy RLS fondée sur `current_setting('app.tenant_id')`.
+Every tenant-scoped table carries an RLS policy based on `current_setting('app.tenant_id')`.
 
-### Migration des données existantes
+### Migrating the existing data
 
-- Corpus (`documents` + `chunks` + embeddings) : dump/restore vers la nouvelle instance — **pas de ré-embedding**.
-- Cohortes et données de validation : ré-upload via les scripts existants adaptés.
-- `simulation_results` précalculés : non migrés (remplacés par la simulation à la demande) ; la démo conserve les siens en fixtures.
+- Corpus (`documents` + `chunks` + embeddings): dump/restore to the new instance — **no re-embedding**.
+- Cohorts and validation data: re-upload via the existing scripts, adapted.
+- Precomputed `simulation_results`: not migrated (replaced by on-demand simulation); the demo keeps its own as fixtures.
 
-## 7. Auth et tenancy
+## 7. Auth and tenancy
 
-1. Le front utilise Supabase Auth (login, session, refresh) et envoie le JWT en `Authorization: Bearer`.
-2. `core/auth.py` vérifie signature (JWKS Supabase, cache), expiration, audience → `UserId`.
-3. `core/tenancy.py` résout l'appartenance (`memberships`) → `CurrentTenant` injecté dans les routes.
-4. `core/db.py` exécute `SET LOCAL app.tenant_id = :tid` à l'ouverture de chaque transaction ; les policies RLS s'y adossent. L'API se connecte avec un rôle Postgres dédié **non exempt de RLS** (pas le service_role).
-5. Résultat : le scoping est appliqué deux fois (repos + RLS). L'oubli d'un filtre dans un service ne peut pas fuiter des données inter-tenants.
+1. The frontend uses Supabase Auth (login, session, refresh) and sends the JWT as `Authorization: Bearer`.
+2. `core/auth.py` verifies signature (Supabase JWKS, cache), expiration, audience → `UserId`.
+3. `core/tenancy.py` resolves the membership (`memberships`) → `CurrentTenant` injected into the routes.
+4. `core/db.py` runs `SET LOCAL app.tenant_id = :tid` when opening each transaction; the RLS policies hang off it. The API connects with a dedicated Postgres role **not exempt from RLS** (not service_role).
+5. Result: scoping is applied twice (repos + RLS). Forgetting a filter in a service cannot leak cross-tenant data.
 
-## 8. Flux clés
+## 8. Key flows
 
-**Requête standard** — client généré → JWT → tenant → service → repo → Pydantic response. Budget p95 < 300 ms hors LLM.
+**Standard request** — generated client → JWT → tenant → service → repo → Pydantic response. p95 budget < 300 ms excluding LLM.
 
-**Agent E1 (SSE)** — `POST /agents/profiling/stream` → boucle tool-use (l'outil retrieval appelle l'interface publique de `corpus`) → events NDJSON streamés (heartbeats ; fin systématique par `done` ou `error`) → résultat persisté dans `study_state`. Plus de plafond 300 s. Premier token < 2 s.
+**E1 agent (SSE)** — `POST /agents/profiling/stream` → tool-use loop (the retrieval tool calls `corpus`'s public interface) → streamed NDJSON events (heartbeats; always ending with `done` or `error`) → result persisted into `study_state`. No more 300 s ceiling. First token < 2 s.
 
-**Job (simulation, ingestion, export)** — `POST /simulations` → insert `jobs` + `Function.spawn(job_id)` → `202 {job_id}` → le worker met à jour `progress` → suivi par polling `GET /jobs/{id}` (SSE possible plus tard). Idempotency key obligatoire sur les POST de jobs : un double-clic ne lance pas deux bootstraps.
+**Job (simulation, ingestion, export)** — `POST /simulations` → insert `jobs` + `Function.spawn(job_id)` → `202 {job_id}` → the worker updates `progress` → tracked by polling `GET /jobs/{id}` (SSE possible later). Mandatory idempotency key on job POSTs: a double-click does not launch two bootstraps.
 
-## 9. Règles de robustesse
+## 9. Robustness rules
 
-### Typage
-- pyright **strict** en CI ; ruff (lint + format).
-- Pydantic v2 à toutes les frontières : requêtes, réponses, settings, payloads de jobs, sorties d'agents.
-- `NewType` pour `TenantId`, `StudyId`, `UserId`, `JobId`.
-- `Any` et `type: ignore` interdits sauf commentaire justificatif.
-- Client TS généré depuis l'OpenAPI (`openapi-typescript`) ; la CI échoue si le client commité a dérivé du contrat (drift check). Le front n'écrit jamais un appel à la main.
+### Typing
+- pyright **strict** in CI; ruff (lint + format).
+- Pydantic v2 at every boundary: requests, responses, settings, job payloads, agent outputs.
+- `NewType` for `TenantId`, `StudyId`, `UserId`, `JobId`.
+- `Any` and `type: ignore` forbidden except with a justifying comment.
+- TS client generated from OpenAPI (`openapi-typescript`); CI fails if the committed client has drifted from the contract (drift check). The frontend never hand-writes a call.
 
-### Exécution
-- Async de bout en bout (httpx, SDK Anthropic async, asyncpg). L'event loop ne fait que de l'I/O.
-- Tout calcul > ~100 ms sort de l'API : thread (`anyio.to_thread`) pour le parsing Excel, job Modal pour le bootstrap et l'ingestion.
-- Cache des réponses d'agents déterministes (mêmes inputs → réponse servie depuis la table cache ; fix U2).
-- Pagination keyset ; index pgvector HNSW.
+### Execution
+- Async end-to-end (httpx, async Anthropic SDK, asyncpg). The event loop only does I/O.
+- Any computation > ~100 ms leaves the API: thread (`anyio.to_thread`) for Excel parsing, Modal job for the bootstrap and ingestion.
+- Caching of deterministic agent responses (same inputs → response served from the cache table; fix U2).
+- Keyset pagination; pgvector HNSW index.
 
-### Erreurs
-- Hiérarchie `AppError(code, http_status, message, details)` → handler global → réponses **Problem Details (RFC 9457)** uniformes.
-- LLM : retries du SDK + timeout par appel ; indisponibilité amont → 503 explicite, jamais d'attente infinie.
-- Sorties structurées invalides : 1 retry « réparation » avec l'erreur de validation injectée, puis échec franc.
-- Jobs : statut `failed` + erreur détaillée + alerte Sentry ; relance manuelle.
+### Errors
+- `AppError(code, http_status, message, details)` hierarchy → global handler → uniform **Problem Details (RFC 9457)** responses.
+- LLM: SDK retries + per-call timeout; upstream unavailability → explicit 503, never an infinite wait.
+- Invalid structured outputs: 1 "repair" retry with the validation error injected, then a clean failure.
+- Jobs: `failed` status + detailed error + Sentry alert; manual relaunch.
 
-## 10. Déploiement (Modal) et observabilité
+## 10. Deployment (Modal) and observability
 
-- `modal_app.py` : l'API en `@modal.asgi_app()` (image légère uv) ; les jobs en `modal.Function` avec image scientifique séparée (numpy/scipy/statsmodels — l'image API reste fine) ; `modal.Cron` pour le récurrent (ex. rafraîchissement du corpus public).
-- Environnements Modal `dev` / `prod` : secrets distincts (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`, `SUPABASE_JWT_*`), instances Supabase distinctes.
-- Prod : `min_containers=1` (pas de cold start utilisateur) ; dev : scale-to-zero.
-- CI GitHub Actions : ruff + pyright + pytest + import-linter + drift check → `modal deploy` sur `main`. Front : Vercel (statique), `VITE_API_URL` → domaine custom Modal.
-- Observabilité : structlog JSON + request_id, Sentry (erreurs), LangSmith (traces agents), `agent_runs` (coûts/latences en DB).
+- `modal_app.py`: the API in `@modal.asgi_app()` (lightweight uv image); the jobs in `modal.Function` with a separate scientific image (numpy/scipy/statsmodels — the API image stays thin); `modal.Cron` for the recurring work (e.g. public corpus refresh).
+- Modal `dev` / `prod` environments: separate secrets (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`, `SUPABASE_JWT_*`), separate Supabase instances.
+- Prod: `min_containers=1` (no user-facing cold start); dev: scale-to-zero.
+- GitHub Actions CI: ruff + pyright + pytest + import-linter + drift check → `modal deploy` on `main`. Frontend: Vercel (static), `VITE_API_URL` → custom Modal domain.
+- Observability: structlog JSON + request_id, Sentry (errors), LangSmith (agent traces), `agent_runs` (costs/latencies in the DB).
 
-## 11. Stratégie de test — le filet du big bang
+## 11. Test strategy — the big-bang safety net
 
-1. **Caractérisation** : les fixtures actuelles (`src/mocks/apiFixtures.js`) deviennent des golden files ; le FastAPI doit répondre la même chose que les routes JS, à schéma près. Les écarts sont listés et assumés, jamais accidentels.
-2. **Repos + RLS** : pytest + Postgres éphémère ; les policies RLS sont testées explicitement (un tenant ne lit jamais l'autre).
-3. **Contrat** : le client TS généré compile contre `apps/web` ; drift check en CI.
-4. **Métier neuf en TDD** : calibration par outcome, power analytique, idempotence des jobs.
-5. **E2E** : le Playwright existant rebranché sur le nouveau backend.
-6. **Critère de bascule** : golden tests + e2e verts, RLS vérifié. Tant que ce n'est pas vert, l'ancien backend reste en service.
+1. **Characterization**: the current fixtures (`src/mocks/apiFixtures.js`) become golden files; FastAPI must return the same thing as the JS routes, up to the schema. The gaps are listed and accepted, never accidental.
+2. **Repos + RLS**: pytest + ephemeral Postgres; the RLS policies are tested explicitly (one tenant never reads another).
+3. **Contract**: the generated TS client compiles against `apps/web`; drift check in CI.
+4. **New business logic in TDD**: per-outcome calibration, analytic power, job idempotency.
+5. **E2E**: the existing Playwright rewired onto the new backend.
+6. **Cutover criterion**: golden tests + e2e green, RLS verified. Until it is green, the old backend stays in service.
 
-## 12. Séquencement
+## 12. Sequencing
 
-1. Scaffold monorepo + CI + hello world Modal (la tuyauterie d'abord)
-2. `core` + auth + tenancy + `studies` minimal + client généré → le front migré boote (login, liste d'études)
-3. `datasets` + `corpus` + transfert du corpus existant
-4. `agents` (caractérisation d'abord ; E1 SSE en dernier des quatre)
-5. `simulation` + infra jobs
+1. Scaffold monorepo + CI + Modal hello world (plumbing first)
+2. `core` + auth + tenancy + minimal `studies` + generated client → the migrated frontend boots (login, study list)
+3. `datasets` + `corpus` + transfer of the existing corpus
+4. `agents` (characterization first; E1 SSE last of the four)
+5. `simulation` + jobs infra
 6. `documents` + `analytics`
-7. Parité prouvée → bascule du front de prod → `lucis-dashboard` figé en démo pure
+7. Parity proven → cutover of the prod frontend → `lucis-dashboard` frozen as a pure demo
 
-## 13. Hors périmètre (non-objectifs)
+## 13. Out of scope (non-goals)
 
-- Pas de microservices, pas de message broker, pas de Kubernetes : le monolithe modulaire + Modal Functions couvrent les besoins ; l'extraction d'un module restera possible grâce aux frontières.
-- Pas de mode démo, soft-auth ou fixtures dans le backend.
-- Pas de réécriture du design system front (déjà fait sur `quentin-workspace`).
-- Pas de SSE sur le suivi de jobs en v1 (polling suffit ; l'upgrade est locale au module).
-- L'app iOS/Apple Health n'est pas dans ce périmètre ; si elle arrive, elle consommera la même API (le contrat OpenAPI est déjà la porte unique).
+- No microservices, no message broker, no Kubernetes: the modular monolith + Modal Functions cover the needs; extracting a module will remain possible thanks to the boundaries.
+- No demo mode, soft-auth or fixtures in the backend.
+- No rewrite of the frontend design system (already done on `quentin-workspace`).
+- No SSE on job tracking in v1 (polling is enough; the upgrade is local to the module).
+- The iOS/Apple Health app is not in this scope; if it arrives, it will consume the same API (the OpenAPI contract is already the single door).
 
-## 14. Risques et mitigations
+## 14. Risks and mitigations
 
-| Risque | Mitigation |
+| Risk | Mitigation |
 |--------|------------|
-| Big bang qui s'éternise | Séquencement par modules livrables ; l'ancien backend reste en service jusqu'au critère de bascule |
-| Dérive du protocole SSE (le front actuel dépend du NDJSON existant) | Caractérisation du flux `trace.js` event par event avant le port |
-| Cold starts / latence Modal | `min_containers=1` en prod ; image API minimale (uv, sans deps scientifiques) |
-| Coûts LLM invisibles | `agent_runs` trace tokens et coût par run ; vue admin dans `analytics` |
-| RLS mal configuré | Policies écrites dans les migrations Alembic + tests d'isolation dédiés ; rôle de connexion non exempt |
-| Embeddings à re-payer | Dump/restore du corpus, jamais de ré-embedding |
+| Big bang that drags on | Sequencing by deliverable modules; the old backend stays in service until the cutover criterion |
+| SSE protocol drift (the current frontend depends on the existing NDJSON) | Characterize the `trace.js` flow event by event before the port |
+| Modal cold starts / latency | `min_containers=1` in prod; minimal API image (uv, without scientific deps) |
+| Invisible LLM costs | `agent_runs` traces tokens and cost per run; admin view in `analytics` |
+| Misconfigured RLS | Policies written into the Alembic migrations + dedicated isolation tests; non-exempt connection role |
+| Re-paying for embeddings | Corpus dump/restore, never re-embedding |

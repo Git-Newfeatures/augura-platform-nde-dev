@@ -9,7 +9,7 @@ import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { apiJson } from '@/api'
 
-// Catalogue de concepts taxonomiques (subsystem sémantique) — GET /semantic/concepts.
+// Catalog of taxonomy concepts (semantic subsystem) — GET /semantic/concepts.
 function TaxonomyConcepts() {
   const [concepts, setConcepts] = useState(null)
   useEffect(() => {

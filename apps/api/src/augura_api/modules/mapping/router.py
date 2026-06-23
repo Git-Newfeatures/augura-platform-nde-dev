@@ -1,4 +1,4 @@
-"""Adaptateur HTTP du module mapping."""
+"""HTTP adapter for the mapping module."""
 
 from uuid import UUID
 

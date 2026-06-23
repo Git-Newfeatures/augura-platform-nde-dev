@@ -1,5 +1,5 @@
 # apps/api/tests/test_corpus_filters.py
-"""Mappers de filtres (date + type d'étude) — purs, sans réseau."""
+"""Filter mappers (date + study type) — pure, no network."""
 
 from datetime import date
 
@@ -18,7 +18,7 @@ def test_empty_filters_are_noop() -> None:
     assert build_pubmed_term("hba1c", f) == "hba1c"
     assert pubmed_date_params(f, TODAY) == {}
     assert ctgov_filter_params(f, TODAY) == {}
-    # None aussi (chemin sans filtres)
+    # None too (path without filters)
     assert build_pubmed_term("hba1c", None) == "hba1c"
     assert pubmed_date_params(None, TODAY) == {}
     assert ctgov_filter_params(None, TODAY) == {}
@@ -50,11 +50,11 @@ def test_ctgov_single_study_type_maps_to_aggfilter() -> None:
 
 
 def test_ctgov_both_or_unmappable_types_skip_studytype() -> None:
-    # rct + observational ⇒ les deux types ⇒ pas de filtre studyType
+    # rct + observational ⇒ both types ⇒ no studyType filter
     assert "aggFilters" not in ctgov_filter_params(
         SearchFilters(study_types=("rct", "observational")), TODAY
     )
-    # systematic_review/meta_analysis n'existent pas côté CT.gov
+    # systematic_review/meta_analysis do not exist on the CT.gov side
     assert ctgov_filter_params(SearchFilters(study_types=("systematic_review",)), TODAY) == {}
 
 

@@ -1,4 +1,4 @@
-"""Checks DQ data-only (A3a+A3b). Chaque check : trigger(ctx) + run(ctx)->findings."""
+"""Data-only DQ checks (A3a+A3b). Each check: trigger(ctx) + run(ctx)->findings."""
 
 from __future__ import annotations
 

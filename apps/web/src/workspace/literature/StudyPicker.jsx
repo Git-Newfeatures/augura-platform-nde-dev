@@ -2,8 +2,8 @@ import { useCollection } from '@/workspace/dataClient'
 import { Button } from '@/components/ui/button'
 import { Library, X } from 'lucide-react'
 
-// Sélecteur d'étude pour « Save to study ». Lit la VRAIE liste d'études via le data
-// client existant (jamais une liste mockée).
+// Study picker for "Save to study". Reads the REAL list of studies via the existing
+// data client (never a mocked list).
 export function StudyPicker({ onPick, onClose }) {
   const { data: studies, loading } = useCollection('studies')
 

@@ -278,24 +278,24 @@ export const normEstimands = (rows) =>
 export const codeLabelMap = (rows) =>
   Object.fromEntries((rows ?? []).map((r) => [r.code, r.label]))
 
-// ── Enrichissement sémantique B4 ────────────────────────────────────────────
+// ── B4 semantic enrichment ──────────────────────────────────────────────────
 
-/** Lance le job de proposition d'enrichissement sémantique (B4). → { job_id } */
+/** Starts the semantic enrichment proposal job (B4). → { job_id } */
 export async function enrichPropose(body) {
   return apiJson('/semantic/enrich/propose', { method: 'POST', body: JSON.stringify(body) })
 }
 
-/** État d'un job (polling unitaire). → { status, progress, result_ref, error } */
+/** State of a job (single poll). → { status, progress, result_ref, error } */
 export async function pollJob(jobId) {
   return apiJson(`/jobs/${jobId}`)
 }
 
-/** Récupère l'artifact JSON de propositions d'un job réussi. */
+/** Fetches the JSON proposals artifact of a succeeded job. */
 export async function fetchEnrichProposals(jobId) {
   return apiJson(`/semantic/enrich/proposals/${jobId}`)
 }
 
-/** Applique un enrichissement à l'ontologie (réservé owner côté backend). */
+/** Applies an enrichment to the ontology (owner-only on the backend). */
 export async function enrichApply(body) {
   return apiJson('/semantic/enrich/apply', { method: 'POST', body: JSON.stringify(body) })
 }

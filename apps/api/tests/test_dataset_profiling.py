@@ -1,4 +1,4 @@
-"""Tests du profiler de colonnes (datasets)."""
+"""Tests for the column profiler (datasets)."""
 
 from augura_api.modules.datasets.profiling import profile_column
 

@@ -1,15 +1,16 @@
-"""Bootstrap Monte-Carlo (mode VALIDATED) — vrai calcul scientifique.
+"""Monte-Carlo bootstrap (VALIDATED mode) — real scientific computation.
 
-Là où `power.py` donne une power analytique fermée (mode LIVE, synchrone), ce module
-exécute une vraie simulation par ré-échantillonnage : pour chaque scénario × estimateur
-on tire `n_boot` réplicats d'une cohorte synthétique calibrée (constantes partagées avec
-`calibration.py`), on calcule l'effet estimé + son erreur-type (Welch), et on en dérive
-effet moyen, IC percentile (2.5/97.5), power empirique (fraction de réplicats rejetant H0)
-et p-value représentative.
+Where `power.py` gives a closed-form analytical power (LIVE mode, synchronous), this
+module runs a real resampling simulation: for each scenario × estimator it draws
+`n_boot` replicates of a calibrated synthetic cohort (constants shared with
+`calibration.py`), computes the estimated effect + its standard error (Welch), and
+derives the mean effect, percentile CI (2.5/97.5), empirical power (fraction of
+replicates rejecting H0) and a representative p-value.
 
-Fonction PURE et DÉTERMINISTE (seed fixe) → testable sans base, sans réseau, sans clé.
-Le worker (jobs/) l'appelle puis persiste le résultat (simulation_runs.results +
-read-model simulation_results). C'est ce calcul qui tournera en job Modal numpy/scipy.
+PURE and DETERMINISTIC function (fixed seed) → testable without a database, network or key.
+The worker (jobs/) calls it then persists the result (simulation_runs.results +
+read-model simulation_results). This is the computation that will run in a numpy/scipy
+Modal job.
 """
 
 from __future__ import annotations
@@ -20,23 +21,23 @@ import numpy as np
 
 from augura_api.modules.simulation import calibration
 
-# Scénarios par défaut : facteurs appliqués au baseline (effet, dropout, σ).
+# Default scenarios: factors applied to the baseline (effect, dropout, σ).
 DEFAULT_SCENARIOS: list[dict[str, Any]] = [
     {"name": "baseline", "effect_mult": 1.0, "dropout_add": 0.0, "sigma_mult": 1.0},
     {"name": "conservative", "effect_mult": 0.7, "dropout_add": 0.10, "sigma_mult": 1.0},
     {"name": "high_risk", "effect_mult": 0.5, "dropout_add": 0.15, "sigma_mult": 1.2},
 ]
 
-_Z_95 = 1.959963984540054  # quantile normal bilatéral à 95 %
+_Z_95 = 1.959963984540054  # two-sided 95% normal quantile
 DEFAULT_N_BOOT = 2000
 DEFAULT_SEED = 42
-# Effet de design par défaut (MDES) — aligné sur power.PowerRequest.effect pour que
-# le mode VALIDATED (bootstrap) et le mode LIVE (power analytique) coïncident au baseline.
+# Default design effect (MDES) — aligned with power.PowerRequest.effect so that
+# VALIDATED mode (bootstrap) and LIVE mode (analytical power) coincide at the baseline.
 DEFAULT_EFFECT = 0.30
 
 
 def _phi(z: float) -> float:
-    """CDF normale (Abramowitz-Stegun) — alignée sur power.normal_cdf côté LIVE."""
+    """Normal CDF (Abramowitz-Stegun) — aligned with power.normal_cdf on the LIVE side."""
     import math
 
     t = 1 / (1 + 0.2316419 * abs(z))
@@ -46,8 +47,8 @@ def _phi(z: float) -> float:
 
 
 def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
-    """Exécute le bootstrap pour tous les scénarios × estimateurs et renvoie un dict
-    sérialisable (JSONB-friendly). `params` provient de la requête /simulations."""
+    """Run the bootstrap for all scenarios × estimators and return a serializable
+    dict (JSONB-friendly). `params` comes from the /simulations request."""
     n = int(params.get("n") or calibration.COHORT_N)
     base_dropout = float(params.get("dropout", 0.20))
     base_effect = float(params.get("effect", DEFAULT_EFFECT))
@@ -75,14 +76,14 @@ def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
             bias_mag = calibration.BASE_BIAS.get(est, 0.015) * (1 + dropout * 1.6)
             var_mult = 1.3 if est == "ipw" else 0.9 if est == "lme" else 1.0
 
-            # Réplicats vectorisés : l'effet réduit l'outcome → traités centrés sur -effect.
+            # Vectorized replicates: the effect reduces the outcome → treated centered on -effect.
             treat = rng.normal(-effect, s_sigma, size=(n_boot, n_treat))
             ctrl = rng.normal(0.0, s_sigma, size=(n_boot, n_ctrl))
             diff = treat.mean(axis=1) - ctrl.mean(axis=1)
             se = np.sqrt(treat.var(axis=1, ddof=1) / n_treat + ctrl.var(axis=1, ddof=1) / n_ctrl)
-            # Efficience de l'estimateur : plus efficient ⇒ SE plus faible ⇒ plus de power.
+            # Estimator efficiency: more efficient ⇒ lower SE ⇒ more power.
             se_est = se * np.sqrt(var_mult) / np.sqrt(efficiency)
-            diff_est = diff - bias_mag  # biais (orienté dans le sens de l'effet)
+            diff_est = diff - bias_mag  # bias (oriented in the direction of the effect)
 
             reject = np.abs(diff_est) / se_est > _Z_95
             effect_size = cast(float, np.mean(diff_est))
@@ -114,7 +115,7 @@ def compute_bootstrap(params: dict[str, Any]) -> dict[str, Any]:
                 }
             )
 
-    # Recommandation : meilleur estimateur du scénario baseline (power max, MSE tie-break).
+    # Recommendation: best estimator of the baseline scenario (max power, MSE tie-break).
     baseline_rows = [r for r in rows if r["scenario"] == (scenarios[0].get("name", "baseline"))]
     best = max(baseline_rows, key=lambda r: (r["power"], -r["mse"])) if baseline_rows else None
     summary = {

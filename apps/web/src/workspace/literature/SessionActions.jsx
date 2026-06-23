@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/button'
 import { Plus, Trash2, Bookmark, BookmarkCheck, Check, AlertCircle } from 'lucide-react'
 
-// Actions de session : sauver (étude ou standalone) gèle un snapshot. `saved`
-// (quand défini) affiche une confirmation à la place des boutons de sauvegarde.
-// `notice` (transitoire) affiche un avertissement AU-DESSUS des boutons sans les
-// masquer — ex. « rien de gardé à sauvegarder » (l'utilisateur peut corriger et réessayer).
+// Session actions: saving (study or standalone) freezes a snapshot. `saved`
+// (when set) shows a confirmation in place of the save buttons.
+// `notice` (transient) shows a warning ABOVE the buttons without hiding them
+// — e.g. "nothing kept to save" (the user can fix it and retry).
 export function SessionActions({ saved, notice, onSaveToStudy, onSaveStandalone, onNewQuery, onDiscard }) {
   return (
     <div className="flex flex-col gap-3">

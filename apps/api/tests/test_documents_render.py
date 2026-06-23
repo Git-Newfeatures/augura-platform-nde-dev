@@ -1,4 +1,4 @@
-"""Tests du rendu de dossier (HTML) — fonction pure, sans base ni I/O."""
+"""Tests for the document rendering (HTML) — pure function, no database or I/O."""
 
 from datetime import UTC, datetime
 

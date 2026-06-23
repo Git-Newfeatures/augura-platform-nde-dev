@@ -1,7 +1,7 @@
-"""Orchestration du module causal : ontologie B1 → sous-graphe → LLM → graphe.
+"""Orchestration of the causal module: B1 ontology → subgraph → LLM → graph.
 
-Port de `dag-generator.js` (generateDAG). Le client LLM est injecté (Protocol) ;
-les tests tournent à LLM mocké, sans clé ni Modal.
+Port of `dag-generator.js` (generateDAG). The LLM client is injected (Protocol);
+tests run against a mocked LLM, without a key or Modal.
 """
 
 from typing import Protocol

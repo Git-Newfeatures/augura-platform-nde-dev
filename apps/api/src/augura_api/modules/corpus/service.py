@@ -1,8 +1,8 @@
-"""Logique du module corpus : feed paginé, heatmap de couverture, sources, recherche.
+"""Corpus module logic: paginated feed, coverage heatmap, sources, search.
 
-Choix : on valide les filtres énumérables (jurisdiction, lifecycle) mais on laisse
-`evidence_type`/`source_id` libres (match exact, longueur bornée) pour ne pas rejeter
-de valeurs stockées légitimes. age_label et gap_score sont calculés côté service.
+Choice: we validate the enumerable filters (jurisdiction, lifecycle) but leave
+`evidence_type`/`source_id` free (exact match, bounded length) so as not to reject
+legitimate stored values. age_label and gap_score are computed on the service side.
 """
 
 from datetime import UTC, date, datetime
@@ -35,7 +35,7 @@ VALID_JURISDICTIONS = {
 }
 VALID_LIFECYCLES = {"pre_market", "post_market", "policy", "unknown"}
 
-# Dimensions de la heatmap (zero-fill sur ces cellules).
+# Heatmap dimensions (zero-fill on these cells).
 COVERAGE_JURISDICTIONS = ["fda", "ema", "imdrf", "global"]
 COVERAGE_EVIDENCE_TYPES = [
     "guidance",
@@ -90,11 +90,11 @@ class CorpusService:
         offset: int,
     ) -> schemas.FeedResponse:
         if jurisdiction and jurisdiction not in VALID_JURISDICTIONS:
-            raise BadRequestError("jurisdiction invalide", value=jurisdiction)
+            raise BadRequestError("invalid jurisdiction", value=jurisdiction)
         if lifecycle and lifecycle not in VALID_LIFECYCLES:
-            raise BadRequestError("lifecycle invalide", value=lifecycle)
+            raise BadRequestError("invalid lifecycle", value=lifecycle)
         if source_id and len(source_id) > 100:
-            raise BadRequestError("source_id trop long")
+            raise BadRequestError("source_id too long")
 
         limit = min(max(1, limit), MAX_LIMIT)
         offset = max(0, offset)
@@ -193,16 +193,16 @@ class CorpusService:
         embedding = req.query_embedding
         if not embedding:
             if not req.query:
-                raise BadRequestError("query ou query_embedding requis")
+                raise BadRequestError("query or query_embedding required")
             if embedder is None:
-                # Pas d'embedder (clé OpenAI absente) → 503 explicite plutôt que 400.
+                # No embedder (OpenAI key absent) → explicit 503 rather than 400.
                 raise AgentUpstreamError(
-                    "recherche sémantique indisponible : embedder requis (clé OpenAI manquante)"
+                    "semantic search unavailable: embedder required (OpenAI key missing)"
                 )
             embedding = await embedder.embed(req.query)
         if len(embedding) != EMBEDDING_DIM:
             raise BadRequestError(
-                "query_embedding de dimension inattendue",
+                "query_embedding of unexpected dimension",
                 expected=EMBEDDING_DIM,
                 got=len(embedding),
             )
@@ -210,7 +210,7 @@ class CorpusService:
         return [schemas.SearchHit.model_validate(r) for r in rows]
 
 
-# ── Agent de recherche de littérature (PubMed → corpus) ──────────────────────
+# ── Literature search agent (PubMed → corpus) ────────────────────────────────
 
 
 class _PubMedQuery(BaseModel):
@@ -219,27 +219,27 @@ class _PubMedQuery(BaseModel):
 
 _QUERY_TOOL = {
     "name": "pubmed_query",
-    "description": "Renvoie UNE requête PubMed optimisée (opérateurs booléens + termes "
-    "MeSH si utile) pour la question de recherche fournie.",
+    "description": "Returns ONE optimized PubMed query (boolean operators + MeSH terms "
+    "if useful) for the provided research question.",
     "input_schema": {
         "type": "object",
-        "properties": {"query": {"type": "string", "description": "Chaîne de requête PubMed"}},
+        "properties": {"query": {"type": "string", "description": "PubMed query string"}},
         "required": ["query"],
     },
 }
 
 
 async def expand_pubmed_query(client: LLMClient, model: str, raw: str) -> str:
-    """Élargit une question en langage naturel en requête PubMed via le LLM.
-    Dégrade en requête brute si l'agent échoue."""
+    """Expands a natural-language question into a PubMed query via the LLM.
+    Degrades to the raw query if the agent fails."""
     try:
         result = await run_structured_agent(
             client,
             model=model,
             system=(
-                "Tu es un·e documentaliste biomédical·e. Transforme la question de "
-                "recherche en UNE requête PubMed précise (booléens + MeSH si pertinent). "
-                "Reste ciblé·e ; pas d'explication, juste la requête."
+                "You are a biomedical information specialist. Turn the research "
+                "question into ONE precise PubMed query (booleans + MeSH if relevant). "
+                "Stay focused; no explanation, just the query."
             ),
             tool=_QUERY_TOOL,  # pyright: ignore[reportArgumentType]
             messages=[{"role": "user", "content": raw}],
@@ -251,9 +251,9 @@ async def expand_pubmed_query(client: LLMClient, model: str, raw: str) -> str:
 
 
 class LiteratureService:
-    """Cherche sur PubMed (E-utilities) et ingère les articles dans le corpus
-    (Document + Chunk). Embedder optionnel : sans clé OpenAI, on ingère sans vecteur
-    (la vue Literature les montre ; la recherche sémantique les ignore)."""
+    """Searches PubMed (E-utilities) and ingests the articles into the corpus
+    (Document + Chunk). Optional embedder: without an OpenAI key, we ingest without a
+    vector (the Literature view shows them; the semantic search ignores them)."""
 
     def __init__(
         self, repo: CorpusRepo, pubmed: PubMedClient, *, embedder: Embedder | None = None
@@ -277,8 +277,8 @@ class LiteratureService:
     async def ingest_by_ids(
         self, tenant: CurrentTenant, *, pmids: list[str]
     ) -> schemas.LiteratureSearchResult:
-        """Ingère des enregistrements PubMed précis (efetch par PMID), sans recherche.
-        Sert « Add to corpus » sur des résultats de retrieve déjà sélectionnés."""
+        """Ingests specific PubMed records (efetch by PMID), without searching.
+        Serves "Add to corpus" on already-selected retrieve results."""
         articles = await self.pubmed.fetch_by_ids(pmids)
         return await self._ingest_articles(
             tenant, articles, query=",".join(pmids), effective_query=",".join(pmids)
@@ -297,7 +297,7 @@ class LiteratureService:
         embedded_any = False
         for art in articles:
             if art.url and await self.repo.find_document_by_url(tenant.tenant_id, art.url):
-                continue  # déjà ingéré pour ce tenant
+                continue  # already ingested for this tenant
             doc = await self.repo.insert_document(
                 tenant.tenant_id,
                 source_id="pubmed",

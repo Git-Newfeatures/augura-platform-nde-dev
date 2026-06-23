@@ -1,4 +1,4 @@
-"""Outils forcés + prompts des agents (ports de lucis-dashboard/api/*.js)."""
+"""Forced tools + agent prompts (ports of lucis-dashboard/api/*.js)."""
 
 from typing import Any
 
@@ -115,7 +115,7 @@ DAG_SYSTEM_PROMPT = (
     "place them in confounders, mediators, effect_modifiers, unmeasured, or colliders."
 )
 
-# Contexte clinique spécifique à l'outcome (clé = selected_outcome).
+# Outcome-specific clinical context (key = selected_outcome).
 OUTCOME_CONTEXT: dict[str, str] = {
     "hba1c": (
         "OUTCOME — HbA1c % change at 12 months. Known confounders: baseline HbA1c "
@@ -205,7 +205,7 @@ def _gap_block(gaps: list[dict[str, object]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-# ── gap-detection (port de api/gap-detection.js) ────────────────────────────
+# ── gap-detection (port of api/gap-detection.js) ────────────────────────────
 
 GAP_TOOL: ToolParam = {
     "name": "identify_data_gaps",
@@ -290,7 +290,7 @@ def build_gap_user_message(
     )
 
 
-# ── variable-check 1b (port de api/variable-check.js) ───────────────────────
+# ── variable-check 1b (port of api/variable-check.js) ───────────────────────
 
 VARIABLE_CHECK_TOOL: ToolParam = {
     "name": "classify_columns",

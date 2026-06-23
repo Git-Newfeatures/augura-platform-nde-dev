@@ -1,78 +1,78 @@
-# Port B4 — Enrichissement sémantique « à la volée » — Plan d'implémentation
+# B4 Port — "On-the-fly" semantic enrichment — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fermer la boucle d'enrichissement de la couche sémantique gouvernée — persister les concepts/relations proposés (par le DAG ou par un pipeline LLM dédié) dans l'ontologie globale, avec versioning et garde-fou de revue.
+**Goal:** Close the enrichment loop of the governed semantic layer — persist the proposed concepts/relations (from the DAG or from a dedicated LLM pipeline) into the global ontology, with versioning and a review guardrail.
 
-**Architecture:** Port fidèle de `Augura-Health/augura@98c1023` (`api/enrich-propose.js`, `api/enrich-apply.js`, `src/semantic/governed-vocab.js`, `LearnFromQuestionPanel.jsx`, fonction SQL `upsert_semantic_release`) vers la tranche verticale `modules/semantic/` de la plateforme. Écriture sur l'ontologie **globale** (`public`) via une fonction SQL `SECURITY DEFINER` ; **apply** synchrone gated `owner` ; **propose** exécuté comme job background. 3 phases livrables indépendamment.
+**Architecture:** Faithful port of `Augura-Health/augura@98c1023` (`api/enrich-propose.js`, `api/enrich-apply.js`, `src/semantic/governed-vocab.js`, `LearnFromQuestionPanel.jsx`, SQL function `upsert_semantic_release`) into the platform's `modules/semantic/` vertical slice. Writing to the **global** ontology (`public`) via a `SECURITY DEFINER` SQL function; synchronous **apply** gated `owner`; **propose** run as a background job. 3 independently deliverable phases.
 
-**Tech Stack:** FastAPI · SQLAlchemy async · asyncpg · Pydantic · Postgres/pgvector (Supabase) · Anthropic (LLM) · React 19/Vite (front) · `uv`/`pytest`/`ruff`/`pyright` (backend) · `npm`/`eslint` (front).
+**Tech Stack:** FastAPI · SQLAlchemy async · asyncpg · Pydantic · Postgres/pgvector (Supabase) · Anthropic (LLM) · React 19/Vite (frontend) · `uv`/`pytest`/`ruff`/`pyright` (backend) · `npm`/`eslint` (frontend).
 
-**Spec de référence :** [docs/superpowers/specs/2026-06-19-b4-semantic-enrichment-port-design.md](../specs/2026-06-19-b4-semantic-enrichment-port-design.md)
+**Reference spec:** [docs/superpowers/specs/2026-06-19-b4-semantic-enrichment-port-design.md](../specs/2026-06-19-b4-semantic-enrichment-port-design.md)
 
-**Source du port (working copy locale) :** `/Users/quentin/Desktop/Augure/lucis-dashboard` (branche `data-intake-nde`, commit `98c1023`).
+**Port source (local working copy):** `/Users/quentin/Desktop/Augure/lucis-dashboard` (branch `data-intake-nde`, commit `98c1023`).
 
-**Conventions à respecter (CLAUDE.md) :** commentaires/docstrings **en français** ; `ruff` ligne 100 ; `pyright` strict ; `lint-imports` (`causal → semantic` autorisé, `core` n'importe jamais `modules`) ; migrations **0002+ idempotentes** ; **pas de mock/fallback** côté `apps/web` ; ne **jamais** éditer `packages/api-client/src/schema.d.ts` à la main. Ne **rien** committer/pousser/déployer sans demande explicite — ce plan crée des commits locaux par tâche ; la bascule DB live et le déploiement Modal restent des actions manuelles séparées.
+**Conventions to respect (CLAUDE.md):** comments/docstrings **in French**; `ruff` line 100; `pyright` strict; `lint-imports` (`causal → semantic` allowed, `core` never imports `modules`); migrations **0002+ idempotent**; **no mock/fallback** on the `apps/web` side; **never** hand-edit `packages/api-client/src/schema.d.ts`. **Never** commit/push/deploy without an explicit request — this plan creates local commits per task; the live DB switch and the Modal deployment remain separate manual actions.
 
-**Commandes de vérification (depuis `apps/api`, env chargé `set -a; . ./.env; set +a`) :**
+**Verification commands (from `apps/api`, env loaded `set -a; . ./.env; set +a`):**
 - `uv run ruff format --check . && uv run ruff check .`
 - `uv run pyright`
 - `uv run lint-imports`
-- `uv run pytest -q` (les tests `@pytest.mark.integration` exigent `AUGURA_DATABASE_URL`)
-- Régénération contrat : `uv run python scripts/dump_openapi.py` puis `npm --prefix ../../packages/api-client run generate`
+- `uv run pytest -q` (the `@pytest.mark.integration` tests require `AUGURA_DATABASE_URL`)
+- Contract regeneration: `uv run python scripts/dump_openapi.py` then `npm --prefix ../../packages/api-client run generate`
 
 ---
 
 ## File Structure (decomposition)
 
-**Backend — Phase 1 (write-path / apply) :**
-- `apps/api/supabase/functions.sql` *(modify)* — ajoute la fonction `upsert_semantic_release`.
-- `apps/api/alembic/versions/0006_semantic_enrich_function.py` *(create)* — migration idempotente (CREATE OR REPLACE).
-- `apps/api/src/augura_api/modules/semantic/repo.py` *(modify)* — ajoute `apply_release()` (seule méthode d'écriture).
-- `apps/api/src/augura_api/modules/semantic/enrich_schemas.py` *(create)* — schémas Pydantic des routes enrich (apply + propose).
-- `apps/api/src/augura_api/modules/semantic/enrich_apply.py` *(create)* — logique des 4 chemins d'apply (construit manifest+payload).
+**Backend — Phase 1 (write-path / apply):**
+- `apps/api/supabase/functions.sql` *(modify)* — adds the `upsert_semantic_release` function.
+- `apps/api/alembic/versions/0006_semantic_enrich_function.py` *(create)* — idempotent migration (CREATE OR REPLACE).
+- `apps/api/src/augura_api/modules/semantic/repo.py` *(modify)* — adds `apply_release()` (the only write method).
+- `apps/api/src/augura_api/modules/semantic/enrich_schemas.py` *(create)* — Pydantic schemas for the enrich routes (apply + propose).
+- `apps/api/src/augura_api/modules/semantic/enrich_apply.py` *(create)* — logic of the 4 apply paths (builds manifest+payload).
 - `apps/api/src/augura_api/modules/semantic/router.py` *(modify)* — route `POST /semantic/enrich/apply` gated owner.
-- `apps/api/tests/semantic/test_enrich_apply.py` *(create)* — unitaires apply.
-- `apps/api/tests/semantic/test_upsert_semantic_release.py` *(create)* — intégration SQL.
+- `apps/api/tests/semantic/test_enrich_apply.py` *(create)* — apply unit tests.
+- `apps/api/tests/semantic/test_upsert_semantic_release.py` *(create)* — SQL integration.
 
-**Backend — Phase 2 (propose pipeline) :**
-- `apps/api/src/augura_api/modules/semantic/vocab.py` *(create)* — enums gouvernés.
-- `apps/api/src/augura_api/modules/causal/prompt.py` + `schemas.py` *(modify)* — consomment `vocab.POLARITY` (fix drift).
-- `apps/api/src/augura_api/modules/semantic/enrichment.py` *(create)* — logique pure (coverage, BFS, prechecks, reassign, stamp).
-- `apps/api/src/augura_api/modules/semantic/enrich_propose.py` *(create)* — orchestration des batchs LLM.
-- `apps/api/src/augura_api/jobs/handlers.py` *(modify)* — `handle_enrich_propose` + enregistrement du kind.
+**Backend — Phase 2 (propose pipeline):**
+- `apps/api/src/augura_api/modules/semantic/vocab.py` *(create)* — governed enums.
+- `apps/api/src/augura_api/modules/causal/prompt.py` + `schemas.py` *(modify)* — consume `vocab.POLARITY` (drift fix).
+- `apps/api/src/augura_api/modules/semantic/enrichment.py` *(create)* — pure logic (coverage, BFS, prechecks, reassign, stamp).
+- `apps/api/src/augura_api/modules/semantic/enrich_propose.py` *(create)* — LLM batch orchestration.
+- `apps/api/src/augura_api/jobs/handlers.py` *(modify)* — `handle_enrich_propose` + kind registration.
 - `apps/api/src/augura_api/modules/semantic/router.py` *(modify)* — `POST /semantic/enrich/propose` + `GET /semantic/enrich/proposals/{job_id}`.
-- `apps/api/tests/semantic/test_enrichment.py` *(create)* — unitaires logique pure.
-- `apps/api/tests/semantic/test_enrich_propose_handler.py` *(create)* — job à LLM mocké.
+- `apps/api/tests/semantic/test_enrichment.py` *(create)* — pure-logic unit tests.
+- `apps/api/tests/semantic/test_enrich_propose_handler.py` *(create)* — job with mocked LLM.
 
-**Frontend — Phase 3 :**
+**Frontend — Phase 3:**
 - `apps/web/src/workspace/dataClient.js` *(modify)* — wrappers `enrichPropose`/`pollJob`/`fetchEnrichProposals`/`enrichApply`.
-- `apps/web/src/workspace/EnrichmentPanel.jsx` *(create)* — port de `LearnFromQuestionPanel`.
-- `apps/web/src/workspace/SemanticLayerPage.jsx` *(modify)* — monte le panneau.
-- `apps/web/src/workspace/CausalModelingPage.jsx` *(modify)* — bouton « accepter l'arête » + `resetSemanticStore()`.
+- `apps/web/src/workspace/EnrichmentPanel.jsx` *(create)* — port of `LearnFromQuestionPanel`.
+- `apps/web/src/workspace/SemanticLayerPage.jsx` *(modify)* — mounts the panel.
+- `apps/web/src/workspace/CausalModelingPage.jsx` *(modify)* — "accept the edge" button + `resetSemanticStore()`.
 
 ---
 
 # PHASE 1 — Write-path (apply)
 
-Livrable : on peut accepter une relation proposée par le DAG et la voir persistée dans l'ontologie (bump de version). Indépendamment testable.
+Deliverable: you can accept a relation proposed by the DAG and see it persisted in the ontology (version bump). Independently testable.
 
-## Task 1: Fonction SQL `upsert_semantic_release`
+## Task 1: SQL function `upsert_semantic_release`
 
 **Files:**
-- Modify: `apps/api/supabase/functions.sql` (append en fin de fichier)
+- Modify: `apps/api/supabase/functions.sql` (append at the end of the file)
 - Create: `apps/api/alembic/versions/0006_semantic_enrich_function.py`
 
-- [ ] **Step 1: Écrire la fonction dans `functions.sql`**
+- [ ] **Step 1: Write the function in `functions.sql`**
 
-Ajouter à la fin de `apps/api/supabase/functions.sql`. **Cible `public`** (la plateforme n'a pas de schéma `semantic`). Colonnes vérifiées contre `schema.sql:500-697` — note : `taxonomy_standard_codes` n'a **pas** de `review_status`.
+Add at the end of `apps/api/supabase/functions.sql`. **Targets `public`** (the platform has no `semantic` schema). Columns verified against `schema.sql:500-697` — note: `taxonomy_standard_codes` has **no** `review_status`.
 
 ```sql
 -- ─────────────────────────────────────────────────────────────────────────
--- upsert_semantic_release : applique un batch d'enrichissement (B4) à la couche
--- sémantique gouvernée et bascule la release courante. SECURITY DEFINER : le rôle
--- applicatif (RLS FOR SELECT seulement) écrit EXCLUSIVEMENT via cette fonction.
--- Idempotent (CREATE OR REPLACE + upserts par clé).
+-- upsert_semantic_release: applies an enrichment batch (B4) to the governed
+-- semantic layer and flips the current release. SECURITY DEFINER: the application
+-- role (RLS FOR SELECT only) writes EXCLUSIVELY through this function.
+-- Idempotent (CREATE OR REPLACE + upserts by key).
 -- ─────────────────────────────────────────────────────────────────────────
 create or replace function public.upsert_semantic_release(
   p_manifest jsonb,
@@ -87,10 +87,10 @@ declare
   v_version text := p_manifest->>'semantic_release_version';
 begin
   if coalesce(v_version, '') = '' then
-    raise exception 'semantic_release_version requis dans le manifest';
+    raise exception 'semantic_release_version required in the manifest';
   end if;
 
-  -- Concepts d'abord (cible FK des relations / synonyms / codes).
+  -- Concepts first (FK target of relations / synonyms / codes).
   insert into public.taxonomy_concepts
     select * from jsonb_populate_recordset(
       null::public.taxonomy_concepts,
@@ -167,7 +167,7 @@ begin
       is_hard_constraint = excluded.is_hard_constraint,
       notes = excluded.notes;
 
-  -- Bascule la release courante (append-only, une seule is_current).
+  -- Flip the current release (append-only, a single is_current).
   update public.semantic_releases set is_current = false where is_current;
   insert into public.semantic_releases (
     semantic_release_version, taxonomy_version, causal_ontology_version,
@@ -194,7 +194,7 @@ end;
 $$;
 
 revoke all on function public.upsert_semantic_release(jsonb, jsonb) from public;
--- Grant conditionnel : le rôle applicatif n'existe pas sur le Postgres de CI (db-bundle).
+-- Conditional grant: the application role does not exist on the CI Postgres (db-bundle).
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'augura_api') then
     execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_api';
@@ -202,16 +202,16 @@ do $$ begin
 end $$;
 ```
 
-- [ ] **Step 2: Créer la migration alembic 0006**
+- [ ] **Step 2: Create the alembic 0006 migration**
 
-`apps/api/alembic/versions/0006_semantic_enrich_function.py` — copier le bloc SQL ci-dessus dans un `op.execute(...)`. `CREATE OR REPLACE FUNCTION` + grant conditionnel = idempotent.
+`apps/api/alembic/versions/0006_semantic_enrich_function.py` — copy the SQL block above into an `op.execute(...)`. `CREATE OR REPLACE FUNCTION` + conditional grant = idempotent.
 
 ```python
-"""upsert_semantic_release : write-path d'enrichissement de la couche sémantique (B4)
+"""upsert_semantic_release: semantic-layer enrichment write-path (B4)
 
-Fonction SECURITY DEFINER : le rôle applicatif (RLS FOR SELECT) écrit l'ontologie
-globale EXCLUSIVEMENT via elle. Idempotente (CREATE OR REPLACE + grant conditionnel),
-vit aussi dans le bundle canonique functions.sql exécuté par 0001_baseline.
+SECURITY DEFINER function: the application role (RLS FOR SELECT) writes the global
+ontology EXCLUSIVELY through it. Idempotent (CREATE OR REPLACE + conditional grant),
+also lives in the canonical functions.sql bundle executed by 0001_baseline.
 
 Revision ID: 0006_semantic_enrich_function
 Revises: 0005_semantic_release
@@ -227,7 +227,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 _FUNCTION_SQL = r"""
-<<COLLER ICI le bloc SQL complet du Step 1, de "create or replace function" jusqu'au "end $$;" final>>
+<<PASTE HERE the full SQL block from Step 1, from "create or replace function" to the final "end $$;">>
 """
 
 
@@ -239,10 +239,10 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS public.upsert_semantic_release(jsonb, jsonb);")
 ```
 
-- [ ] **Step 3: Vérifier le format/lint**
+- [ ] **Step 3: Check the format/lint**
 
 Run: `cd apps/api && uv run ruff format --check alembic/versions/0006_semantic_enrich_function.py && uv run ruff check alembic/versions/0006_semantic_enrich_function.py`
-Expected: PASS (aucune erreur).
+Expected: PASS (no error).
 
 - [ ] **Step 4: Commit**
 
@@ -251,20 +251,20 @@ git add apps/api/supabase/functions.sql apps/api/alembic/versions/0006_semantic_
 git commit -m "feat(semantic): upsert_semantic_release write-path (B4 enrich)"
 ```
 
-> **Note bascule DB live (manuelle, hors plan) :** après merge, appliquer la fonction à la DB prod via MCP Supabase (`execute_sql`, project `fqmoylmvjoafihiuiiuj`) — le déploiement Modal ne lance pas les migrations.
+> **Live DB switch note (manual, out of plan):** after merge, apply the function to the prod DB via Supabase MCP (`execute_sql`, project `fqmoylmvjoafihiuiiuj`) — the Modal deployment does not run the migrations.
 
-## Task 2: Méthode repo `apply_release` + test d'intégration
+## Task 2: Repo method `apply_release` + integration test
 
 **Files:**
 - Modify: `apps/api/src/augura_api/modules/semantic/repo.py`
 - Test: `apps/api/tests/semantic/test_upsert_semantic_release.py`
 
-- [ ] **Step 1: Écrire le test d'intégration (échoue)**
+- [ ] **Step 1: Write the integration test (fails)**
 
-Vérifie que la fonction insère une relation et bascule `is_current`. Marqué `integration` (exige `AUGURA_DATABASE_URL`). Utilise des IDs jetables préfixés `TEST_` et nettoie en fin de test.
+Verifies that the function inserts a relation and flips `is_current`. Marked `integration` (requires `AUGURA_DATABASE_URL`). Uses disposable IDs prefixed `TEST_` and cleans up at the end of the test.
 
 ```python
-"""Intégration : la fonction SQL upsert_semantic_release écrit l'ontologie + release."""
+"""Integration: the SQL function upsert_semantic_release writes the ontology + release."""
 
 import json
 
@@ -279,9 +279,9 @@ pytestmark = pytest.mark.integration
 @pytest.mark.asyncio
 async def test_apply_release_inserts_relation_and_bumps_current(db_session) -> None:
     repo = SemanticRepo(db_session)
-    # Pré-requis : deux concepts + un prédicat existants (réutilise le seed réel).
+    # Prerequisite: two existing concepts + one predicate (reuses the real seed).
     rows = await repo.list_concepts()
-    assert len(rows) >= 2, "le seed sémantique doit être présent sur la DB de test"
+    assert len(rows) >= 2, "the semantic seed must be present on the test DB"
     subj, obj = rows[0].local_concept_id, rows[1].local_concept_id
     pred = (await repo.list_causal_predicates())[0].predicate_id
 
@@ -304,7 +304,7 @@ async def test_apply_release_inserts_relation_and_bumps_current(db_session) -> N
     result = await repo.apply_release(manifest, payload)
     assert result["version"] == "test.0.1"
 
-    # La relation est lisible et la release courante a basculé.
+    # The relation is readable and the current release has flipped.
     got = await db_session.execute(
         text("select active from ontology_relations where relation_id = 'TEST_REL_0001'")
     )
@@ -314,7 +314,7 @@ async def test_apply_release_inserts_relation_and_bumps_current(db_session) -> N
     )
     assert cur.scalar_one() == "test.0.1"
 
-    # Nettoyage.
+    # Cleanup.
     await db_session.execute(text("delete from ontology_relation_evidence where evidence_id = 'TEST_EV_0001'"))
     await db_session.execute(text("delete from ontology_relations where relation_id = 'TEST_REL_0001'"))
     await db_session.execute(text("update semantic_releases set is_current = false where semantic_release_version = 'test.0.1'"))
@@ -322,28 +322,28 @@ async def test_apply_release_inserts_relation_and_bumps_current(db_session) -> N
     await db_session.execute(text("delete from semantic_releases where semantic_release_version = 'test.0.1'"))
 ```
 
-> Note : si la fixture `db_session` n'existe pas encore dans `apps/api/tests/`, regarder un test `@pytest.mark.integration` existant (ex. `tests/` du module corpus/literature) et réutiliser/copier sa fixture de session privilégiée. Documenter dans le test la fixture utilisée.
+> Note: if the `db_session` fixture does not yet exist in `apps/api/tests/`, look at an existing `@pytest.mark.integration` test (e.g. the corpus/literature module's `tests/`) and reuse/copy its privileged session fixture. Document in the test which fixture is used.
 
-- [ ] **Step 2: Lancer le test (échoue : `apply_release` n'existe pas)**
+- [ ] **Step 2: Run the test (fails: `apply_release` does not exist)**
 
 Run: `cd apps/api && set -a && . ./.env && set +a && uv run pytest tests/semantic/test_upsert_semantic_release.py -v`
 Expected: FAIL — `AttributeError: 'SemanticRepo' object has no attribute 'apply_release'`.
 
-- [ ] **Step 3: Ajouter `apply_release` au repo**
+- [ ] **Step 3: Add `apply_release` to the repo**
 
-Dans `apps/api/src/augura_api/modules/semantic/repo.py`, ajouter (après `release_status`) la **seule** méthode d'écriture. Elle passe par la RPC `SECURITY DEFINER` ; `json.dumps` car asyncpg attend du texte jsonb pour les paramètres liés.
+In `apps/api/src/augura_api/modules/semantic/repo.py`, add (after `release_status`) the **only** write method. It goes through the `SECURITY DEFINER` RPC; `json.dumps` because asyncpg expects jsonb text for the bound parameters.
 
 ```python
-    # ── Écriture (B4 enrich) : exclusivement via la fonction SECURITY DEFINER ──
+    # ── Write (B4 enrich): exclusively through the SECURITY DEFINER function ──
 
     async def apply_release(
         self, manifest: dict[str, Any], payload: dict[str, Any]
     ) -> dict[str, Any]:
-        """Applique un batch d'enrichissement + bascule la release courante.
+        """Applies an enrichment batch + flips the current release.
 
-        Le rôle applicatif n'a pas le write direct (RLS FOR SELECT) ; tout passe par
-        public.upsert_semantic_release (SECURITY DEFINER). Renvoie {version, concepts,
-        relations}."""
+        The application role has no direct write (RLS FOR SELECT); everything goes
+        through public.upsert_semantic_release (SECURITY DEFINER). Returns {version,
+        concepts, relations}."""
         stmt = text(
             "select public.upsert_semantic_release("
             "cast(:manifest as jsonb), cast(:payload as jsonb))"
@@ -352,7 +352,7 @@ Dans `apps/api/src/augura_api/modules/semantic/repo.py`, ajouter (après `releas
         return coerce_jsonb(res.scalar_one())
 ```
 
-- [ ] **Step 4: Lancer le test (passe)**
+- [ ] **Step 4: Run the test (passes)**
 
 Run: `cd apps/api && set -a && . ./.env && set +a && uv run pytest tests/semantic/test_upsert_semantic_release.py -v`
 Expected: PASS.
@@ -364,23 +364,23 @@ git add apps/api/src/augura_api/modules/semantic/repo.py apps/api/tests/semantic
 git commit -m "feat(semantic): repo.apply_release via SECURITY DEFINER + integration test"
 ```
 
-## Task 3: Schémas Pydantic des routes enrich
+## Task 3: Pydantic schemas for the enrich routes
 
 **Files:**
 - Create: `apps/api/src/augura_api/modules/semantic/enrich_schemas.py`
 
-- [ ] **Step 1: Écrire les schémas**
+- [ ] **Step 1: Write the schemas**
 
-Couvre les entrées des 4 chemins d'apply + la réponse. (Les schémas propose sont ajoutés en Phase 2 dans le même fichier.)
+Covers the inputs of the 4 apply paths + the response. (The propose schemas are added in Phase 2 in the same file.)
 
 ```python
-"""Contrat public des routes d'enrichissement (B4) — apply + propose."""
+"""Public contract of the enrichment routes (B4) — apply + propose."""
 
 from pydantic import BaseModel
 
 
 class DirectRelationIn(BaseModel):
-    """Relation légère proposée par le DAG (sans id pré-assigné)."""
+    """Lightweight relation proposed by the DAG (without a pre-assigned id)."""
 
     subject_concept_id: str
     object_concept_id: str
@@ -388,7 +388,7 @@ class DirectRelationIn(BaseModel):
     polarity: str = "neutral"
     default_strength: str = "moderate"
     mechanism_summary: str = ""
-    relation_id: str | None = None  # id provisoire DAG (réconcilié au retour)
+    relation_id: str | None = None  # provisional DAG id (reconciled on return)
 
 
 class DeactivateRelationIn(BaseModel):
@@ -405,7 +405,7 @@ class AddQualifierIn(BaseModel):
 
 
 class EnrichApplyRequest(BaseModel):
-    """Corps de POST /semantic/enrich/apply — un seul chemin renseigné à la fois."""
+    """Body of POST /semantic/enrich/apply — only one path set at a time."""
 
     proposals: dict | None = None
     selected_concept_ids: list[str] = []
@@ -424,7 +424,7 @@ class EnrichApplyResponse(BaseModel):
     detail: str = ""
 ```
 
-- [ ] **Step 2: Vérifier types/format**
+- [ ] **Step 2: Check types/format**
 
 Run: `cd apps/api && uv run ruff check src/augura_api/modules/semantic/enrich_schemas.py && uv run pyright src/augura_api/modules/semantic/enrich_schemas.py`
 Expected: PASS.
@@ -436,20 +436,20 @@ git add apps/api/src/augura_api/modules/semantic/enrich_schemas.py
 git commit -m "feat(semantic): enrich apply request/response schemas"
 ```
 
-## Task 4: Logique d'apply (4 chemins) + tests unitaires
+## Task 4: Apply logic (4 paths) + unit tests
 
 **Files:**
 - Create: `apps/api/src/augura_api/modules/semantic/enrich_apply.py`
 - Test: `apps/api/tests/semantic/test_enrich_apply.py`
 
-Référence source : `lucis-dashboard/api/enrich-apply.js` (les 4 branches). Adaptation : pas de Supabase JS — on construit `manifest`+`payload` et on délègue à `repo.apply_release`. Le bump de version est une fonction pure (testable sans DB).
+Source reference: `lucis-dashboard/api/enrich-apply.js` (the 4 branches). Adaptation: no Supabase JS — we build `manifest`+`payload` and delegate to `repo.apply_release`. The version bump is a pure function (testable without a DB).
 
-- [ ] **Step 1: Écrire les tests unitaires (échouent)**
+- [ ] **Step 1: Write the unit tests (fail)**
 
-Teste la logique pure de construction de payload + bump, sans DB (repo mocké).
+Tests the pure payload-construction + bump logic, without a DB (mocked repo).
 
 ```python
-"""Unitaires : construction manifest/payload des 4 chemins d'apply (sans DB)."""
+"""Unit tests: manifest/payload construction for the 4 apply paths (no DB)."""
 
 import pytest
 
@@ -472,26 +472,26 @@ def test_build_direct_relations_assigns_ids_and_autostubs_evidence() -> None:
     assert payload["ontology_relations"][0]["relation_id"] == "ENRR_20260619_003"
     assert payload["ontology_relations"][0]["active"] is True
     assert payload["ontology_relations"][0]["polarity"] == "neutral"
-    # evidence auto-stub (1 par relation).
+    # auto-stub evidence (1 per relation).
     assert len(payload["ontology_relation_evidence"]) == 1
     assert payload["ontology_relation_evidence"][0]["relation_id"] == "ENRR_20260619_003"
 ```
 
-- [ ] **Step 2: Lancer (échoue : module absent)**
+- [ ] **Step 2: Run (fails: module absent)**
 
 Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_apply.py -v`
 Expected: FAIL — `ModuleNotFoundError: ...enrich_apply`.
 
-- [ ] **Step 3: Implémenter `enrich_apply.py`**
+- [ ] **Step 3: Implement `enrich_apply.py`**
 
-Fonctions pures + un orchestrateur `apply()` qui choisit le chemin et appelle `repo.apply_release`. Port fidèle de `enrich-apply.js` (bump_version lignes 27-32 ; direct_relations 142-260 ; deactivate 66-98 ; add_qualifier 100-140 ; proposals 262-345).
+Pure functions + an `apply()` orchestrator that picks the path and calls `repo.apply_release`. Faithful port of `enrich-apply.js` (bump_version lines 27-32; direct_relations 142-260; deactivate 66-98; add_qualifier 100-140; proposals 262-345).
 
 ```python
-"""Logique d'apply de l'enrichissement (B4) — port de api/enrich-apply.js.
+"""Enrichment apply logic (B4) — port of api/enrich-apply.js.
 
-4 chemins, un seul actif par requête : proposals approuvées (pipeline propose) ·
-direct_relations (relations proposées par le DAG) · deactivate_relation · add_qualifier.
-Tous construisent un (manifest, payload) délégué à SemanticRepo.apply_release.
+4 paths, only one active per request: approved proposals (propose pipeline) ·
+direct_relations (relations proposed by the DAG) · deactivate_relation · add_qualifier.
+All build a (manifest, payload) delegated to SemanticRepo.apply_release.
 """
 
 from typing import Any
@@ -506,7 +506,7 @@ from augura_api.modules.semantic.repo import SemanticRepo
 
 
 def bump_version(current: str | None, kind: str) -> str:
-    """Bump SemVer (port de bumpVersion). Fallback 3.0.0."""
+    """SemVer bump (port of bumpVersion). Fallback 3.0.0."""
     parts = [int(x) for x in (current or "3.0.0").split(".")]
     major, minor, patch = (parts + [0, 0, 0])[:3]
     if kind == "major":
@@ -530,7 +530,7 @@ def _manifest(version: str, description: str) -> dict[str, Any]:
 def build_direct_relations_payload(
     relations: list[DirectRelationIn], *, version: str, existing_max_rel_n: int, today: str
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Assigne ENRR_{today}_{NNN}, auto-stub evidence, renvoie (payload, id_map)."""
+    """Assigns ENRR_{today}_{NNN}, auto-stubs evidence, returns (payload, id_map)."""
     id_map: dict[str, str] = {}
     rel_rows: list[dict[str, Any]] = []
     ev_rows: list[dict[str, Any]] = []
@@ -569,7 +569,7 @@ def build_direct_relations_payload(
 
 
 class EnrichApplyService:
-    """Orchestre l'apply : choisit le chemin, calcule le bump, délègue au repo."""
+    """Orchestrates the apply: picks the path, computes the bump, delegates to the repo."""
 
     def __init__(self, repo: SemanticRepo) -> None:
         self.repo = repo
@@ -586,7 +586,7 @@ class EnrichApplyService:
             return await self._direct_relations(req.direct_relations, current, today)
         if req.proposals:
             return await self._proposals(req, current)
-        raise ValueError("aucun chemin d'apply renseigné")
+        raise ValueError("no apply path provided")
 
     async def _direct_relations(
         self, relations: list[DirectRelationIn], current: str, today: str
@@ -608,7 +608,7 @@ class EnrichApplyService:
     async def _deactivate(self, relation_id: str, current: str) -> EnrichApplyResponse:
         existing = await self.repo.get_relation_row(relation_id)
         if existing is None:
-            raise ValueError(f"relation {relation_id} introuvable")
+            raise ValueError(f"relation {relation_id} not found")
         new_version = bump_version(current, "patch")
         row = {**existing, "active": False, "review_status": "deprecated", "version": new_version}
         manifest = _manifest(new_version, f"patch: deactivate {relation_id} via DAG review")
@@ -641,14 +641,14 @@ class EnrichApplyService:
         )
 
     async def _proposals(self, req: EnrichApplyRequest, current: str) -> EnrichApplyResponse:
-        # Port de enrich-apply.js:262-345 — filtre les rows sélectionnés + cascade enfants,
-        # stampe approved/active, bump minor si concepts sinon patch.
+        # Port of enrich-apply.js:262-345 — filters the selected rows + cascades children,
+        # stamps approved/active, bumps minor if concepts else patch.
         p = req.proposals or {}
         csel, rsel = set(req.selected_concept_ids), set(req.selected_relation_ids)
         concepts = [c for c in p.get("taxonomy_concepts", []) if c.get("local_concept_id") in csel]
         relations = [r for r in p.get("ontology_relations", []) if r.get("relation_id") in rsel]
         if not concepts and not relations:
-            raise ValueError("aucun concept/relation approuvé à appliquer")
+            raise ValueError("no approved concept/relation to apply")
         cset = {c["local_concept_id"] for c in concepts}
         rset = {r["relation_id"] for r in relations}
         new_version = bump_version(current, "minor" if concepts else "patch")
@@ -682,13 +682,13 @@ class EnrichApplyService:
         )
 ```
 
-- [ ] **Step 4: Ajouter les méthodes repo manquantes**
+- [ ] **Step 4: Add the missing repo methods**
 
-`_direct_relations`/`_deactivate`/`_add_qualifier` utilisent 3 lectures non encore présentes. Les ajouter à `SemanticRepo` (lecture seule, OK avec RLS) :
+`_direct_relations`/`_deactivate`/`_add_qualifier` use 3 reads not yet present. Add them to `SemanticRepo` (read-only, OK with RLS):
 
 ```python
     async def max_relation_seq(self, today: str) -> int:
-        """Plus grand NNN des relation_id ENRR_{today}_NNN (évite les collisions d'id)."""
+        """Largest NNN among relation_id ENRR_{today}_NNN (avoids id collisions)."""
         stmt = text(
             r"select coalesce(max(substring(relation_id from 'ENRR_' || :d || '_(\d{3})')::int), 0) "
             "from ontology_relations"
@@ -710,10 +710,10 @@ class EnrichApplyService:
         return coerce_jsonb(row) if row is not None else None
 ```
 
-- [ ] **Step 5: Lancer les unitaires (passent)**
+- [ ] **Step 5: Run the unit tests (pass)**
 
 Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_apply.py -v`
-Expected: PASS (les deux tests).
+Expected: PASS (both tests).
 
 - [ ] **Step 6: Format/lint/types**
 
@@ -733,12 +733,12 @@ git commit -m "feat(semantic): enrich apply service (4 paths) + repo seq helpers
 - Modify: `apps/api/src/augura_api/modules/semantic/router.py`
 - Test: `apps/api/tests/semantic/test_enrich_apply_route.py`
 
-- [ ] **Step 1: Écrire le test de gating (échoue)**
+- [ ] **Step 1: Write the gating test (fails)**
 
-Vérifie qu'un membre non-owner reçoit 403. Réutiliser le harness de test HTTP existant (regarder un test de route gated, ex. analytics `admin`, pour la fabrication du client + override d'auth). Documenter la fixture utilisée.
+Verifies that a non-owner member gets a 403. Reuse the existing HTTP test harness (look at a gated route test, e.g. analytics `admin`, for the client construction + auth override). Document the fixture used.
 
 ```python
-"""La route enrich/apply exige le rôle owner (mutation d'ontologie globale)."""
+"""The enrich/apply route requires the owner role (global ontology mutation)."""
 
 import pytest
 
@@ -752,14 +752,14 @@ async def test_enrich_apply_requires_owner(client_as_member) -> None:
     assert resp.status_code == 403
 ```
 
-- [ ] **Step 2: Lancer (échoue : route absente → 404)**
+- [ ] **Step 2: Run (fails: route absent → 404)**
 
 Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_apply_route.py -v`
-Expected: FAIL (404 au lieu de 403).
+Expected: FAIL (404 instead of 403).
 
-- [ ] **Step 3: Ajouter la route**
+- [ ] **Step 3: Add the route**
 
-Dans `router.py` — importer le pattern owner (cf. analytics) et brancher le service. `today` est calculé côté serveur (UTC).
+In `router.py` — import the owner pattern (cf. analytics) and wire the service. `today` is computed server-side (UTC).
 
 ```python
 from datetime import UTC, datetime
@@ -781,20 +781,20 @@ async def enrich_apply(
     tenant: OwnerTenantDep,
     session: SessionDep,
 ) -> enrich_schemas.EnrichApplyResponse:
-    """Persiste un enrichissement dans l'ontologie GLOBALE (gated owner). Bump de version."""
+    """Persists an enrichment into the GLOBAL ontology (owner-gated). Version bump."""
     today = datetime.now(UTC).strftime("%Y%m%d")
     return await EnrichApplyService(SemanticRepo(session)).apply(req, today=today)
 ```
 
-- [ ] **Step 4: Lancer (passe : 403)**
+- [ ] **Step 4: Run (passes: 403)**
 
 Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_apply_route.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Suite complète + contrats**
+- [ ] **Step 5: Full suite + contracts**
 
 Run: `cd apps/api && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run lint-imports && uv run pytest -q -m "not integration"`
-Expected: PASS partout.
+Expected: PASS everywhere.
 
 - [ ] **Step 6: Commit**
 
@@ -803,24 +803,24 @@ git add apps/api/src/augura_api/modules/semantic/router.py apps/api/tests/semant
 git commit -m "feat(semantic): POST /semantic/enrich/apply (owner-gated)"
 ```
 
-## Task 6: Régénérer le client API (Phase 1)
+## Task 6: Regenerate the API client (Phase 1)
 
 **Files:**
-- Modify: `packages/api-client/openapi.json` (généré), `packages/api-client/src/schema.d.ts` (généré)
+- Modify: `packages/api-client/openapi.json` (generated), `packages/api-client/src/schema.d.ts` (generated)
 
-- [ ] **Step 1: Régénérer**
+- [ ] **Step 1: Regenerate**
 
 Run:
 ```bash
 cd apps/api && set -a && . ./.env && set +a && uv run python scripts/dump_openapi.py
 cd ../.. && npm --prefix packages/api-client run generate
 ```
-Expected: `openapi.json` contient `/semantic/enrich/apply` ; `schema.d.ts` régénéré.
+Expected: `openapi.json` contains `/semantic/enrich/apply`; `schema.d.ts` regenerated.
 
-- [ ] **Step 2: Vérifier le drift**
+- [ ] **Step 2: Check the drift**
 
 Run: `git status --porcelain packages/api-client`
-Expected: les deux fichiers générés modifiés (et seulement eux dans ce package).
+Expected: both generated files modified (and only those in this package).
 
 - [ ] **Step 3: Commit**
 
@@ -829,21 +829,21 @@ git add packages/api-client/openapi.json packages/api-client/src/schema.d.ts
 git commit -m "chore(api-client): regenerate for /semantic/enrich/apply"
 ```
 
-> **Checkpoint Phase 1 :** le write-path est complet et testé. La boucle DAG→persistance peut être câblée (Phase 3 Task 16) indépendamment de la Phase 2.
+> **Phase 1 checkpoint:** the write-path is complete and tested. The DAG→persistence loop can be wired (Phase 3 Task 16) independently of Phase 2.
 
 ---
 
 # PHASE 2 — Propose pipeline
 
-Livrable : un job qui analyse la couverture de l'ontologie pour des questions PICOT et propose concepts/relations (revus puis appliqués via Phase 1).
+Deliverable: a job that analyzes the ontology coverage for PICOT questions and proposes concepts/relations (reviewed then applied via Phase 1).
 
-## Task 7: Module d'enums gouvernés `vocab.py`
+## Task 7: Governed enums module `vocab.py`
 
 **Files:**
 - Create: `apps/api/src/augura_api/modules/semantic/vocab.py`
 - Test: `apps/api/tests/semantic/test_vocab.py`
 
-- [ ] **Step 1: Écrire le test (échoue)**
+- [ ] **Step 1: Write the test (fails)**
 
 ```python
 from augura_api.modules.semantic import vocab
@@ -860,28 +860,28 @@ def test_domains_and_qualifier_enums_present() -> None:
     assert "LOINC" in vocab.STANDARD_CODE_VOCABULARIES
 ```
 
-- [ ] **Step 2: Lancer (échoue)** — Run: `cd apps/api && uv run pytest tests/semantic/test_vocab.py -v` — Expected: FAIL (module absent).
+- [ ] **Step 2: Run (fails)** — Run: `cd apps/api && uv run pytest tests/semantic/test_vocab.py -v` — Expected: FAIL (module absent).
 
-- [ ] **Step 3: Implémenter `vocab.py`** (port de `governed-vocab.js`)
+- [ ] **Step 3: Implement `vocab.py`** (port of `governed-vocab.js`)
 
 ```python
-"""Vocabulaire gouverné (Semantic Layer v3 §10.5) — source unique des enums.
+"""Governed vocabulary (Semantic Layer v3 §10.5) — single source of the enums.
 
-Importé par l'enrichissement (B4) ET le causal (B2) pour qu'ils ne divergent plus.
-Bug historique corrigé : polarity valait `mixed`/`unknown` côté DAG mais `neutral`
-côté enrichissement. La valeur gouvernée est `neutral`.
+Imported by enrichment (B4) AND causal (B2) so they no longer diverge. Historical bug
+fixed: polarity was `mixed`/`unknown` on the DAG side but `neutral` on the enrichment
+side. The governed value is `neutral`.
 """
 
-# §10.5 — polarité des relations.
+# §10.5 — relation polarity.
 POLARITY = ["increases", "decreases", "neutral"]
 
-# augura_domain — domaines des concepts.
+# augura_domain — concept domains.
 AUGURA_DOMAINS = [
     "therapeutics", "measurement", "condition", "device", "procedure",
     "outcome", "structural", "biomarker", "pharmacology",
 ]
 
-# §10.5 — enums gouvernés des qualifiers.
+# §10.5 — governed qualifier enums.
 QUALIFIER_TYPES = [
     "population", "comorbidity", "age_range", "sex",
     "therapeutic_context", "biomarker_threshold", "temporal_context",
@@ -890,14 +890,14 @@ QUALIFIER_EFFECTS = [
     "reverses_polarity", "attenuates_strength", "amplifies_strength", "restricts_applicability",
 ]
 
-# Vocabulaires de codes standards acceptés pour les concepts Layer 1.
+# Standard-code vocabularies accepted for Layer 1 concepts.
 STANDARD_CODE_VOCABULARIES = ["LOINC", "SNOMED", "RxNorm", "OMOP", "ICD10CM"]
 
-# Buckets de force de relation.
+# Relation strength buckets.
 RELATION_STRENGTH = ["strong", "moderate", "weak"]
 ```
 
-- [ ] **Step 4: Lancer (passe)** — Run: `cd apps/api && uv run pytest tests/semantic/test_vocab.py -v` — Expected: PASS.
+- [ ] **Step 4: Run (passes)** — Run: `cd apps/api && uv run pytest tests/semantic/test_vocab.py -v` — Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -906,16 +906,16 @@ git add apps/api/src/augura_api/modules/semantic/vocab.py apps/api/tests/semanti
 git commit -m "feat(semantic): governed vocab module (single source of enums)"
 ```
 
-## Task 8: Corriger le drift polarity du causal
+## Task 8: Fix the causal polarity drift
 
 **Files:**
 - Modify: `apps/api/src/augura_api/modules/causal/prompt.py:141`
-- Modify: `apps/api/src/augura_api/modules/causal/schemas.py:83` (défaut `ProposedRelation.polarity`)
+- Modify: `apps/api/src/augura_api/modules/causal/schemas.py:83` (default `ProposedRelation.polarity`)
 
-- [ ] **Step 1: Écrire un test de garde (échoue)**
+- [ ] **Step 1: Write a guard test (fails)**
 
 ```python
-"""Le tool schema DAG et l'enrichissement partagent l'enum polarity gouverné."""
+"""The DAG tool schema and enrichment share the governed polarity enum."""
 
 from augura_api.modules.causal.prompt import DAG_FILTER_TOOL
 from augura_api.modules.semantic import vocab
@@ -927,29 +927,29 @@ def test_dag_tool_polarity_enum_matches_governed_vocab() -> None:
     assert rel_props["polarity"]["enum"] == vocab.POLARITY
 ```
 
-Le placer dans `apps/api/tests/causal/test_polarity_governed.py`.
+Place it in `apps/api/tests/causal/test_polarity_governed.py`.
 
-- [ ] **Step 2: Lancer (échoue)** — Run: `cd apps/api && uv run pytest tests/causal/test_polarity_governed.py -v` — Expected: FAIL (enum = `["increases","decreases","mixed","unknown"]`).
+- [ ] **Step 2: Run (fails)** — Run: `cd apps/api && uv run pytest tests/causal/test_polarity_governed.py -v` — Expected: FAIL (enum = `["increases","decreases","mixed","unknown"]`).
 
-- [ ] **Step 3: Corriger `prompt.py`**
+- [ ] **Step 3: Fix `prompt.py`**
 
-Remplacer l'enum en dur ligne ~141 par l'import gouverné. En tête de `prompt.py` :
+Replace the hardcoded enum at line ~141 with the governed import. At the top of `prompt.py`:
 
 ```python
 from augura_api.modules.semantic import vocab
 ```
 
-Et l'entrée polarity (ligne ~141) :
+And the polarity entry (line ~141):
 
 ```python
                             "enum": vocab.POLARITY,
 ```
 
-- [ ] **Step 4: Corriger le défaut de `ProposedRelation`**
+- [ ] **Step 4: Fix the `ProposedRelation` default**
 
-Dans `causal/schemas.py:83`, remplacer `polarity: str = "unknown"` par `polarity: str = "neutral"`.
+In `causal/schemas.py:83`, replace `polarity: str = "unknown"` with `polarity: str = "neutral"`.
 
-- [ ] **Step 5: Lancer + non-régression DAG** — Run: `cd apps/api && uv run pytest tests/causal/ -v && uv run lint-imports` — Expected: PASS (le contrat `causal → semantic` est autorisé).
+- [ ] **Step 5: Run + DAG non-regression** — Run: `cd apps/api && uv run pytest tests/causal/ -v && uv run lint-imports` — Expected: PASS (the `causal → semantic` contract is allowed).
 
 - [ ] **Step 6: Commit**
 
@@ -958,18 +958,18 @@ git add apps/api/src/augura_api/modules/causal/prompt.py apps/api/src/augura_api
 git commit -m "fix(causal): polarity enum from governed vocab (drop mixed/unknown)"
 ```
 
-## Task 9: Logique pure d'enrichissement `enrichment.py`
+## Task 9: Pure enrichment logic `enrichment.py`
 
 **Files:**
 - Create: `apps/api/src/augura_api/modules/semantic/enrichment.py`
 - Test: `apps/api/tests/semantic/test_enrichment.py`
 
-Port (sans I/O) de `enrich-propose.js` : `buildSemanticData` (140-210), `matchTokens` (214-261), `directedBFS` (263-292), `analyzeCoverage` (294-361), `groupMissingConcepts` (399-418), `applyPreChecks` (479-576), `reassignIds` (431-461), `stampRows` (469-477), `mergeInto` (463-467). Utiliser des `@dataclass`/`dict` ; `normalize()` = port simple de `lexical-normalizer.js` (lowercase + trim + espaces normalisés ; le porter aussi si non présent).
+Port (without I/O) of `enrich-propose.js`: `buildSemanticData` (140-210), `matchTokens` (214-261), `directedBFS` (263-292), `analyzeCoverage` (294-361), `groupMissingConcepts` (399-418), `applyPreChecks` (479-576), `reassignIds` (431-461), `stampRows` (469-477), `mergeInto` (463-467). Use `@dataclass`/`dict`; `normalize()` = simple port of `lexical-normalizer.js` (lowercase + trim + normalized spaces; port it too if not present).
 
-- [ ] **Step 1: Écrire les tests (échouent)** — couvrir les invariants clés.
+- [ ] **Step 1: Write the tests (fail)** — cover the key invariants.
 
 ```python
-"""Unitaires de la logique pure d'enrichissement (coverage, BFS, prechecks)."""
+"""Unit tests of the pure enrichment logic (coverage, BFS, prechecks)."""
 
 from augura_api.modules.semantic import enrichment as enr
 
@@ -1010,21 +1010,21 @@ def test_prechecks_reject_self_loop_and_orphan() -> None:
     enr.apply_prechecks(batch, existing_concept_ids={"A"}, existing_relation_keys=set(),
                         valid_predicate_ids={"precedes"}, log=log,
                         id_counters={"concept": 0, "relation": 0, "evidence": 0, "qualifier": 0})
-    assert batch["ontology_relations"] == []  # self-loop + orphan rejetés
+    assert batch["ontology_relations"] == []  # self-loop + orphan rejected
     assert any("self-loop" in m for m in log)
 ```
 
-- [ ] **Step 2: Lancer (échoue)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrichment.py -v` — Expected: FAIL (module absent).
+- [ ] **Step 2: Run (fails)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrichment.py -v` — Expected: FAIL (module absent).
 
-- [ ] **Step 3: Implémenter `enrichment.py`**
+- [ ] **Step 3: Implement `enrichment.py`**
 
-Porter chaque fonction JS citée ci-dessus en Python idiomatique. Structures :
+Port each JS function cited above into idiomatic Python. Structures:
 
 ```python
-"""Logique pure d'enrichissement (B4) — port de api/enrich-propose.js (hors I/O/LLM).
+"""Pure enrichment logic (B4) — port of api/enrich-propose.js (excluding I/O/LLM).
 
-Aucune dépendance DB ni réseau : testable unitairement. Index sémantique, analyse de
-couverture (matchTokens + directedBFS), regroupement, pre-checks, reassign d'IDs, stamp.
+No DB or network dependency: unit-testable. Semantic index, coverage analysis
+(matchTokens + directedBFS), grouping, pre-checks, ID reassignment, stamp.
 """
 
 import re
@@ -1035,8 +1035,8 @@ HOP_LIMIT = 3
 
 
 def normalize(text: str | None) -> str:
-    """Normalisation lexicale (port de lexical-normalizer.js) : minuscules, trim,
-    espaces compactés."""
+    """Lexical normalization (port of lexical-normalizer.js): lowercase, trim,
+    compacted spaces."""
     if not text:
         return ""
     return re.sub(r"\s+", " ", text.strip().lower())
@@ -1075,9 +1075,9 @@ def stamp_rows(proposals, version: str) -> None: ...
 def merge_into(target, source) -> None: ...
 ```
 
-Remplir chaque corps en suivant **fidèlement** la fonction JS source correspondante (mêmes seuils : `len >= 4`, couverture de mots `>= 0.5`, `phraseWords <= 3` ; mêmes règles de rejet : self-loop, doublon par clé `subject|predicate|object|polarity`, orphelin sujet/objet, prédicat inconnu, L1-sans-code ; auto-stub evidence). IDs : `ENRC_/ENRR_/ENRV_/ENRQ_{today}_{NNN}` via `f"{prefix}_{today}_{n:03d}"`.
+Fill in each body **faithfully** following the corresponding source JS function (same thresholds: `len >= 4`, word coverage `>= 0.5`, `phraseWords <= 3`; same rejection rules: self-loop, duplicate by key `subject|predicate|object|polarity`, orphan subject/object, unknown predicate, L1-without-code; auto-stub evidence). IDs: `ENRC_/ENRR_/ENRV_/ENRQ_{today}_{NNN}` via `f"{prefix}_{today}_{n:03d}"`.
 
-- [ ] **Step 4: Lancer (passent)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrichment.py -v` — Expected: PASS (les 3 tests).
+- [ ] **Step 4: Run (pass)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrichment.py -v` — Expected: PASS (the 3 tests).
 
 - [ ] **Step 5: Format/lint/types** — Run: `cd apps/api && uv run ruff format . && uv run ruff check src/augura_api/modules/semantic/enrichment.py && uv run pyright src/augura_api/modules/semantic/enrichment.py` — Expected: PASS.
 
@@ -1088,26 +1088,26 @@ git add apps/api/src/augura_api/modules/semantic/enrichment.py apps/api/tests/se
 git commit -m "feat(semantic): pure enrichment logic (coverage/bfs/prechecks)"
 ```
 
-## Task 10: Orchestration des propositions LLM `enrich_propose.py`
+## Task 10: LLM proposal orchestration `enrich_propose.py`
 
 **Files:**
 - Create: `apps/api/src/augura_api/modules/semantic/enrich_propose.py`
 - Test: `apps/api/tests/semantic/test_enrich_propose.py`
 
-Port de la partie I/O de `enrich-propose.js` : `PROPOSAL_SCHEMA` (dérivé de `vocab.py`), `buildSystemPrompt` (366-397), et l'orchestration des batchs (Batch 1 concepts manquants 794-864 ; Batch 2 path gaps 866-921 ; Batch 3 bootstrap 923-999 ; raccourci `selectedConcepts` 621-714). Adaptation : appels LLM via `core.llm.runtime.run_structured_agent` (au lieu de `callClaude`), Pydantic `ProposalBatch` au lieu de schéma JSON brut, progression via un callback `on_progress: Callable[[float, str], Awaitable[None]]` injecté (le handler le branche sur `set_progress`).
+Port of the I/O part of `enrich-propose.js`: `PROPOSAL_SCHEMA` (derived from `vocab.py`), `buildSystemPrompt` (366-397), and the batch orchestration (Batch 1 missing concepts 794-864; Batch 2 path gaps 866-921; Batch 3 bootstrap 923-999; `selectedConcepts` shortcut 621-714). Adaptation: LLM calls via `core.llm.runtime.run_structured_agent` (instead of `callClaude`), Pydantic `ProposalBatch` instead of a raw JSON schema, progress via an injected `on_progress: Callable[[float, str], Awaitable[None]]` callback (the handler wires it onto `set_progress`).
 
-- [ ] **Step 1: Écrire le test (échoue) — à LLM mocké**
+- [ ] **Step 1: Write the test (fails) — with mocked LLM**
 
-Un client mock renvoie un `ToolUseBlock` avec un batch minimal ; vérifier que `propose()` produit un batch agrégé et appelle `on_progress`.
+A mock client returns a `ToolUseBlock` with a minimal batch; verify that `propose()` produces an aggregated batch and calls `on_progress`.
 
 ```python
-"""propose() agrège les batchs LLM et émet la progression (LLM mocké)."""
+"""propose() aggregates the LLM batches and emits progress (mocked LLM)."""
 
 import pytest
 
 from augura_api.modules.semantic.enrich_propose import propose
-# Réutiliser le mock LLM des tests causal (tests/causal/) : un client dont
-# messages.create renvoie un ToolUseBlock 'propose_enrichment_batch'. Copier/adapter.
+# Reuse the LLM mock from the causal tests (tests/causal/): a client whose
+# messages.create returns a 'propose_enrichment_batch' ToolUseBlock. Copy/adapt.
 
 
 @pytest.mark.asyncio
@@ -1127,22 +1127,22 @@ async def test_propose_aggregates_and_reports_progress(stub_llm_empty_batch) -> 
     )
     assert "taxonomy_concepts" in result["proposals"]
     assert "coverage_summary" in result
-    assert progress  # au moins une étape émise
+    assert progress  # at least one step emitted
 ```
 
-- [ ] **Step 2: Lancer (échoue)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose.py -v` — Expected: FAIL (module absent).
+- [ ] **Step 2: Run (fails)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose.py -v` — Expected: FAIL (module absent).
 
-- [ ] **Step 3: Implémenter `enrich_propose.py`**
+- [ ] **Step 3: Implement `enrich_propose.py`**
 
-Interface publique :
+Public interface:
 
 ```python
-"""Pipeline de proposition d'enrichissement (B4) — orchestration LLM.
+"""Enrichment proposal pipeline (B4) — LLM orchestration.
 
-Port de la partie LLM de api/enrich-propose.js. Sans état serveur : prend le bundle
-sémantique + des questions PICOT (ou des concepts sélectionnés), exécute les batchs
-LLM via run_structured_agent, applique les pre-checks (enrichment.py) et renvoie le
-batch de propositions agrégé + le résumé de couverture + le precheck_log.
+Port of the LLM part of api/enrich-propose.js. Stateless on the server: takes the
+semantic bundle + PICOT questions (or selected concepts), runs the LLM batches via
+run_structured_agent, applies the pre-checks (enrichment.py) and returns the
+aggregated proposal batch + the coverage summary + the precheck_log.
 """
 
 from collections.abc import Awaitable, Callable
@@ -1175,7 +1175,7 @@ class ProposalBatch(BaseModel):
 PROPOSAL_TOOL: ToolParam = {
     "name": "propose_enrichment_batch",
     "description": "Propose taxonomy concepts and causal ontology relations",
-    "input_schema": {  # construit depuis vocab.* (enum polarity/domains/etc.)
+    "input_schema": {  # built from vocab.* (polarity/domains/etc. enums)
         ...
     },
 }
@@ -1193,13 +1193,13 @@ async def propose(
     selected_concepts: list[dict[str, Any]] | None,
     on_progress: Callable[[float, str], Awaitable[None]],
 ) -> dict[str, Any]:
-    """Renvoie {proposals, coverage_summary, precheck_log, summary}."""
+    """Returns {proposals, coverage_summary, precheck_log, summary}."""
     ...
 ```
 
-Remplir les corps : dériver `PROPOSAL_TOOL["input_schema"]` des enums de `vocab.py` (polarity, domains, qualifier types/effects, standard-code vocabs) ; pour chaque batch, appeler `run_structured_agent(client, model=model, system=..., tool=PROPOSAL_TOOL, messages=[...], output_model=ProposalBatch, max_tokens=8192)` ; après chaque appel, `reassign_ids` + `apply_prechecks` (enrichment.py) + `merge_into` l'agrégat ; émettre `on_progress(frac, message)` aux étapes setup/coverage/propose/precheck ; finir par `stamp_rows(all_proposals, "pending")`. Suivre l'ordre des batchs de la source.
+Fill in the bodies: derive `PROPOSAL_TOOL["input_schema"]` from the enums of `vocab.py` (polarity, domains, qualifier types/effects, standard-code vocabs); for each batch, call `run_structured_agent(client, model=model, system=..., tool=PROPOSAL_TOOL, messages=[...], output_model=ProposalBatch, max_tokens=8192)`; after each call, `reassign_ids` + `apply_prechecks` (enrichment.py) + `merge_into` the aggregate; emit `on_progress(frac, message)` at the setup/coverage/propose/precheck steps; finish with `stamp_rows(all_proposals, "pending")`. Follow the source's batch order.
 
-- [ ] **Step 4: Lancer (passe)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose.py -v` — Expected: PASS.
+- [ ] **Step 4: Run (passes)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose.py -v` — Expected: PASS.
 
 - [ ] **Step 5: Format/lint/types** — Run: `cd apps/api && uv run ruff format . && uv run ruff check src/augura_api/modules/semantic/enrich_propose.py && uv run pyright src/augura_api/modules/semantic/enrich_propose.py` — Expected: PASS.
 
@@ -1216,12 +1216,12 @@ git commit -m "feat(semantic): LLM propose pipeline (coverage→batches→preche
 - Modify: `apps/api/src/augura_api/jobs/handlers.py`
 - Test: `apps/api/tests/jobs/test_enrich_propose_handler.py`
 
-- [ ] **Step 1: Écrire le test (échoue) — LLM mocké, repo réel mocké**
+- [ ] **Step 1: Write the test (fails) — mocked LLM, mocked real repo**
 
-Vérifier que le handler lit le bundle, exécute `propose`, écrit un artifact storage et renvoie un `result_ref`. S'inspirer d'un test de handler existant (s'il y en a) ou monter un `JobContext` minimal avec session mockée.
+Verify that the handler reads the bundle, runs `propose`, writes a storage artifact and returns a `result_ref`. Take inspiration from an existing handler test (if there is one) or set up a minimal `JobContext` with a mocked session.
 
 ```python
-"""handle_enrich_propose : exécute le pipeline et persiste l'artifact de propositions."""
+"""handle_enrich_propose: runs the pipeline and persists the proposals artifact."""
 
 import json
 
@@ -1234,23 +1234,23 @@ async def test_handle_enrich_propose_writes_artifact(enrich_job_ctx_stub) -> Non
 
     ref = await handle_enrich_propose(enrich_job_ctx_stub)
     assert ref and ref.startswith("org/")
-    # L'artifact contient un batch de propositions sérialisable.
+    # The artifact contains a serializable proposal batch.
     from augura_api.core import storage
     data = json.loads(storage.read_bytes(enrich_job_ctx_stub.settings, ref))
     assert "proposals" in data and "coverage_summary" in data
 ```
 
-- [ ] **Step 2: Lancer (échoue)** — Run: `cd apps/api && uv run pytest tests/jobs/test_enrich_propose_handler.py -v` — Expected: FAIL (handler absent).
+- [ ] **Step 2: Run (fails)** — Run: `cd apps/api && uv run pytest tests/jobs/test_enrich_propose_handler.py -v` — Expected: FAIL (handler absent).
 
-- [ ] **Step 3: Implémenter le handler + enregistrer le kind**
+- [ ] **Step 3: Implement the handler + register the kind**
 
-Dans `handlers.py`, ajouter le handler (mirroir de `handle_document` : lit, calcule, écrit l'artifact, log_usage) et l'entrée registry.
+In `handlers.py`, add the handler (mirror of `handle_document`: reads, computes, writes the artifact, log_usage) and the registry entry.
 
 ```python
 async def handle_enrich_propose(ctx: JobContext) -> str | None:
-    """Pipeline de proposition d'enrichissement (B4) : lit le bundle, exécute les
-    batchs LLM, persiste le batch de propositions en artifact JSON. Progression via
-    set_progress (le log textuel détaillé est inclus dans l'artifact)."""
+    """Enrichment proposal pipeline (B4): reads the bundle, runs the LLM batches,
+    persists the proposal batch as a JSON artifact. Progress via set_progress (the
+    detailed text log is included in the artifact)."""
     import json
 
     from augura_api.core.llm.runtime import get_anthropic_client
@@ -1287,17 +1287,17 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
     return ref
 ```
 
-Et dans `build_handlers()` :
+And in `build_handlers()`:
 
 ```python
         "enrich_propose": handle_enrich_propose,
 ```
 
-> Vérifier que `ctx.settings.agent_model_dag` existe (utilisé par le causal) ; sinon utiliser le réglage de modèle d'agent approprié dans `core/config.py`.
+> Check that `ctx.settings.agent_model_dag` exists (used by the causal); otherwise use the appropriate agent-model setting in `core/config.py`.
 
-- [ ] **Step 4: Lancer (passe)** — Run: `cd apps/api && uv run pytest tests/jobs/test_enrich_propose_handler.py -v` — Expected: PASS.
+- [ ] **Step 4: Run (passes)** — Run: `cd apps/api && uv run pytest tests/jobs/test_enrich_propose_handler.py -v` — Expected: PASS.
 
-- [ ] **Step 5: Lint-imports (le handler croise les modules, c'est permis ici)** — Run: `cd apps/api && uv run lint-imports` — Expected: PASS (`jobs.handlers` est la couche d'orchestration autorisée à croiser les modules).
+- [ ] **Step 5: Lint-imports (the handler crosses modules, which is allowed here)** — Run: `cd apps/api && uv run lint-imports` — Expected: PASS (`jobs.handlers` is the orchestration layer allowed to cross modules).
 
 - [ ] **Step 6: Commit**
 
@@ -1306,16 +1306,16 @@ git add apps/api/src/augura_api/jobs/handlers.py apps/api/tests/jobs/test_enrich
 git commit -m "feat(jobs): enrich_propose handler (LLM pipeline → artifact)"
 ```
 
-## Task 12: Routes propose + récupération des propositions
+## Task 12: Propose routes + proposals retrieval
 
 **Files:**
 - Modify: `apps/api/src/augura_api/modules/semantic/router.py`
-- Modify: `apps/api/src/augura_api/modules/semantic/enrich_schemas.py` (ajout requête propose)
+- Modify: `apps/api/src/augura_api/modules/semantic/enrich_schemas.py` (add propose request)
 - Test: `apps/api/tests/semantic/test_enrich_propose_route.py`
 
-- [ ] **Step 1: Ajouter le schéma de requête propose**
+- [ ] **Step 1: Add the propose request schema**
 
-Dans `enrich_schemas.py` :
+In `enrich_schemas.py`:
 
 ```python
 class PicotQuestionIn(BaseModel):
@@ -1333,7 +1333,7 @@ class EnrichProposeAccepted(BaseModel):
     job_id: str
 ```
 
-- [ ] **Step 2: Écrire le test (échoue)** — propose renvoie 202 + job_id ; la récupération d'un job inexistant donne 404.
+- [ ] **Step 2: Write the test (fails)** — propose returns 202 + job_id; retrieving a nonexistent job gives 404.
 
 ```python
 import pytest
@@ -1349,13 +1349,13 @@ async def test_enrich_propose_enqueues_job(client_as_member) -> None:
     assert "job_id" in resp.json()
 ```
 
-> Propose n'est **pas** gated owner (proposer ≠ muter) : tout membre peut lancer une analyse ; seul l'apply écrit.
+> Propose is **not** gated owner (proposing ≠ mutating): any member can launch an analysis; only the apply writes.
 
-- [ ] **Step 3: Lancer (échoue : 404)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose_route.py -v` — Expected: FAIL.
+- [ ] **Step 3: Run (fails: 404)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose_route.py -v` — Expected: FAIL.
 
-- [ ] **Step 4: Ajouter les routes**
+- [ ] **Step 4: Add the routes**
 
-Dans `router.py` (mirroir documents/router.py pour l'enqueue + le download d'artifact) :
+In `router.py` (mirror documents/router.py for the enqueue + artifact download):
 
 ```python
 from fastapi import BackgroundTasks, status
@@ -1379,7 +1379,7 @@ async def enrich_propose(
     settings: SettingsDep,
     background_tasks: BackgroundTasks,
 ) -> enrich_schemas.EnrichProposeAccepted:
-    """Lance l'analyse de couverture + proposition LLM en job background (polling)."""
+    """Launches the coverage analysis + LLM proposal as a background job (polling)."""
     job = await jobs_iface.create_job(
         session, tenant.tenant_id, type="enrich_propose",
         payload={"questions": [q.model_dump() for q in req.questions],
@@ -1393,22 +1393,22 @@ async def enrich_propose(
 async def enrich_proposals(
     job_id: UUID, tenant: CurrentTenantDep, session: SessionDep, settings: SettingsDep
 ) -> Response:
-    """Sert l'artifact JSON de propositions d'un job réussi (scopé tenant)."""
+    """Serves the JSON proposals artifact of a succeeded job (tenant-scoped)."""
     job = await jobs_iface.get_job(session, tenant.tenant_id, job_id)
     if job is None or not job.result_ref:
-        raise NotFoundError("propositions non disponibles", job_id=str(job_id))
+        raise NotFoundError("proposals not available", job_id=str(job_id))
     try:
         data = storage.read_bytes(settings, job.result_ref)
     except FileNotFoundError as exc:
-        raise NotFoundError("artifact introuvable", job_id=str(job_id)) from exc
+        raise NotFoundError("artifact not found", job_id=str(job_id)) from exc
     return Response(content=data, media_type="application/json")
 ```
 
-Ajouter `from uuid import UUID` si absent.
+Add `from uuid import UUID` if absent.
 
-- [ ] **Step 5: Lancer (passe)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose_route.py -v` — Expected: PASS.
+- [ ] **Step 5: Run (passes)** — Run: `cd apps/api && uv run pytest tests/semantic/test_enrich_propose_route.py -v` — Expected: PASS.
 
-- [ ] **Step 6: Suite complète + contrats** — Run: `cd apps/api && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run lint-imports && uv run pytest -q -m "not integration"` — Expected: PASS.
+- [ ] **Step 6: Full suite + contracts** — Run: `cd apps/api && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run lint-imports && uv run pytest -q -m "not integration"` — Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
@@ -1417,16 +1417,16 @@ git add apps/api/src/augura_api/modules/semantic/router.py apps/api/src/augura_a
 git commit -m "feat(semantic): POST /enrich/propose (job) + GET /enrich/proposals"
 ```
 
-## Task 13: Régénérer le client API (Phase 2)
+## Task 13: Regenerate the API client (Phase 2)
 
-- [ ] **Step 1: Régénérer**
+- [ ] **Step 1: Regenerate**
 
 Run:
 ```bash
 cd apps/api && set -a && . ./.env && set +a && uv run python scripts/dump_openapi.py
 cd ../.. && npm --prefix packages/api-client run generate
 ```
-Expected: `openapi.json` contient `/semantic/enrich/propose` + `/semantic/enrich/proposals/{job_id}` + enum polarity corrigé.
+Expected: `openapi.json` contains `/semantic/enrich/propose` + `/semantic/enrich/proposals/{job_id}` + the fixed polarity enum.
 
 - [ ] **Step 2: Commit**
 
@@ -1439,36 +1439,36 @@ git commit -m "chore(api-client): regenerate for /semantic/enrich/propose"
 
 # PHASE 3 — Frontend
 
-Livrable : surfaces de revue/acceptation câblées sur le backend réel (aucun mock).
+Deliverable: review/acceptance surfaces wired to the real backend (no mock).
 
-## Task 14: Wrappers client `dataClient.js`
+## Task 14: Client wrappers `dataClient.js`
 
 **Files:**
 - Modify: `apps/web/src/workspace/dataClient.js`
 
-- [ ] **Step 1: Ajouter les wrappers**
+- [ ] **Step 1: Add the wrappers**
 
-Suivre le style des appels existants (`apiJson` de `@/api`). Le propose est asynchrone : create → poll `/jobs/{id}` → fetch `/semantic/enrich/proposals/{id}`.
+Follow the style of the existing calls (`apiJson` from `@/api`). The propose is asynchronous: create → poll `/jobs/{id}` → fetch `/semantic/enrich/proposals/{id}`.
 
 ```javascript
 import { apiJson } from '@/api'
 
-/** Lance le job de proposition d'enrichissement. → { job_id } */
+/** Launches the enrichment proposal job. → { job_id } */
 export async function enrichPropose(body) {
   return apiJson('/semantic/enrich/propose', { method: 'POST', body: JSON.stringify(body) })
 }
 
-/** Poll l'état d'un job. → { status, progress, result_ref, error } */
+/** Polls a job's state. → { status, progress, result_ref, error } */
 export async function pollJob(jobId) {
   return apiJson(`/jobs/${jobId}`)
 }
 
-/** Récupère l'artifact de propositions d'un job réussi. */
+/** Fetches the proposals artifact of a succeeded job. */
 export async function fetchEnrichProposals(jobId) {
   return apiJson(`/semantic/enrich/proposals/${jobId}`)
 }
 
-/** Applique un enrichissement (owner). Chemins : proposals+selection | direct_relations | … */
+/** Applies an enrichment (owner). Paths: proposals+selection | direct_relations | … */
 export async function enrichApply(body) {
   return apiJson('/semantic/enrich/apply', { method: 'POST', body: JSON.stringify(body) })
 }
@@ -1483,22 +1483,22 @@ git add apps/web/src/workspace/dataClient.js
 git commit -m "feat(web): enrich propose/apply api client wrappers"
 ```
 
-## Task 15: Panneau de revue `EnrichmentPanel.jsx`
+## Task 15: Review panel `EnrichmentPanel.jsx`
 
 **Files:**
 - Create: `apps/web/src/workspace/EnrichmentPanel.jsx`
 - Modify: `apps/web/src/workspace/SemanticLayerPage.jsx`
 
-Port de `lucis-dashboard/src/workspace/LearnFromQuestionPanel.jsx` (492 l.). Adaptation clé : l'original lit le SSE en flux (`res.body.getReader()`) ; ici, **polling** — lancer `enrichPropose`, boucler `pollJob` (toutes ~1.5 s) en affichant `progress` (barre), puis `fetchEnrichProposals` au statut `succeeded`. La revue (sélection concepts/relations + cascade) et l'apply (`enrichApply({ proposals, selectedConceptIds, selectedRelationIds })`) restent identiques. **Aucun mock/fallback.**
+Port of `lucis-dashboard/src/workspace/LearnFromQuestionPanel.jsx` (492 lines). Key adaptation: the original reads the SSE as a stream (`res.body.getReader()`); here, **polling** — launch `enrichPropose`, loop `pollJob` (every ~1.5 s) showing `progress` (bar), then `fetchEnrichProposals` on `succeeded` status. The review (concept/relation selection + cascade) and the apply (`enrichApply({ proposals, selectedConceptIds, selectedRelationIds })`) stay identical. **No mock/fallback.**
 
-- [ ] **Step 1: Créer le composant** — squelette d'interface :
+- [ ] **Step 1: Create the component** — interface skeleton:
 
 ```jsx
 import { useState } from 'react'
 import { enrichPropose, pollJob, fetchEnrichProposals, enrichApply } from '@/workspace/dataClient'
 import { resetSemanticStore, initSemanticStore } from '@/lib/semantic-store'
 
-// Port de LearnFromQuestionPanel : propose (job+polling) → revue → apply.
+// Port of LearnFromQuestionPanel: propose (job+polling) → review → apply.
 export function EnrichmentPanel({ questions }) {
   const [phase, setPhase] = useState('idle')      // idle | running | review | applying | done | error
   const [progress, setProgress] = useState(0)
@@ -1510,13 +1510,13 @@ export function EnrichmentPanel({ questions }) {
     setPhase('running'); setError('')
     try {
       const { job_id } = await enrichPropose({ questions })
-      // Polling jusqu'à succeeded/failed.
+      // Poll until succeeded/failed.
       for (;;) {
         await new Promise(r => setTimeout(r, 1500))
         const job = await pollJob(job_id)
         setProgress(job.progress ?? 0)
         if (job.status === 'succeeded') break
-        if (job.status === 'failed') throw new Error(job.error || 'job échoué')
+        if (job.status === 'failed') throw new Error(job.error || 'job failed')
       }
       setProposals(await fetchEnrichProposals(job_id))
       setPhase('review')
@@ -1526,30 +1526,30 @@ export function EnrichmentPanel({ questions }) {
   async function applySelected() {
     setPhase('applying')
     try {
-      // Corps en snake_case : EnrichApplyRequest attend selected_concept_ids /
-      // selected_relation_ids (cohérent avec le reste du front, ex. /causal/dag).
+      // snake_case body: EnrichApplyRequest expects selected_concept_ids /
+      // selected_relation_ids (consistent with the rest of the front, e.g. /causal/dag).
       const selected_concept_ids = (proposals.proposals.taxonomy_concepts || [])
         .map(c => c.local_concept_id).filter(id => selected.has(id))
       const selected_relation_ids = (proposals.proposals.ontology_relations || [])
         .map(r => r.relation_id).filter(id => selected.has(id))
       await enrichApply({ proposals: proposals.proposals, selected_concept_ids, selected_relation_ids })
-      resetSemanticStore(); await initSemanticStore()      // recharge la couche enrichie
+      resetSemanticStore(); await initSemanticStore()      // reload the enriched layer
       setPhase('done')
     } catch (e) { setError(String(e.message ?? e)); setPhase('error') }
   }
 
-  // … rendu : bouton lancer, barre de progression, tableau de revue (cases + cascade),
-  //   bouton appliquer, messages d'erreur. Reprendre la mise en page de la source.
+  // … render: launch button, progress bar, review table (checkboxes + cascade),
+  //   apply button, error messages. Reuse the source layout.
 }
 ```
 
-Compléter le rendu en reprenant la structure visuelle de `LearnFromQuestionPanel.jsx` (tableau concepts/relations avec cases à cocher, compteurs « N/M selected », bouton apply désactivé si rien de sélectionné).
+Complete the rendering by reusing the visual structure of `LearnFromQuestionPanel.jsx` (concepts/relations table with checkboxes, "N/M selected" counters, apply button disabled if nothing selected).
 
-- [ ] **Step 2: Monter dans `SemanticLayerPage.jsx`** — remplacer le commentaire « intentionally omitted » (lignes 12-13) et ajouter un onglet/section « Enrichissement » rendant `<EnrichmentPanel questions={…}/>`. Les questions PICOT peuvent venir d'une saisie simple (textarea → une question) pour la v1.
+- [ ] **Step 2: Mount in `SemanticLayerPage.jsx`** — replace the "intentionally omitted" comment (lines 12-13) and add an "Enrichment" tab/section rendering `<EnrichmentPanel questions={…}/>`. The PICOT questions can come from a simple input (textarea → one question) for v1.
 
 - [ ] **Step 3: Lint + build** — Run: `cd apps/web && npm run lint && npm run build` — Expected: PASS.
 
-- [ ] **Step 4: Vérification navigateur (preview)** — démarrer le dev server, ouvrir la page Semantic Layer, vérifier que le panneau s'affiche, lancer un propose (avec backend local + clé Anthropic), confirmer barre de progression puis tableau de revue. Capturer une preuve.
+- [ ] **Step 4: Browser check (preview)** — start the dev server, open the Semantic Layer page, verify the panel renders, launch a propose (with local backend + Anthropic key), confirm the progress bar then the review table. Capture proof.
 
 - [ ] **Step 5: Commit**
 
@@ -1558,16 +1558,16 @@ git add apps/web/src/workspace/EnrichmentPanel.jsx apps/web/src/workspace/Semant
 git commit -m "feat(web): semantic enrichment review panel (propose→review→apply)"
 ```
 
-## Task 16: Acceptation d'arête proposée sur le DAG
+## Task 16: Accepting a proposed edge on the DAG
 
 **Files:**
 - Modify: `apps/web/src/workspace/CausalModelingPage.jsx`
 
-L'original (`DagGenerationTab.jsx`) propose d'accepter une arête `proposed_*` → `enrich-apply` via `direct_relations`. Ici, brancher le bouton « accepter » sur les arêtes pointillées (déjà identifiées par `isProposed(e)` ligne 30).
+The original (`DagGenerationTab.jsx`) offers to accept a `proposed_*` edge → `enrich-apply` via `direct_relations`. Here, wire the "accept" button on the dashed edges (already identified by `isProposed(e)` line 30).
 
-- [ ] **Step 1: Câbler l'acceptation**
+- [ ] **Step 1: Wire the acceptance**
 
-Sur clic d'une arête `proposed_*`, appeler :
+On clicking a `proposed_*` edge, call:
 
 ```javascript
 import { enrichApply } from '@/workspace/dataClient'
@@ -1583,15 +1583,15 @@ async function acceptProposedEdge(edge) {
     }],
   })
   resetSemanticStore(); await initSemanticStore()
-  // Re-générer le DAG ou re-styler l'arête comme persistée (plus de pointillé).
+  // Re-generate the DAG or re-style the edge as persisted (no longer dashed).
 }
 ```
 
-Ajouter l'affordance UI (bouton/menu au survol d'une arête proposée), réservée aux owners (masquer/désactiver sinon — l'API renverra 403 pour les autres ; le front ne doit pas mocker).
+Add the UI affordance (button/menu on hover of a proposed edge), reserved for owners (hide/disable otherwise — the API will return 403 for the others; the frontend must not mock).
 
 - [ ] **Step 2: Lint + build** — Run: `cd apps/web && npm run lint && npm run build` — Expected: PASS.
 
-- [ ] **Step 3: Vérification navigateur** — générer un DAG produisant des arêtes proposées, accepter l'une d'elles (compte owner), confirmer la persistance (l'arête n'est plus pointillée après re-fetch). Capturer une preuve.
+- [ ] **Step 3: Browser check** — generate a DAG producing proposed edges, accept one of them (owner account), confirm persistence (the edge is no longer dashed after a re-fetch). Capture proof.
 
 - [ ] **Step 4: Commit**
 
@@ -1600,33 +1600,33 @@ git add apps/web/src/workspace/CausalModelingPage.jsx
 git commit -m "feat(web): accept DAG-proposed edge → persist via enrich/apply"
 ```
 
-## Task 17: Vérification finale
+## Task 17: Final verification
 
-- [ ] **Step 1: Backend complet**
+- [ ] **Step 1: Full backend**
 
 Run: `cd apps/api && uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run lint-imports && uv run pytest -q -m "not integration"`
-Expected: tout PASS. (Intégration : `uv run pytest -q -m integration` avec `AUGURA_DATABASE_URL` chargé.)
+Expected: all PASS. (Integration: `uv run pytest -q -m integration` with `AUGURA_DATABASE_URL` loaded.)
 
-- [ ] **Step 2: Front complet**
+- [ ] **Step 2: Full frontend**
 
 Run: `cd apps/web && npm run lint && npm run build`
 Expected: PASS.
 
-- [ ] **Step 3: Drift contrat**
+- [ ] **Step 3: Contract drift**
 
-Run: `git status --porcelain packages/api-client` — Expected: rien (déjà committé en Tasks 6 & 13).
+Run: `git status --porcelain packages/api-client` — Expected: nothing (already committed in Tasks 6 & 13).
 
-- [ ] **Step 4: Récapitulatif des actions manuelles restantes (hors plan)**
+- [ ] **Step 4: Recap of the remaining manual actions (out of plan)**
 
-À faire séparément, sur demande explicite : (1) appliquer la fonction SQL à la DB live via MCP Supabase ; (2) redéployer le backend sur Modal ; (3) déployer le front (Vercel). Vérifier l'enrichissement de bout en bout en prod **avec un compte owner**.
+To be done separately, on explicit request: (1) apply the SQL function to the live DB via Supabase MCP; (2) redeploy the backend on Modal; (3) deploy the frontend (Vercel). Verify end-to-end enrichment in prod **with an owner account**.
 
 ---
 
-## Notes de risque (rappel spec §8)
+## Risk notes (recap of spec §8)
 
-- **Colonnes SQL** : `taxonomy_standard_codes` n'a pas de `review_status` ; `ontology_relation_qualifiers` a `qualifier_concept_id` + `notes NOT NULL`. La fonction et les payloads doivent matcher exactement (sinon erreur d'insert).
-- **`jsonb_populate_recordset`** ignore les clés en trop et met `NULL` pour les colonnes absentes : tout payload doit fournir **toutes** les colonnes `NOT NULL` de la table ciblée.
-- **Grant conditionnel** : nécessaire pour que la CI `db-bundle` (Postgres sans rôle `augura_api`) passe.
-- **Enum polarity** : avant bascule prod, vérifier qu'aucune donnée DAG live ne porte `mixed`/`unknown` (sinon migration de données à prévoir).
-- **`set_progress` est un flottant** (0..1), pas un message : le log textuel détaillé vit dans l'artifact de propositions, pas dans le job.
+- **SQL columns**: `taxonomy_standard_codes` has no `review_status`; `ontology_relation_qualifiers` has `qualifier_concept_id` + `notes NOT NULL`. The function and the payloads must match exactly (otherwise an insert error).
+- **`jsonb_populate_recordset`** ignores extra keys and sets `NULL` for absent columns: every payload must provide **all** the `NOT NULL` columns of the targeted table.
+- **Conditional grant**: needed for the CI `db-bundle` (Postgres without the `augura_api` role) to pass.
+- **Polarity enum**: before the prod switch, verify that no live DAG data carries `mixed`/`unknown` (otherwise a data migration is needed).
+- **`set_progress` is a float** (0..1), not a message: the detailed text log lives in the proposals artifact, not in the job.
 ```

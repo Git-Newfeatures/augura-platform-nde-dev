@@ -1,4 +1,4 @@
-"""Test du générateur de seed sémantique (CSV → SQL)."""
+"""Test for the semantic seed generator (CSV → SQL)."""
 
 import csv
 from pathlib import Path

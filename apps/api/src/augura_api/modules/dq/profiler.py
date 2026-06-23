@@ -1,4 +1,4 @@
-"""Profiler DQ complet — porté de l'MVP profiler.js (transitoire, non persisté)."""
+"""Full DQ profiler — ported from MVP profiler.js (transient, not persisted)."""
 
 from __future__ import annotations
 

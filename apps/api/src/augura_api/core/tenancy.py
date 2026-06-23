@@ -1,8 +1,8 @@
-"""Résolution du tenant courant à partir de l'utilisateur authentifié (spec §7).
+"""Resolution of the current tenant from the authenticated user (spec §7).
 
-`resolve_tenant` mappe un `Principal` (issu de `core.auth`) vers le `CurrentTenant`
-via la table `memberships`. La recherche est injectée (`MembershipLookup`) pour
-rester testable sans base ; le câblage en dépendance FastAPI arrive avec les routes.
+`resolve_tenant` maps a `Principal` (from `core.auth`) to the `CurrentTenant`
+via the `memberships` table. The lookup is injected (`MembershipLookup`) to
+stay testable without a database; the FastAPI dependency wiring comes with the routes.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class CurrentTenant:
     role: str
 
 
-# (user, org demandé optionnel) → appartenance, ou None si l'utilisateur n'a pas accès.
+# (user, optional requested org) → membership, or None if the user has no access.
 MembershipLookup = Callable[[UserId, TenantId | None], Awaitable[Membership | None]]
 
 
@@ -41,7 +41,7 @@ async def resolve_tenant(
     membership = await lookup(principal.user_id, requested_org)
     if membership is None:
         raise ForbiddenError(
-            "aucune appartenance pour cet utilisateur",
+            "no membership for this user",
             user_id=str(principal.user_id),
             requested_org=str(requested_org) if requested_org else None,
         )

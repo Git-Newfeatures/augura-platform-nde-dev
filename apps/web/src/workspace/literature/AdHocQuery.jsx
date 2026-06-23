@@ -43,7 +43,7 @@ const initialState = {
   groups: {},      // source -> { results, note, error, loading }
   marks: {},       // resultId -> 'kept' | 'dismissed'
   error: null,
-  saved: null,     // { label, href } après sauvegarde
+  saved: null,     // { label, href } after save
   frozenAt: null,
   modelVersion: null,
   promptVersion: null,
@@ -51,9 +51,9 @@ const initialState = {
 
 const blankGroups = (sources) => Object.fromEntries(sources.map((s) => [s, { results: [], loading: true }]))
 
-// Persistance de session (Recent queries #2) : la dernière recherche est conservée
-// côté client pour qu'un aller-retour de navigation (ou un reload) la restaure. Ce
-// n'est PAS un mock — c'est l'état réel de la recherche de l'utilisateur, mis en cache.
+// Session persistence (Recent queries #2): the last search is kept client-side so
+// that a navigation round-trip (or a reload) restores it. This is NOT a mock — it is
+// the user's real search state, cached.
 const PERSIST_KEY = 'augura.literature.adhoc'
 
 function loadPersisted() {
@@ -61,8 +61,8 @@ function loadPersisted() {
     const raw = sessionStorage.getItem(PERSIST_KEY)
     if (!raw) return initialState
     const s = JSON.parse(raw)
-    // Pas de flux actif au retour : une recherche « querying » devient complete (si
-    // des résultats sont déjà arrivés) ou idle, et le bandeau transitoire est purgé.
+    // No active stream on return: a "querying" search becomes complete (if results
+    // already arrived) or idle, and the transient banner is purged.
     const hasResults = Object.values(s.groups || {}).some((g) => g.results && g.results.length)
     if (s.status === 'querying') s.status = hasResults ? 'complete' : 'idle'
     return { ...initialState, ...s, saved: null }
@@ -79,7 +79,7 @@ function persist(state) {
     }
     sessionStorage.setItem(PERSIST_KEY, JSON.stringify(state))
   } catch {
-    /* quota dépassé / indisponible : best-effort, on ignore */
+    /* quota exceeded / unavailable: best-effort, ignore */
   }
 }
 
@@ -122,17 +122,17 @@ export function AdHocQuery() {
   const [history, setHistory] = useState([])
   const [saved, setSavedList] = useState([])
   const [picking, setPicking] = useState(false)
-  const [notice, setNotice] = useState(null)   // avertissement transitoire (rien de sélectionné)
+  const [notice, setNotice] = useState(null)   // transient warning (nothing selected)
   const abortRef = useRef(null)
 
-  // Restaure la dernière recherche au montage et la persiste à chaque évolution (#2).
+  // Restores the last search on mount and persists it on every change (#2).
   useEffect(() => { persist(state) }, [state])
 
   const refreshHistory = useCallback(async () => {
     try {
       const rows = await listSessions()
-      // Dédoublonnage par texte de requête (#4) : on regroupe les sessions identiques,
-      // en gardant la plus récente comme représentante + tous leurs ids (pour le delete).
+      // Dedup by query text (#4): identical sessions are grouped, keeping the most
+      // recent as representative + all their ids (for the delete).
       const byKey = new Map()
       const order = []
       for (const s of rows) {
@@ -144,16 +144,16 @@ export function AdHocQuery() {
         byKey.get(key).ids.push(s.id)
       }
       setHistory(order.map((k) => byKey.get(k)))
-    } catch { /* non-bloquant */ }
+    } catch { /* non-blocking */ }
   }, [])
   const refreshSaved = useCallback(async () => {
     try {
       const rows = await listSnapshots()
       setSavedList(rows.map((s) => ({ snapshotId: s.id, question: s.query, studyId: s.study_id, resultCount: s.result_count })))
-    } catch { /* non-bloquant */ }
+    } catch { /* non-blocking */ }
   }, [])
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- appel au mount uniquement (useCallback stable)
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-only call (useCallback stable)
   useEffect(() => { refreshHistory(); refreshSaved() }, [refreshHistory, refreshSaved])
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -190,18 +190,18 @@ export function AdHocQuery() {
     const id = resultId(result)
     const next = state.marks[id] === value ? null : value
     dispatch({ type: 'mark', id, value: next })
-    if (next === 'kept') setNotice(null)   // garder un résultat lève l'avertissement « rien de sélectionné »
+    if (next === 'kept') setNotice(null)   // keeping a result clears the "nothing selected" warning
     if (next && state.sessionId) {
       logEvent(state.sessionId, value === 'kept' ? 'result_kept' : 'result_dismissed', { id, source: result.source })
     }
   }
 
-  // On ne gèle QUE les résultats explicitement gardés (« Keep ») — pas les rejetés
-  // ni les non marqués. Chaque item porte annotation: 'kept'.
+  // We freeze ONLY the results explicitly kept ("Keep") — not the dismissed ones
+  // nor the unmarked ones. Each item carries annotation: 'kept'.
   const keptItems = () => Object.values(state.groups).flatMap((g) =>
     (g.results || []).filter((r) => state.marks[resultId(r)] === 'kept').map((r) => ({ ...r, annotation: 'kept' })))
 
-  // « Save to study » : exige au moins un Keep avant d'ouvrir le sélecteur d'étude.
+  // "Save to study": requires at least one Keep before opening the study picker.
   const requestSaveToStudy = () => {
     if (!keptItems().length) { setNotice('Keep at least one result before saving to a study.'); return }
     setNotice(null); setPicking(true)
@@ -230,8 +230,8 @@ export function AdHocQuery() {
   }
 
   const reopenRecent = (id, question) => { abortRef.current?.abort(); dispatch({ type: 'set_question', value: question || '' }) }
-  // Suppression unitaire (#4) : retire toutes les sessions partageant ce texte (la ligne
-  // affichée est dédoublonnée), puis rafraîchit. « Clear all » vide tout l'historique.
+  // Single removal (#4): removes all sessions sharing this text (the displayed row
+  // is deduplicated), then refreshes. "Clear all" wipes the entire history.
   const removeRecent = async (entry) => {
     try { await Promise.all((entry.ids || [entry.id]).map((id) => deleteSession(id))) } catch { /* ignore */ }
     refreshHistory()

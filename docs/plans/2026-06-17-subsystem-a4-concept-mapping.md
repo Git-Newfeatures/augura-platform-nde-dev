@@ -16,7 +16,7 @@
 
 - [ ] **Step 1: failing tests** `tests/test_mapping_normalize.py`:
 ```python
-"""Tests du normaliseur lexical + similarité."""
+"""Tests for the lexical normalizer + similarity."""
 
 from augura_api.modules.mapping.normalize import normalize, string_similarity
 
@@ -38,11 +38,11 @@ def test_similarity_bounds() -> None:
 
 - [ ] **Step 2: Run → FAIL.** `cd apps/api && uv run pytest tests/test_mapping_normalize.py -q`
 
-- [ ] **Step 3:** `mapping/__init__.py` = `"""Module mapping — appariement lexical colonnes→concepts (A4)."""`
+- [ ] **Step 3:** `mapping/__init__.py` = `"""mapping module — lexical column→concept matching (A4)."""`
 
 - [ ] **Step 4:** `mapping/normalize.py`:
 ```python
-"""Normalisation lexicale + similarité de chaînes (porté de l'MVP lexical-normalizer.js)."""
+"""Lexical normalization + string similarity (ported from the MVP lexical-normalizer.js)."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ import math
 import re
 from collections import Counter
 
-# Sous-ensemble clinique de l'ABBREV_MAP du MVP (les synonymes portent le reste).
+# Clinical subset of the MVP's ABBREV_MAP (the synonyms carry the rest).
 ABBREV_MAP: dict[str, str] = {
     "hba1c": "hemoglobin a1c", "a1c": "hemoglobin a1c", "hgba1c": "hemoglobin a1c",
     "sbp": "systolic blood pressure", "dbp": "diastolic blood pressure",
@@ -144,7 +144,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: failing tests** `tests/test_mapping_matcher.py`:
 ```python
-"""Tests de l'index + matcher + confidence."""
+"""Tests for the index + matcher + confidence."""
 
 from dataclasses import dataclass
 
@@ -194,7 +194,7 @@ def test_no_match_is_unmapped() -> None:
 
 - [ ] **Step 3:** `mapping/index.py`:
 ```python
-"""Index de concepts pour l'appariement lexical (depuis la taxonomie A1)."""
+"""Concept index for lexical matching (from the A1 taxonomy)."""
 
 from __future__ import annotations
 
@@ -254,7 +254,7 @@ def build_index(concepts: list[_ConceptRow], synonyms: list[_SynonymRow]) -> Con
 
 - [ ] **Step 4:** `mapping/matcher.py`:
 ```python
-"""Appariement lexical colonne→concept (exact synonyme → fuzzy label/synonyme)."""
+"""Lexical column→concept matching (exact synonym → fuzzy label/synonym)."""
 
 from __future__ import annotations
 
@@ -310,7 +310,7 @@ def match_column(norm_name: str, index: ConceptIndex, top_n: int = 5) -> list[Ca
 
 - [ ] **Step 5:** `mapping/confidence.py`:
 ```python
-"""Confiance d'appariement (réduite : semantic + method + ambiguity)."""
+"""Match confidence (reduced: semantic + method + ambiguity)."""
 
 from __future__ import annotations
 
@@ -362,7 +362,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1:** `mapping/schemas.py`:
 ```python
-"""Contrat public du module mapping."""
+"""Public contract of the mapping module."""
 
 from uuid import UUID
 
@@ -387,7 +387,7 @@ class MapResult(BaseModel):
 
 - [ ] **Step 2:** `mapping/repo.py` (reads + updates `dataset_columns`; imports the datasets model — allowed):
 ```python
-"""Accès base du module mapping — met à jour les propositions sur dataset_columns."""
+"""Database access for the mapping module — updates the proposals on dataset_columns."""
 
 from uuid import UUID
 
@@ -422,7 +422,7 @@ class MappingRepo:
 
 - [ ] **Step 3:** `mapping/service.py`:
 ```python
-"""Logique métier du module mapping : colonnes d'un dataset → concepts (lexical)."""
+"""Business logic for the mapping module: dataset columns → concepts (lexical)."""
 
 from uuid import UUID
 
@@ -447,7 +447,7 @@ class MappingService:
     async def map_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.MapResult:
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None:
-            raise NotFoundError("dataset introuvable", dataset_id=str(dataset_id))
+            raise NotFoundError("dataset not found", dataset_id=str(dataset_id))
         columns = await self.datasets.list_columns(dataset_id)
         concepts = await self.semantic.list_concepts()
         synonyms = await self.semantic.list_synonyms()
@@ -503,7 +503,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - [ ] **Step 1:** add `"/datasets/{dataset_id}/map"` to BOTH tuples in `test_app_routes.py`. Run → FAIL.
 - [ ] **Step 2:** `mapping/router.py`:
 ```python
-"""Adaptateur HTTP du module mapping."""
+"""HTTP adapter for the mapping module."""
 
 from uuid import UUID
 

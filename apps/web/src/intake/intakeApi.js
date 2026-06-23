@@ -1,4 +1,4 @@
-// Helpers pour le pipeline d'intake (upload → map → DQ), câblés sur le backend FastAPI.
+// Helpers for the intake pipeline (upload → map → DQ), wired to the FastAPI backend.
 import { apiFetch, apiJson } from '../api'
 
 export async function uploadDataset(file, { name, studyId } = {}) {
@@ -11,9 +11,9 @@ export async function uploadDataset(file, { name, studyId } = {}) {
   return res.json() // { dataset, columns }
 }
 
-// Upload de plusieurs fichiers — un dataset par fichier. Séquentiel (évite N POST
-// multipart concurrents vers Modal) et déterministe pour la progression. Une erreur
-// sur un fichier n'arrête pas les autres. Renvoie { ok: [résultats], failed: [{ name, message }] }.
+// Upload multiple files — one dataset per file. Sequential (avoids N concurrent
+// multipart POSTs to Modal) and deterministic for progress. An error on one file
+// does not stop the others. Returns { ok: [results], failed: [{ name, message }] }.
 export async function uploadDatasets(files, { studyId, onProgress } = {}) {
   const list = Array.from(files || [])
   const ok = []

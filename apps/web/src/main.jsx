@@ -5,8 +5,8 @@ import '@fontsource-variable/geist-mono'
 import './index.css'
 import App from './App.jsx'
 
-// apps/web parle au vrai backend FastAPI (VITE_API_URL) avec le JWT Supabase
-// (voir src/api.js). Aucune couche mock : données réelles uniquement.
+// apps/web talks to the real FastAPI backend (VITE_API_URL) with the Supabase JWT
+// (see src/api.js). No mock layer: real data only.
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

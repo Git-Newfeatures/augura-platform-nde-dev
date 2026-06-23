@@ -1,20 +1,20 @@
 # @augura/api-client
 
-Client TypeScript **généré** depuis l'OpenAPI du backend FastAPI (spec §9).
-**Ne jamais éditer `src/schema.d.ts` ni `openapi.json` à la main.**
+TypeScript client **generated** from the FastAPI backend's OpenAPI (spec §9).
+**Never edit `src/schema.d.ts` or `openapi.json` by hand.**
 
-## Régénérer
+## Regenerate
 
 ```bash
-# 1. Dump du contrat OpenAPI depuis le backend
+# 1. Dump the OpenAPI contract from the backend
 cd ../../apps/api && AUGURA_ENV=dev uv run python scripts/dump_openapi.py \
   > ../../packages/api-client/openapi.json
-# 2. Types TS
+# 2. TS types
 cd ../../packages/api-client && npm run generate
 ```
 
-La CI (`client-drift`) régénère les deux et casse si le client commité a dérivé
-du contrat — le front ne peut donc jamais appeler une API qui n'existe pas.
+The CI (`client-drift`) regenerates both and breaks if the committed client has drifted
+from the contract — so the frontend can never call an API that does not exist.
 
 ## Usage
 

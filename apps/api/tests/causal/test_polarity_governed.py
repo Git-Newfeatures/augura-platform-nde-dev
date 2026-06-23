@@ -1,4 +1,4 @@
-"""Le tool schema DAG partage l'enum polarity gouverné (plus de mixed/unknown)."""
+"""The DAG tool schema shares the governed polarity enum (no more mixed/unknown)."""
 
 from typing import Any, cast
 

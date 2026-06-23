@@ -1,4 +1,4 @@
-"""Constantes DQ — profils de poids, dimensions, seuils, déductions (MVP dq-config.js)."""
+"""DQ constants — weight profiles, dimensions, thresholds, deductions (MVP dq-config.js)."""
 
 WEIGHT_PROFILES: dict[str, dict[str, float]] = {
     "exploratory": {

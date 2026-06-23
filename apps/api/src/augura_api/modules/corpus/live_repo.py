@@ -1,9 +1,9 @@
-"""Accès base de la recherche live : snapshots gelés, sessions, events.
+"""Database access for live search: frozen snapshots, sessions, events.
 
-Comme `CorpusRepo`, les écritures sont scopées tenant (org_id = tenant) et les
-lectures filtrent org_id == tenant — tenant-isolation défensive en plus de la RLS.
-La visibilité par-étude (study_members) n'est PAS implémentée ici : déléguée à la
-RLS (Tier 3), pas au code applicatif.
+Like `CorpusRepo`, writes are tenant-scoped (org_id = tenant) and reads
+filter org_id == tenant — defensive tenant isolation on top of RLS.
+Per-study visibility (study_members) is NOT implemented here: delegated to
+RLS (Tier 3), not to application code.
 """
 
 from __future__ import annotations
@@ -103,7 +103,7 @@ class LiveRepo:
         return list(res.scalars().all())
 
     async def delete_session(self, tenant_id: TenantId, session_id: UUID) -> None:
-        """Supprime une session (scopée tenant). Idempotent : aucun effet si absente."""
+        """Deletes a session (tenant-scoped). Idempotent: no effect if absent."""
         await self.session.execute(
             delete(SearchSession).where(
                 SearchSession.id == session_id, SearchSession.org_id == tenant_id
@@ -112,7 +112,7 @@ class LiveRepo:
         await self.session.flush()
 
     async def delete_all_sessions(self, tenant_id: TenantId) -> None:
-        """Vide l'historique de recherche du tenant."""
+        """Clears the tenant's search history."""
         await self.session.execute(delete(SearchSession).where(SearchSession.org_id == tenant_id))
         await self.session.flush()
 

@@ -1,7 +1,7 @@
-"""Outil forcé + prompts du filtre DAG (port de dag-llm-schema.js).
+"""Forced tool + prompts for the DAG filter (port of dag-llm-schema.js).
 
-Identique en intention au tool Anthropic de Nico : sélectionner / écarter / assigner
-les rôles, et proposer concepts/relations manquants pour la trajectoire causale.
+Identical in intent to Nico's Anthropic tool: select / discard / assign
+roles, and propose missing concepts/relations for the causal pathway.
 """
 
 from anthropic.types import ToolParam

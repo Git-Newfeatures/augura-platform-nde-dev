@@ -33,16 +33,16 @@ build-backend = "uv_build"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
-    "integration: nécessite un Postgres réel (AUGURA_DATABASE_URL) — tourne en CI",
+    "integration: requires a real Postgres (AUGURA_DATABASE_URL) — runs in CI",
 ]
 
 [tool.pyright]
 include = ["src", "tests"]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
-# Les handlers FastAPI (@app.get, @app.exception_handler) et les fixtures pytest sont
-# enregistrés par décorateur : pyright les voit « non accédés ». Faux positif structurel,
-# pervasif dans tout codebase FastAPI — on désactive cette règle, le reste reste strict.
+# FastAPI handlers (@app.get, @app.exception_handler) and pytest fixtures are
+# registered by decorator: pyright sees them as "not accessed". Structural false positive,
+# pervasive across any FastAPI codebase — we disable this rule, the rest stays strict.
 reportUnusedFunction = false
 
 [tool.ruff]
@@ -56,16 +56,16 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TID252"]
 root_package = "augura_api"
 
 [[tool.importlinter.contracts]]
-name = "core est indépendant des modules et des jobs"
+name = "core is independent of modules and jobs"
 type = "forbidden"
 source_modules = ["augura_api.core"]
 forbidden_modules = ["augura_api.modules", "augura_api.jobs"]
 
-# Les modules de données restent mutuellement indépendants. `agents` est la
-# couche d'orchestration : il peut consommer l'interface publique de `corpus`
-# (retrieval E1, spec §8), donc il n'est pas dans cet ensemble d'indépendance.
+# The data modules stay mutually independent. `agents` is the
+# orchestration layer: it may consume the public interface of `corpus`
+# (retrieval E1, spec §8), so it is not in this independence set.
 [[tool.importlinter.contracts]]
-name = "les modules de données ne s'importent pas entre eux"
+name = "data modules do not import one another"
 type = "independence"
 modules = [
     "augura_api.modules.studies",

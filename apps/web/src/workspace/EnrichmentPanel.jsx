@@ -1,12 +1,12 @@
 /**
- * EnrichmentPanel — panneau d'enrichissement sémantique B4.
+ * EnrichmentPanel — B4 semantic enrichment panel.
  *
- * Flux : saisie d'une question clinique → job enrichPropose → polling avec
- * barre de progression → revue des propositions (concepts + relations) avec
- * cases à cocher → enrichApply → rechargement du store sémantique.
+ * Flow: enter a clinical question → enrichPropose job → polling with a
+ * progress bar → review the proposals (concepts + relations) with
+ * checkboxes → enrichApply → reload the semantic store.
  *
- * Adapté de LearnFromQuestionPanel (lucis-dashboard) pour l'architecture
- * job + polling (au lieu du SSE direct).
+ * Adapted from LearnFromQuestionPanel (lucis-dashboard) for the
+ * job + polling architecture (instead of direct SSE).
  */
 import { useState, useCallback } from 'react'
 import { Sparkles } from 'lucide-react'
@@ -15,7 +15,7 @@ import { enrichPropose, pollJob, fetchEnrichProposals, enrichApply } from '@/wor
 import { resetSemanticStore, initSemanticStore } from '@/lib/semantic-store'
 import { parsePICOT } from '@/semantic/picot-parser'
 
-// ── Couleurs domaine (reprises de LearnFromQuestionPanel) ─────────────────────
+// ── Domain colors (taken from LearnFromQuestionPanel) ─────────────────────────
 
 function domainColor(domain) {
   const colors = {
@@ -32,7 +32,7 @@ function domainColor(domain) {
   return colors[domain] || 'bg-muted text-muted-foreground border-border'
 }
 
-// ── Barre de progression ──────────────────────────────────────────────────────
+// ── Progress bar ──────────────────────────────────────────────────────────────
 
 function ProgressBar({ value }) {
   // value : 0–100
@@ -47,7 +47,7 @@ function ProgressBar({ value }) {
   )
 }
 
-// ── Item concept proposé ──────────────────────────────────────────────────────
+// ── Proposed concept item ─────────────────────────────────────────────────────
 
 function ConceptItem({ concept, checked, onToggle }) {
   return (
@@ -91,7 +91,7 @@ function ConceptItem({ concept, checked, onToggle }) {
   )
 }
 
-// ── Item relation proposée ────────────────────────────────────────────────────
+// ── Proposed relation item ────────────────────────────────────────────────────
 
 function RelationItem({ relation, checked, onToggle, conceptLabels }) {
   const subjectLabel = conceptLabels[relation.subject_concept_id] || relation.subject_concept_id
@@ -145,7 +145,7 @@ function RelationItem({ relation, checked, onToggle, conceptLabels }) {
   )
 }
 
-// ── Composant principal ───────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function EnrichmentPanel() {
   const [phase,    setPhase]    = useState('idle')   // idle | running | review | applying | done | error
@@ -156,7 +156,7 @@ export function EnrichmentPanel() {
   const [question, setQuestion] = useState('')
   const [result,   setResult]   = useState(null)
 
-  // ── Toggle sélection individuelle ──────────────────────────────────────────
+  // ── Toggle individual selection ─────────────────────────────────────────────
   const toggle = useCallback((id) => {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -166,7 +166,7 @@ export function EnrichmentPanel() {
     })
   }, [])
 
-  // ── Tout sélectionner / désélectionner ────────────────────────────────────
+  // ── Select all / deselect all ───────────────────────────────────────────────
   const toggleAll = useCallback(() => {
     if (!artifact) return
     const concepts  = artifact.proposals?.taxonomy_concepts  || []
@@ -176,13 +176,13 @@ export function EnrichmentPanel() {
       ...relations.map((r) => r.relation_id),
     ]
     setSelected((prev) => {
-      // Si tout est sélectionné → tout désélectionner, sinon tout sélectionner
+      // If everything is selected → deselect all, otherwise select all
       const allSelected = allIds.every((id) => prev.has(id))
       return new Set(allSelected ? [] : allIds)
     })
   }, [artifact])
 
-  // ── Lancement de l'analyse ────────────────────────────────────────────────
+  // ── Run the analysis ──────────────────────────────────────────────────────
   const runPropose = useCallback(async () => {
     if (!question.trim()) return
     setPhase('running')
@@ -193,7 +193,7 @@ export function EnrichmentPanel() {
     setResult(null)
 
     try {
-      // Utilise parsePICOT pour extraire les termes PICOT de la question libre
+      // Use parsePICOT to extract the PICOT terms from the free-text question
       const parsed = parsePICOT(question.trim())
       const body = {
         questions: [
@@ -212,8 +212,8 @@ export function EnrichmentPanel() {
 
       const { job_id } = await enrichPropose(body)
 
-      // Polling jusqu'à succeeded / failed. job.progress est une fraction 0..1 côté
-      // backend → on la convertit en pourcentage pour la barre (0..100).
+      // Poll until succeeded / failed. job.progress is a 0..1 fraction on the
+      // backend → we convert it to a percentage for the bar (0..100).
       let attempts = 0
       for (;;) {
         await new Promise((r) => setTimeout(r, 1500))
@@ -227,7 +227,7 @@ export function EnrichmentPanel() {
       const fetched = await fetchEnrichProposals(job_id)
       setArtifact(fetched)
 
-      // Pré-sélectionner tous les éléments proposés
+      // Pre-select all proposed items
       const p = fetched?.proposals || {}
       const allIds = new Set([
         ...(p.taxonomy_concepts  || []).map((c) => c.local_concept_id),
@@ -241,7 +241,7 @@ export function EnrichmentPanel() {
     }
   }, [question])
 
-  // ── Application des propositions sélectionnées ────────────────────────────
+  // ── Apply the selected proposals ──────────────────────────────────────────
   const applySelected = useCallback(async () => {
     if (!artifact) return
     setPhase('applying')
@@ -267,12 +267,12 @@ export function EnrichmentPanel() {
     }
   }, [artifact, selected])
 
-  // ── Données dérivées pour la phase review ─────────────────────────────────
+  // ── Derived data for the review phase ─────────────────────────────────────
   const proposals  = artifact?.proposals || {}
   const concepts   = proposals.taxonomy_concepts  || []
   const relations  = proposals.ontology_relations || []
 
-  // Map concept_id → concept_name pour les libellés des relations
+  // Map concept_id → concept_name for the relation labels
   const conceptLabels = {}
   for (const c of concepts) {
     conceptLabels[c.local_concept_id] = c.concept_name
@@ -289,7 +289,7 @@ export function EnrichmentPanel() {
   return (
     <div className="flex flex-col gap-5">
 
-      {/* ── Saisie de la question (toujours visible hors done) ── */}
+      {/* ── Question input (always visible except in done) ── */}
       {phase !== 'done' && (
         <div className="flex flex-col gap-3">
           <div>
@@ -316,7 +316,7 @@ export function EnrichmentPanel() {
         </div>
       )}
 
-      {/* ── Progression ── */}
+      {/* ── Progress ── */}
       {phase === 'running' && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-[11.5px]">
@@ -327,10 +327,10 @@ export function EnrichmentPanel() {
         </div>
       )}
 
-      {/* ── Revue des propositions ── */}
+      {/* ── Review the proposals ── */}
       {phase === 'review' && (
         <div className="flex flex-col gap-4">
-          {/* En-tête revue */}
+          {/* Review header */}
           <div className="flex items-center justify-between">
             <p className="text-[11.5px] text-muted-foreground">
               All proposals are pre-selected. Uncheck any you want to skip.
@@ -345,14 +345,14 @@ export function EnrichmentPanel() {
             )}
           </div>
 
-          {/* Résumé de couverture */}
+          {/* Coverage summary */}
           {artifact?.coverage_summary && (
             <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5 text-[11.5px] text-muted-foreground">
               {artifact.summary || `Coverage: ${JSON.stringify(artifact.coverage_summary)}`}
             </div>
           )}
 
-          {/* Aucune proposition */}
+          {/* No proposals */}
           {totalItems === 0 && (
             <div className="rounded-md border border-border bg-muted/40 px-3 py-4 text-center text-[11.5px] text-muted-foreground">
               No new proposals — the semantic layer may already cover this question,
@@ -415,7 +415,7 @@ export function EnrichmentPanel() {
             </div>
           )}
 
-          {/* Bouton appliquer */}
+          {/* Apply button */}
           {totalSelected > 0 && (
             <button
               onClick={applySelected}
@@ -427,7 +427,7 @@ export function EnrichmentPanel() {
         </div>
       )}
 
-      {/* ── Application en cours ── */}
+      {/* ── Applying ── */}
       {phase === 'applying' && (
         <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground">
           <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -435,7 +435,7 @@ export function EnrichmentPanel() {
         </div>
       )}
 
-      {/* ── Succès ── */}
+      {/* ── Success ── */}
       {phase === 'done' && (
         <div className="flex flex-col gap-4">
           <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3.5">
@@ -470,7 +470,7 @@ export function EnrichmentPanel() {
         </div>
       )}
 
-      {/* ── Erreur ── */}
+      {/* ── Error ── */}
       {phase === 'error' && (
         <div className="flex flex-col gap-3">
           <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[11.5px] text-destructive">

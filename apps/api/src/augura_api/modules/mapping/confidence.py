@@ -1,4 +1,4 @@
-"""Confiance d'appariement (réduite : semantic + method + ambiguity)."""
+"""Match confidence (reduced: semantic + method + ambiguity)."""
 
 from __future__ import annotations
 

@@ -125,6 +125,6 @@ jobs:
           ( cd packages/api-client && npm run generate )
       - name: Verify there is no drift
         run: git diff --exit-code packages/api-client/openapi.json packages/api-client/src/schema.d.ts
-      - name: Typecheck du client
+      - name: Typecheck the client
         run: npx tsc --noEmit
         working-directory: packages/api-client

@@ -35,7 +35,10 @@ def upgrade() -> None:
     conn = op.get_bind()
     for name in _DDL_FILES:
         sql = (_SUPABASE / name).read_text(encoding="utf-8")
-        conn.exec_driver_sql(_strip_tx(sql))
+        # exec_driver_sql routes through the DBAPI paramstyle (pyformat), so a literal
+        # `%` in the DDL (e.g. plpgsql `format('... %I ...')`) is read as a parameter
+        # marker and fails. Double it to `%%` for the driver; psycopg collapses it to `%`.
+        conn.exec_driver_sql(_strip_tx(sql).replace("%", "%%"))
 
 
 def downgrade() -> None:

@@ -20,6 +20,7 @@ class DatasetOut(BaseModel):
     # label is resolved on the frontend via study_id: the datasets↔studies
     # independence (import-linter) forbids a JOIN on studies here.
     column_count: int = 0
+    file_count: int = 0
     created_at: datetime
 
 
@@ -28,6 +29,17 @@ class DatasetCreate(BaseModel):
     study_id: UUID | None = None
     storage_path: str | None = None
     row_count: int | None = None
+
+
+class DatasetFileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    filename: str
+    row_count: int | None = None
+    column_count: int = 0
+    position: int = 0
+    created_at: datetime
 
 
 class ColumnIn(BaseModel):
@@ -82,6 +94,8 @@ class ColumnsPut(BaseModel):
 class UploadResult(BaseModel):
     dataset: DatasetOut
     columns: list[ColumnOut]
+    files: list[DatasetFileOut] = []
+    warnings: list[str] = []
 
 
 class CohortMemberOut(BaseModel):

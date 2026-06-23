@@ -69,8 +69,7 @@ async def test_upload_persists_dataset_and_profiled_columns(
         result = await svc.upload_dataset(
             CurrentTenant(tenant_id=tenant, user_id=USER, role="owner"),
             settings,
-            filename="cohort.csv",
-            data=csv,
+            files=[("cohort.csv", csv)],
             name=None,
             study_id=None,
         )

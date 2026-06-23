@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from augura_api.core.ids import TenantId
@@ -12,6 +12,7 @@ from augura_api.modules.datasets.models import (
     CohortMember,
     Dataset,
     DatasetColumn,
+    DatasetFile,
 )
 
 
@@ -19,21 +20,31 @@ class DatasetRepo:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_datasets(self, tenant_id: TenantId) -> list[tuple[Dataset, int]]:
-        """Datasets of the tenant + their column count (correlated subquery
-        on dataset_columns, intra-module)."""
+    async def list_datasets(self, tenant_id: TenantId) -> list[tuple[Dataset, int, int]]:
+        """Datasets of the tenant + column count + file count (correlated subqueries
+        on dataset_columns / dataset_files, intra-module)."""
         col_count = (
             select(func.count(DatasetColumn.id))
             .where(DatasetColumn.dataset_id == Dataset.id)
             .correlate(Dataset)
             .scalar_subquery()
         )
+        file_count = (
+            select(func.count(DatasetFile.id))
+            .where(DatasetFile.dataset_id == Dataset.id)
+            .correlate(Dataset)
+            .scalar_subquery()
+        )
         res = await self.session.execute(
-            select(Dataset, col_count.label("column_count"))
+            select(
+                Dataset,
+                col_count.label("column_count"),
+                file_count.label("file_count"),
+            )
             .where(Dataset.org_id == tenant_id)
             .order_by(Dataset.created_at.desc())
         )
-        return [(row[0], int(row[1])) for row in res.all()]
+        return [(row[0], int(row[1]), int(row[2])) for row in res.all()]
 
     async def get_dataset(self, tenant_id: TenantId, dataset_id: UUID) -> Dataset | None:
         res = await self.session.execute(
@@ -46,6 +57,75 @@ class DatasetRepo:
             select(func.count(DatasetColumn.id)).where(DatasetColumn.dataset_id == dataset_id)
         )
         return int(res.scalar_one())
+
+    async def count_files(self, dataset_id: UUID) -> int:
+        res = await self.session.execute(
+            select(func.count(DatasetFile.id)).where(DatasetFile.dataset_id == dataset_id)
+        )
+        return int(res.scalar_one())
+
+    async def list_files(self, dataset_id: UUID) -> list[DatasetFile]:
+        res = await self.session.execute(
+            select(DatasetFile)
+            .where(DatasetFile.dataset_id == dataset_id)
+            .order_by(DatasetFile.position, DatasetFile.created_at)
+        )
+        return list(res.scalars().all())
+
+    async def get_file(self, dataset_id: UUID, file_id: UUID) -> DatasetFile | None:
+        res = await self.session.execute(
+            select(DatasetFile).where(
+                DatasetFile.dataset_id == dataset_id, DatasetFile.id == file_id
+            )
+        )
+        return res.scalar_one_or_none()
+
+    async def next_position(self, dataset_id: UUID) -> int:
+        res = await self.session.execute(
+            select(func.coalesce(func.max(DatasetFile.position), -1) + 1).where(
+                DatasetFile.dataset_id == dataset_id
+            )
+        )
+        return int(res.scalar_one())
+
+    async def add_file(
+        self,
+        dataset_id: UUID,
+        *,
+        filename: str,
+        storage_path: str,
+        row_count: int | None,
+        headers: list[str],
+        position: int,
+    ) -> DatasetFile:
+        row = DatasetFile(
+            dataset_id=dataset_id,
+            filename=filename,
+            storage_path=storage_path,
+            row_count=row_count,
+            headers=headers,
+            position=position,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        await self.session.refresh(row)
+        return row
+
+    async def delete_file(self, dataset_id: UUID, file_id: UUID) -> None:
+        await self.session.execute(
+            delete(DatasetFile).where(
+                DatasetFile.dataset_id == dataset_id, DatasetFile.id == file_id
+            )
+        )
+
+    async def set_storage_and_rowcount(
+        self, dataset_id: UUID, *, storage_path: str | None, row_count: int | None
+    ) -> None:
+        await self.session.execute(
+            update(Dataset)
+            .where(Dataset.id == dataset_id)
+            .values(storage_path=storage_path, row_count=row_count)
+        )
 
     async def create_dataset(
         self,

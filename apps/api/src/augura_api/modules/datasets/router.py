@@ -71,18 +71,13 @@ async def upload_dataset(
     tenant: CurrentTenantDep,
     session: SessionDep,
     settings: SettingsDep,
-    file: UploadFile,
+    files: list[UploadFile],
     name: str | None = Form(default=None),  # noqa: B008
     study_id: UUID | None = Form(default=None),  # noqa: B008
 ) -> schemas.UploadResult:
-    data = await file.read()
+    payload = [((f.filename or "upload.csv"), await f.read()) for f in files]
     return await _service(session).upload_dataset(
-        tenant,
-        settings,
-        filename=file.filename or "upload.csv",
-        data=data,
-        name=name,
-        study_id=study_id,
+        tenant, settings, files=payload, name=name, study_id=study_id
     )
 
 
@@ -108,3 +103,37 @@ async def replace_columns(
     session: SessionDep,
 ) -> list[schemas.ColumnOut]:
     return await _service(session).replace_columns(tenant, dataset_id, payload)
+
+
+@router.get("/{dataset_id}/files", response_model=list[schemas.DatasetFileOut])
+async def list_files(
+    dataset_id: UUID, tenant: CurrentTenantDep, session: SessionDep
+) -> list[schemas.DatasetFileOut]:
+    return await _service(session).list_files(tenant, dataset_id)
+
+
+@router.post(
+    "/{dataset_id}/files",
+    response_model=schemas.UploadResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_files(
+    dataset_id: UUID,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    files: list[UploadFile],
+) -> schemas.UploadResult:
+    payload = [((f.filename or "upload.csv"), await f.read()) for f in files]
+    return await _service(session).add_files(tenant, settings, dataset_id, payload)
+
+
+@router.delete("/{dataset_id}/files/{file_id}", response_model=schemas.UploadResult)
+async def remove_file(
+    dataset_id: UUID,
+    file_id: UUID,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> schemas.UploadResult:
+    return await _service(session).remove_file(tenant, settings, dataset_id, file_id)

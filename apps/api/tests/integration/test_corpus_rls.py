@@ -83,7 +83,7 @@ async def _seed(conn: AsyncConnection) -> tuple[UUID, UUID, UUID]:
             text(
                 "insert into literature_snapshots "
                 "(id, org_id, study_id, created_by, payload, content_hash) values "
-                "(cast(:id as uuid), cast(:t as uuid), :study, cast(:c as uuid), "
+                "(cast(:id as uuid), cast(:t as uuid), cast(:study as uuid), cast(:c as uuid), "
                 " cast(:p as jsonb), :h)"
             ).bindparams(
                 id=str(sid),

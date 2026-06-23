@@ -78,8 +78,8 @@ async def test_import_cohort_round_trip(session: AsyncSession) -> None:
         cohort_name=name,
         dataset_id=None,
         members=[
-            schemas.CohortMemberIn(member_id="m1", age=54, sex="F", engagement_group="HIGH"),
-            schemas.CohortMemberIn(member_id="m2", age=61, sex="M", engagement_group="REST"),
+            schemas.CohortMemberIn(member_id="m1", age=54, sex="F", engagement_group="high"),
+            schemas.CohortMemberIn(member_id="m2", age=61, sex="M", engagement_group="low"),
         ],
         biomarkers=[
             schemas.CohortBiomarkerIn(member_id="m1", timepoint_months=0, hba1c_pct=8.1),

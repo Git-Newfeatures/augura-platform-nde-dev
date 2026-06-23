@@ -63,8 +63,8 @@ jobs:
         run: uv run alembic upgrade head
       - name: Seed (data, outside migrations)
         run: psql -v ON_ERROR_STOP=1 -f supabase/seed.sql
-      - name: Integration tests (repos + RLS under the augura_app role)
-        run: uv run pytest -m integration -q
+      - name: Integration fixtures (deterministic test data for repos + smoke)
+        run: psql -v ON_ERROR_STOP=1 -f tests/integration/fixtures.sql
       - name: Smoke — seed counts
         run: |
           set -euo pipefail
@@ -95,10 +95,12 @@ jobs:
           -- global corpus (org_id NULL) stays visible regardless of tenant
           do $$ begin
             if (select count(*) from documents) <> 8 then
-              raise exception 'corpus global invisible sous RLS';
+              raise exception 'global corpus invisible under RLS';
             end if;
           end $$;
           SQL
+      - name: Integration tests (repos + RLS under the augura_app role)
+        run: uv run pytest -m integration -q
 
   client-drift:
     # The committed TS client must match the backend OpenAPI contract.

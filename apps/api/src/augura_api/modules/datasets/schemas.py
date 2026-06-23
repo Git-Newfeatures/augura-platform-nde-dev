@@ -98,6 +98,25 @@ class UploadResult(BaseModel):
     warnings: list[str] = []
 
 
+class DataDictionaryEntry(BaseModel):
+    """One variable described by a data dictionary."""
+
+    name: str
+    label: str | None = None
+    value_type: str | None = None  # e.g. numeric, categorical, date, text, binary
+    description: str | None = None
+    allowed_values: list[str] = []
+
+
+class DataDictionaryResult(BaseModel):
+    format: str = "augura.intake.data_dictionary/1"
+    # "structured" = parsed deterministically from a dictionary-shaped table;
+    # "free_form_llm" = extracted from prose/loose layout by the LLM.
+    source_kind: str
+    entries: list[DataDictionaryEntry] = []
+    warnings: list[str] = []
+
+
 class CohortMemberOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

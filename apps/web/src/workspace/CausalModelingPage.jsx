@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
+import { SubTabs } from '@/cockpit/SubTabs'
 import { apiJson } from '@/api'
 import { parsePICOT } from '@/semantic/picot-parser'
 import { enrichApply } from '@/workspace/dataClient'
@@ -27,6 +28,34 @@ const ROLE = {
 }
 const NODE_W = 150
 const NODE_H = 46
+
+// Wrap a node label onto up to `maxLines` lines so the full text is shown (the previous
+// renderer hard-truncated at 19 chars). A <title> still carries the complete label on hover.
+function wrapLabel(label, maxChars = 22, maxLines = 2) {
+  const words = String(label ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (!words.length) return ['']
+  const lines = []
+  let cur = ''
+  for (let i = 0; i < words.length; i++) {
+    const next = cur ? `${cur} ${words[i]}` : words[i]
+    if (!cur || next.length <= maxChars) {
+      cur = next
+    } else {
+      lines.push(cur)
+      cur = words[i]
+      if (lines.length === maxLines) {
+        lines[maxLines - 1] = `${lines[maxLines - 1]}…`
+        cur = ''
+        break
+      }
+    }
+  }
+  if (cur) lines.push(cur)
+  return lines
+}
 
 // Edges proposed by the LLM carry the id `proposed_<subj>_<obj>` (cf. builder).
 const isProposed = (e) => typeof e.id === 'string' && e.id.startsWith('proposed_')
@@ -94,8 +123,12 @@ function DagSvg({ nodes, edges }) {
           const s = ROLE[n.role] || ROLE.other
           const rx = n.x - minX
           const ry = n.y - minY
+          const lines = wrapLabel(n.label)
+          const labelCx = rx + NODE_W / 2
+          const labelTop = ry + NODE_H / 2 + 4 - (lines.length - 1) * 6.5
           return (
             <g key={n.id}>
+              <title>{n.label}</title>
               {n.adjusted && (
                 <rect
                   x={rx - 4}
@@ -122,15 +155,17 @@ function DagSvg({ nodes, edges }) {
                 strokeDasharray={n.observed ? undefined : '5,3'}
               />
               <text
-                x={rx + NODE_W / 2}
-                y={ry + NODE_H / 2 + 4}
                 textAnchor="middle"
-                fontSize="11.5"
+                fontSize="10.5"
                 fontWeight="600"
                 fill={s.text}
                 style={{ pointerEvents: 'none' }}
               >
-                {n.label.length > 20 ? n.label.slice(0, 19) + '…' : n.label}
+                {lines.map((ln, li) => (
+                  <tspan key={li} x={labelCx} y={labelTop + li * 12.5}>
+                    {ln}
+                  </tspan>
+                ))}
               </text>
             </g>
           )
@@ -342,10 +377,83 @@ function Result({ dag, onAccepted }) {
   )
 }
 
+// Maps the local parsePICOT output to the backend Picot payload (or null on failure).
+function picotFromQuestion(question) {
+  if (!question || !question.trim()) return null
+  try {
+    const p = parsePICOT(question)
+    return {
+      intervention: p.intervention ?? null,
+      comparator: p.comparator ?? null,
+      outcomes: (p.outcomes || []).map((o) => ({
+        concept_id: o.concept_id ?? null,
+        label: o.label ?? null,
+      })),
+      timeframe:
+        Array.isArray(p.time_window) && p.time_window.length ? p.time_window.join(', ') : null,
+      population: p.population ?? null,
+      therapeutic_area: p.therapeutic_areas?.[0] ?? null,
+      intervention_concept_id: null,
+    }
+  } catch {
+    return null
+  }
+}
+
+// Surfaces the structured PICOT extracted from the clinical question.
+function PicotView({ picot }) {
+  if (!picot) return null
+  const rows = [
+    ['Population', picot.population],
+    ['Intervention / exposure', picot.intervention],
+    ['Comparator', picot.comparator],
+    ['Timeframe', picot.timeframe],
+    ['Therapeutic area', picot.therapeutic_area],
+  ]
+  const outcomes = (picot.outcomes || []).map((o) => o.label || o.concept_id).filter(Boolean)
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        Parsed question (PICOT)
+      </div>
+      <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex items-baseline gap-2 text-[12.5px]">
+            <span className="w-36 shrink-0 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+              {k}
+            </span>
+            <span className="text-foreground">
+              {v || <span className="text-muted-foreground/50">—</span>}
+            </span>
+          </div>
+        ))}
+        <div className="flex items-baseline gap-2 text-[12.5px] sm:col-span-2">
+          <span className="w-36 shrink-0 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+            Outcomes
+          </span>
+          <span className="flex flex-wrap gap-1.5">
+            {outcomes.length ? (
+              outcomes.map((o, i) => (
+                <Badge key={i} variant="secondary" className="text-[10.5px]">
+                  {o}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-muted-foreground/50">—</span>
+            )}
+          </span>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function CausalModelingPage() {
+  const [sub, setSub] = useState('question')
   const [datasets, setDatasets] = useState(null)
   const [datasetId, setDatasetId] = useState('')
   const [question, setQuestion] = useState('')
+  const [picot, setPicot] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dag, setDag] = useState(null)
@@ -365,48 +473,41 @@ export function CausalModelingPage() {
     }
   }, [])
 
+  function parseQuestion() {
+    setPicot(picotFromQuestion(question))
+  }
+
   async function generate() {
-    if (!datasetId) return
+    if (!question.trim()) {
+      setSub('question')
+      return
+    }
     setBusy(true)
     setError('')
     setDag(null)
+    setSub('dag')
     try {
-      const map = await apiJson(`/datasets/${datasetId}/map`, { method: 'POST' })
-      const mapped_concepts = (map.columns || [])
-        .filter((c) => c.proposed_canonical_id)
-        .map((c) => ({
-          concept_id: c.proposed_canonical_id,
-          concept_label: c.column,
-          confidence: c.confidence,
-        }))
-      // PICOT derived from the question (local parser) → enriches the B2 prompt.
-      // Defensive: any failure falls back to picot=null (prior behavior unchanged).
-      let picot = null
-      try {
-        if (question) {
-          const p = parsePICOT(question)
-          picot = {
-            intervention: p.intervention ?? null,
-            comparator: p.comparator ?? null,
-            outcomes: (p.outcomes || []).map((o) => ({
-              concept_id: o.concept_id ?? null,
-              label: o.label ?? null,
-            })),
-            timeframe:
-              Array.isArray(p.time_window) && p.time_window.length
-                ? p.time_window.join(', ')
-                : null,
-            population: p.population ?? null,
-            therapeutic_area: p.therapeutic_areas?.[0] ?? null,
-            intervention_concept_id: null,
-          }
-        }
-      } catch {
-        picot = null
+      // A dataset is optional: when one is linked we map it and feed its mapped concepts
+      // into the DAG; otherwise the model is generated from the clinical question alone.
+      let mapped_concepts = []
+      if (datasetId) {
+        const map = await apiJson(`/datasets/${datasetId}/map`, { method: 'POST' })
+        mapped_concepts = (map.columns || [])
+          .filter((c) => c.proposed_canonical_id)
+          .map((c) => ({
+            concept_id: c.proposed_canonical_id,
+            concept_label: c.column,
+            confidence: c.confidence,
+          }))
       }
+      const parsed = picot ?? picotFromQuestion(question)
       const result = await apiJson('/causal/dag', {
         method: 'POST',
-        body: JSON.stringify({ mapped_concepts, picot, clinical_question: question || null }),
+        body: JSON.stringify({
+          mapped_concepts,
+          picot: parsed,
+          clinical_question: question || null,
+        }),
       })
       setDag(result)
     } catch (e) {
@@ -420,51 +521,100 @@ export function CausalModelingPage() {
     <WorkspacePage
       eyebrow="Modeling"
       title="Causal modeling"
-      sub="Generate an ontology-grounded causal DAG from a mapped dataset. Reviewed ontology relations are the ground truth; the LLM only contextualizes them to your question."
+      sub="Frame a clinical question, then generate an ontology-grounded causal DAG. Reviewed ontology relations are the ground truth; the LLM only contextualizes them to your question."
     >
-      <Card className="mb-5 flex flex-col gap-3 p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-            Dataset
-            <select
-              value={datasetId}
-              onChange={(e) => setDatasetId(e.target.value)}
-              className="min-w-[220px] rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground"
-            >
-              <option value="">{datasets == null ? 'Loading…' : 'Select a dataset…'}</option>
-              {(datasets || []).map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button onClick={generate} disabled={!datasetId || busy} className="gap-1.5">
-            <Sparkles className="h-3.5 w-3.5" />
-            {busy ? 'Generating…' : 'Generate causal model'}
-          </Button>
-        </div>
-        <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-          Clinical question (optional)
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={2}
-            placeholder="e.g. Does higher app engagement reduce HbA1c at 12 months?"
-            className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground"
-          />
-        </label>
-        {error && <p className="text-[12px] text-red-700">{error}</p>}
-      </Card>
+      <SubTabs
+        className="mb-4"
+        tabs={[
+          { id: 'question', label: 'Causal question', icon: <Sparkles size={14} /> },
+          { id: 'dag', label: 'DAG', icon: <Network size={14} /> },
+        ]}
+        active={sub}
+        onChange={setSub}
+      />
 
-      {busy && <Loading label="Querying the causal ontology and contextualizing…" />}
-      {!busy && dag && <Result dag={dag} onAccepted={generate} />}
-      {!busy && !dag && !error && (
-        <EmptyState
-          icon={Network}
-          title="No causal model yet"
-          subtitle="Pick a mapped dataset and generate a DAG grounded in the reviewed causal ontology."
-        />
+      {sub === 'question' && (
+        <div className="flex flex-col gap-4">
+          <Card className="flex flex-col gap-3 p-4">
+            <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+              Clinical question
+              <textarea
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                rows={3}
+                placeholder="e.g. Does higher app engagement reduce HbA1c at 12 months?"
+                className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground"
+              />
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={parseQuestion}
+                disabled={!question.trim()}
+                className="gap-1.5"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Parse question
+              </Button>
+              <Button onClick={() => setSub('dag')} disabled={!question.trim()} className="gap-1.5">
+                Continue to DAG
+              </Button>
+            </div>
+          </Card>
+          {picot ? (
+            <PicotView picot={picot} />
+          ) : (
+            <EmptyState
+              icon={Sparkles}
+              title="Frame your causal question"
+              subtitle="Enter a clinical question and parse it into PICOT (population, intervention, comparator, outcomes, timeframe)."
+            />
+          )}
+        </div>
+      )}
+
+      {sub === 'dag' && (
+        <div className="flex flex-col gap-4">
+          <Card className="flex flex-col gap-3 p-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+                Link a dataset (optional)
+                <select
+                  value={datasetId}
+                  onChange={(e) => setDatasetId(e.target.value)}
+                  className="min-w-[220px] rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground"
+                >
+                  <option value="">{datasets == null ? 'Loading…' : 'No dataset'}</option>
+                  {(datasets || []).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button onClick={generate} disabled={!question.trim() || busy} className="gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                {busy ? 'Generating…' : 'Generate causal model'}
+              </Button>
+            </div>
+            {!question.trim() && (
+              <p className="text-[12px] text-muted-foreground">
+                Enter a clinical question in the “Causal question” tab first.
+              </p>
+            )}
+            {error && <p className="text-[12px] text-red-700">{error}</p>}
+          </Card>
+
+          {busy && <Loading label="Querying the causal ontology and contextualizing…" />}
+          {!busy && dag && <Result dag={dag} onAccepted={generate} />}
+          {!busy && !dag && !error && (
+            <EmptyState
+              icon={Network}
+              title="No causal model yet"
+              subtitle="Generate a DAG grounded in the reviewed causal ontology — link a dataset to ground it in your data, or generate from the question alone."
+            />
+          )}
+        </div>
       )}
     </WorkspacePage>
   )

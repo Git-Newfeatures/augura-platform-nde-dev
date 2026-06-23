@@ -137,3 +137,20 @@ async def remove_file(
     settings: SettingsDep,
 ) -> schemas.UploadResult:
     return await _service(session).remove_file(tenant, settings, dataset_id, file_id)
+
+
+@router.post("/{dataset_id}/data-dictionary", response_model=schemas.DataDictionaryResult)
+async def parse_data_dictionary(
+    dataset_id: UUID,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    file: UploadFile,
+) -> schemas.DataDictionaryResult:
+    """Parse an uploaded data dictionary into a structured data model. A dictionary-shaped
+    CSV/XLSX is parsed deterministically; free-form input (.txt/.md or loose tables) is
+    structured by the LLM (requires an Anthropic key, else 503)."""
+    data = await file.read()
+    return await _service(session).parse_data_dictionary(
+        tenant, settings, dataset_id, filename=file.filename or "dictionary.csv", data=data
+    )

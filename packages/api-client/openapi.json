@@ -271,6 +271,20 @@
         "title": "Body_add_files_datasets__dataset_id__files_post",
         "type": "object"
       },
+      "Body_parse_data_dictionary_datasets__dataset_id__data_dictionary_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_parse_data_dictionary_datasets__dataset_id__data_dictionary_post",
+        "type": "object"
+      },
       "Body_upload_dataset_datasets_upload_post": {
         "properties": {
           "files": {
@@ -1472,6 +1486,17 @@
               }
             ],
             "title": "Proposed Role"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
           }
         },
         "required": [
@@ -1922,6 +1947,95 @@
           "rationale"
         ],
         "title": "DagResponse",
+        "type": "object"
+      },
+      "DataDictionaryEntry": {
+        "description": "One variable described by a data dictionary.",
+        "properties": {
+          "allowed_values": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Values",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Type"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DataDictionaryEntry",
+        "type": "object"
+      },
+      "DataDictionaryResult": {
+        "properties": {
+          "entries": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DataDictionaryEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "default": "augura.intake.data_dictionary/1",
+            "title": "Format",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_kind"
+        ],
+        "title": "DataDictionaryResult",
         "type": "object"
       },
       "DatasetCreate": {
@@ -7479,6 +7593,60 @@
           }
         },
         "summary": "Replace Columns",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
+    "/datasets/{dataset_id}/data-dictionary": {
+      "post": {
+        "description": "Parse an uploaded data dictionary into a structured data model. A dictionary-shaped\nCSV/XLSX is parsed deterministically; free-form input (.txt/.md or loose tables) is\nstructured by the LLM (requires an Anthropic key, else 503).",
+        "operationId": "parse_data_dictionary_datasets__dataset_id__data_dictionary_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_parse_data_dictionary_datasets__dataset_id__data_dictionary_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataDictionaryResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Data Dictionary",
         "tags": [
           "datasets"
         ]

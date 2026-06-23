@@ -569,6 +569,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets/{dataset_id}/data-dictionary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Data Dictionary
+         * @description Parse an uploaded data dictionary into a structured data model. A dictionary-shaped
+         *     CSV/XLSX is parsed deterministically; free-form input (.txt/.md or loose tables) is
+         *     structured by the LLM (requires an Anthropic key, else 503).
+         */
+        post: operations["parse_data_dictionary_datasets__dataset_id__data_dictionary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/datasets/{dataset_id}/dq": {
         parameters: {
             query?: never;
@@ -1329,6 +1351,11 @@ export interface components {
             /** Files */
             files: string[];
         };
+        /** Body_parse_data_dictionary_datasets__dataset_id__data_dictionary_post */
+        Body_parse_data_dictionary_datasets__dataset_id__data_dictionary_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_dataset_datasets_upload_post */
         Body_upload_dataset_datasets_upload_post: {
             /** Files */
@@ -1671,6 +1698,8 @@ export interface components {
             proposed_canonical_id?: string | null;
             /** Proposed Role */
             proposed_role?: string | null;
+            /** Sheet */
+            sheet?: string | null;
         };
         /** ColumnStat */
         ColumnStat: {
@@ -1799,6 +1828,45 @@ export interface components {
             nodes: components["schemas"]["augura_api__modules__agents__schemas__DagNode"][];
             /** Rationale */
             rationale: string;
+        };
+        /**
+         * DataDictionaryEntry
+         * @description One variable described by a data dictionary.
+         */
+        DataDictionaryEntry: {
+            /**
+             * Allowed Values
+             * @default []
+             */
+            allowed_values: string[];
+            /** Description */
+            description?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Name */
+            name: string;
+            /** Value Type */
+            value_type?: string | null;
+        };
+        /** DataDictionaryResult */
+        DataDictionaryResult: {
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["DataDictionaryEntry"][];
+            /**
+             * Format
+             * @default augura.intake.data_dictionary/1
+             */
+            format: string;
+            /** Source Kind */
+            source_kind: string;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
         };
         /** DatasetCreate */
         DatasetCreate: {
@@ -4509,6 +4577,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ColumnOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_data_dictionary_datasets__dataset_id__data_dictionary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_parse_data_dictionary_datasets__dataset_id__data_dictionary_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataDictionaryResult"];
                 };
             };
             /** @description Validation Error */

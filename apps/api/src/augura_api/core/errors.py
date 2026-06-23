@@ -100,3 +100,25 @@ def register_error_handlers(app: FastAPI) -> None:
             },
             media_type="application/problem+json",
         )
+
+    @app.exception_handler(OSError)
+    async def handle_storage_error(_request: Request, exc: OSError) -> JSONResponse:
+        # Object-store failures (core.storage) raise OSError — FileNotFoundError when a
+        # dataset file is missing (e.g. Modal's per-container ephemeral disk not holding a
+        # file written by another container), or OSError when the Supabase Storage REST call
+        # fails. Like the DB handler above, we map it BELOW the CORS middleware so the 500
+        # keeps its CORS header; otherwise ServerErrorMiddleware emits a header-less 500 that
+        # the browser surfaces as an opaque "Failed to fetch" (no message). Fix the underlying
+        # cause by configuring AUGURA_SUPABASE_URL/AUGURA_SUPABASE_SERVICE_ROLE_KEY in prod.
+        log.exception("storage_error", error=str(exc))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "https://augura.dev/errors/storage_error",
+                "title": "Storage error",
+                "status": 500,
+                "detail": "the file storage operation failed",
+                "code": "storage_error",
+            },
+            media_type="application/problem+json",
+        )

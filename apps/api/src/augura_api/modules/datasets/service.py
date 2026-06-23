@@ -65,6 +65,20 @@ class DatasetService:
         rows = await self.repo.replace_columns(dataset_id, payload.columns)
         return [schemas.ColumnOut.model_validate(r) for r in rows]
 
+    async def parse_data_dictionary(
+        self,
+        tenant: CurrentTenant,
+        settings: Settings,
+        dataset_id: UUID,
+        *,
+        filename: str,
+        data: bytes,
+    ) -> schemas.DataDictionaryResult:
+        await self._require_dataset(tenant, dataset_id)
+        from augura_api.modules.datasets.data_dictionary import parse_data_dictionary
+
+        return await parse_data_dictionary(settings, filename, data)
+
     async def list_cohorts(self, tenant: CurrentTenant) -> list[schemas.CohortSummary]:
         return [
             schemas.CohortSummary(cohort_name=name, n_members=n)

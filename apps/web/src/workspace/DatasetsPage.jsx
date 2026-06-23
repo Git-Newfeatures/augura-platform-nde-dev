@@ -15,6 +15,7 @@ import {
   Plus,
   X,
   FileSpreadsheet,
+  BookText,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +26,6 @@ import { useStudyNav } from '@/workspace/useStudyNav'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { SubTabs } from '@/cockpit/SubTabs'
 import { CohortImport } from '@/workspace/CohortImport'
-import { LocalMappingSuggestions } from '@/workspace/LocalMappingSuggestions'
 import { apiJson } from '@/api'
 import {
   uploadDataset,
@@ -36,6 +36,7 @@ import {
   runDq,
   getDq,
   listColumns,
+  parseDataDictionary,
 } from '@/intake/intakeApi'
 
 // Data workspace — port of Nico's /datasets view, rewired onto Quentin's
@@ -267,20 +268,21 @@ function FilesPanel({ dataset, columns, onChanged }) {
         </div>
       </Card>
 
-      {columns && columns.length > 0 && <ColumnsTable columns={columns} />}
+      <DataDictionaryPanel datasetId={dataset.id} />
+
+      {columns && columns.length > 0 && <ColumnsByTable columns={columns} />}
     </div>
   )
 }
 
-// ── Profiled columns table (GET /datasets/{id}/columns) ───────────────────────
-function ColumnsTable({ columns }) {
+// ── Profiled columns of ONE table (GET /datasets/{id}/columns, filtered by sheet) ─
+function ColumnRows({ columns }) {
   return (
     <Card className="gap-0 overflow-x-auto rounded-xl border p-0">
       <table className="w-full border-collapse text-[12.5px]">
         <thead>
           <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
             <th className="px-4 py-2.5 font-medium">Column</th>
-            <th className="px-4 py-2.5 font-medium">Sheet</th>
             <th className="px-4 py-2.5 font-medium">Type</th>
             <th className="px-4 py-2.5 font-medium text-right">Null %</th>
             <th className="px-4 py-2.5 font-medium text-right">Distinct</th>
@@ -291,7 +293,6 @@ function ColumnsTable({ columns }) {
           {columns.map((c) => (
             <tr key={c.id} className="border-b border-border/60 last:border-0">
               <td className="px-4 py-2 font-mono text-foreground">{c.name}</td>
-              <td className="px-4 py-2 text-muted-foreground">{c.sheet}</td>
               <td className="px-4 py-2 text-muted-foreground">{c.value_kind ?? '—'}</td>
               <td className="px-4 py-2 text-right font-mono text-muted-foreground">
                 {c.null_pct != null ? `${Math.round(c.null_pct <= 1 ? c.null_pct * 100 : c.null_pct)}%` : '—'}
@@ -310,6 +311,157 @@ function ColumnsTable({ columns }) {
           ))}
         </tbody>
       </table>
+    </Card>
+  )
+}
+
+// Distinct sheet/table names, in first-seen order.
+function tablesOf(columns) {
+  const sheets = []
+  for (const c of columns) {
+    const s = c.sheet || 'data'
+    if (!sheets.includes(s)) sheets.push(s)
+  }
+  return sheets
+}
+
+// ── Columns preview as per-table tabs (the data model) ────────────────────────
+function ColumnsByTable({ columns }) {
+  const sheets = tablesOf(columns)
+  const [active, setActive] = useState(sheets[0])
+  const current = sheets.includes(active) ? active : sheets[0]
+  const shown = columns.filter((c) => (c.sheet || 'data') === current)
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          {sheets.map((s) => {
+            const on = s === current
+            const n = columns.filter((c) => (c.sheet || 'data') === s).length
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setActive(s)}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors ${
+                  on
+                    ? 'border-primary/40 bg-secondary text-primary'
+                    : 'border-border bg-card text-muted-foreground hover:bg-muted/40'
+                }`}
+              >
+                <FileSpreadsheet size={13} />
+                <span className="font-mono">{s}</span>
+                <span className="text-[10.5px] text-muted-foreground">{n}</span>
+              </button>
+            )
+          })}
+        </div>
+        <span className="text-[11px] text-muted-foreground">
+          {sheets.length} table{sheets.length === 1 ? '' : 's'} in the data model
+        </span>
+      </div>
+      <ColumnRows columns={shown} />
+    </div>
+  )
+}
+
+// ── Data dictionary (POST /datasets/{id}/data-dictionary) ─────────────────────
+function DataDictionaryPanel({ datasetId }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [result, setResult] = useState(null)
+  const ref = useRef(null)
+
+  async function handle(fileList) {
+    const file = Array.from(fileList || [])[0]
+    if (!file) return
+    setBusy(true)
+    setError(null)
+    try {
+      setResult(await parseDataDictionary(datasetId, file))
+    } catch (e) {
+      setError(String(e?.message || e))
+    } finally {
+      setBusy(false)
+      if (ref.current) ref.current.value = ''
+    }
+  }
+
+  return (
+    <Card className="gap-0 rounded-xl border p-5">
+      <SectionTitle
+        icon={<BookText size={15} className="text-primary" />}
+        sub="Upload a data dictionary (CSV/XLSX/TXT/MD). Dictionary-shaped tables are parsed directly; free-form ones are structured by the LLM."
+      >
+        Data dictionary{' '}
+        <span className="rounded-full bg-muted px-1.5 py-px text-[10px] font-semibold text-muted-foreground">
+          beta
+        </span>
+      </SectionTitle>
+
+      <input
+        ref={ref}
+        type="file"
+        accept=".csv,.xlsx,.xls,.txt,.md"
+        className="hidden"
+        onChange={(e) => handle(e.target.files)}
+      />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => ref.current?.click()}
+        className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-secondary/40 px-4 py-3 text-[12.5px] text-muted-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+      >
+        <Plus size={15} />
+        {busy ? 'Parsing…' : 'Upload data dictionary'}
+      </button>
+      {error && <span className="mt-2 text-[11px] text-destructive">{error}</span>}
+
+      {result && (
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <Badge variant="outline" className="text-muted-foreground">
+              {result.source_kind === 'structured' ? 'Structured' : 'AI-parsed'}
+            </Badge>
+            <span>
+              {result.entries.length} variable{result.entries.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          {(result.warnings || []).map((w, i) => (
+            <span key={i} className="text-[11px] text-muted-foreground">
+              {w}
+            </span>
+          ))}
+          {result.entries.length > 0 && (
+            <Card className="gap-0 overflow-x-auto rounded-xl border p-0">
+              <table className="w-full border-collapse text-[12.5px]">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">Variable</th>
+                    <th className="px-4 py-2.5 font-medium">Label</th>
+                    <th className="px-4 py-2.5 font-medium">Type</th>
+                    <th className="px-4 py-2.5 font-medium">Description</th>
+                    <th className="px-4 py-2.5 font-medium">Allowed values</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.entries.map((e, i) => (
+                    <tr key={e.name + i} className="border-b border-border/60 align-top last:border-0">
+                      <td className="px-4 py-2 font-mono text-foreground">{e.name}</td>
+                      <td className="px-4 py-2 text-foreground">{e.label ?? '—'}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{e.value_type ?? '—'}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{e.description ?? '—'}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {e.allowed_values?.length ? e.allowed_values.join(', ') : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+        </div>
+      )}
     </Card>
   )
 }
@@ -333,6 +485,56 @@ function ConfBadge({ score, label }) {
   )
 }
 
+function MappingTable({ rows }) {
+  return (
+    <Card className="gap-0 overflow-x-auto rounded-xl border p-0">
+      <table className="w-full border-collapse text-[12.5px]">
+        <thead>
+          <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+            <th className="px-4 py-2.5 font-medium">Source column</th>
+            <th className="px-4 py-2.5 font-medium">Proposed concept</th>
+            <th className="px-4 py-2.5 font-medium text-center">Layer</th>
+            <th className="px-4 py-2.5 font-medium">Domain</th>
+            <th className="px-4 py-2.5 font-medium text-right">Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((c) => (
+            <tr key={c.column} className="border-b border-border/60 last:border-0">
+              <td className="px-4 py-2 font-mono text-foreground">{c.column}</td>
+              <td className="px-4 py-2 font-mono text-[11.5px] text-muted-foreground">
+                {c.proposed_canonical_id ?? <em className="text-muted-foreground/50">Unmapped</em>}
+              </td>
+              <td className="px-4 py-2 text-center">
+                {c.layer != null ? (
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    L{c.layer}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground/40">—</span>
+                )}
+              </td>
+              <td className="px-4 py-2">
+                {c.domain ? (
+                  <Badge variant="secondary" className="text-[10px] font-normal">
+                    {c.domain}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground/40">—</span>
+                )}
+              </td>
+              <td className="px-4 py-2 text-right">
+                <ConfBadge score={c.confidence} label={c.confidence_label} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  )
+}
+
+// Mapping shown per table (sheet), not as one flat attribute list.
 function MappingPanel({ result }) {
   const columns = result.columns || []
   const total = result.total_count ?? 0
@@ -345,6 +547,7 @@ function MappingPanel({ result }) {
     ['Low conf.', tally('Low')],
     ['Unmapped', total - mapped],
   ]
+  const sheets = tablesOf(columns)
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
@@ -356,50 +559,21 @@ function MappingPanel({ result }) {
         ))}
       </div>
 
-      <Card className="gap-0 overflow-x-auto rounded-xl border p-0">
-        <table className="w-full border-collapse text-[12.5px]">
-          <thead>
-            <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
-              <th className="px-4 py-2.5 font-medium">Source column</th>
-              <th className="px-4 py-2.5 font-medium">Proposed concept</th>
-              <th className="px-4 py-2.5 font-medium text-center">Layer</th>
-              <th className="px-4 py-2.5 font-medium">Domain</th>
-              <th className="px-4 py-2.5 font-medium text-right">Confidence</th>
-            </tr>
-          </thead>
-          <tbody>
-            {columns.map((c) => (
-              <tr key={c.column} className="border-b border-border/60 last:border-0">
-                <td className="px-4 py-2 font-mono text-foreground">{c.column}</td>
-                <td className="px-4 py-2 font-mono text-[11.5px] text-muted-foreground">
-                  {c.proposed_canonical_id ?? <em className="text-muted-foreground/50">Unmapped</em>}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {c.layer != null ? (
-                    <Badge variant="outline" className="font-mono text-[10px]">
-                      L{c.layer}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground/40">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-2">
-                  {c.domain ? (
-                    <Badge variant="secondary" className="text-[10px] font-normal">
-                      {c.domain}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground/40">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <ConfBadge score={c.confidence} label={c.confidence_label} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      {sheets.map((s) => {
+        const rows = columns.filter((c) => (c.sheet || 'data') === s)
+        return (
+          <div key={s} className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+              <FileSpreadsheet size={13} />
+              <span className="font-mono text-foreground">{s}</span>
+              <span className="text-[10.5px]">
+                · {rows.length} column{rows.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <MappingTable rows={rows} />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -569,7 +743,7 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
           { id: 'upload', label: 'Files', icon: <Upload size={14} /> },
           { id: 'privacy', label: 'Privacy', icon: <Shield size={14} />, badge: 'beta' },
           { id: 'mapping', label: 'Mapping', icon: <Workflow size={14} /> },
-          { id: 'dq', label: 'Data Quality', icon: <Activity size={14} /> },
+          { id: 'dq', label: 'Data Quality', icon: <Activity size={14} />, badge: 'beta' },
           { id: 'validation', label: 'Validation', icon: <CheckCircle2 size={14} />, badge: 'beta' },
           { id: 'lineage', label: 'Lineage', icon: <GitBranch size={14} />, badge: 'beta' },
         ]}
@@ -625,10 +799,7 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
           ) : mapBusy && !mapping ? (
             <Loading label="Matching columns to the taxonomy…" />
           ) : mapping ? (
-            <>
-              <MappingPanel result={mapping} />
-              <LocalMappingSuggestions columns={mapping.columns || columns} />
-            </>
+            <MappingPanel result={mapping} />
           ) : (
             <EmptyState icon={Workflow} title="No mapping yet" subtitle="Run mapping to bind columns to concepts." />
           )}

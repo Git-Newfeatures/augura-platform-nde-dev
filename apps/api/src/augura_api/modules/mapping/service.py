@@ -49,6 +49,7 @@ class MappingService:
             out.append(
                 schemas.ColumnProposal(
                     column=col.name,
+                    sheet=col.sheet,
                     proposed_canonical_id=best.concept_id if best else None,
                     proposed_role=best.dq_column_role if best else None,
                     layer=best.layer if best else None,

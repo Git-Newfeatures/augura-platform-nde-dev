@@ -7,6 +7,9 @@ from pydantic import BaseModel
 
 class ColumnProposal(BaseModel):
     column: str
+    # Source table/sheet of the column — lets the frontend group the mapping by table
+    # instead of showing one flat attribute list. CSV files share the sheet "data".
+    sheet: str | None = None
     proposed_canonical_id: str | None = None
     proposed_role: str | None = None
     layer: int | None = None

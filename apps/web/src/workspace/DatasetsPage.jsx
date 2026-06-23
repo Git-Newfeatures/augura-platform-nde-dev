@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Plus,
   X,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +27,16 @@ import { SubTabs } from '@/cockpit/SubTabs'
 import { CohortImport } from '@/workspace/CohortImport'
 import { LocalMappingSuggestions } from '@/workspace/LocalMappingSuggestions'
 import { apiJson } from '@/api'
-import { uploadDataset, uploadDatasets, mapDataset, runDq, getDq, listColumns } from '@/intake/intakeApi'
+import {
+  uploadDataset,
+  addFiles,
+  removeFile,
+  listFiles,
+  mapDataset,
+  runDq,
+  getDq,
+  listColumns,
+} from '@/intake/intakeApi'
 
 // Data workspace — port of Nico's /datasets view, rewired onto Quentin's
 // backend. The intake flow (upload → mapping → data quality) lives HERE, per
@@ -149,19 +159,38 @@ const BetaNote = ({ children }) => (
 )
 
 // ── Upload tab (real: POST /datasets/upload → new dataset) ─────────────────────
-function UploadPanel({ columns, onUploaded }) {
+function FilesPanel({ dataset, columns, onChanged }) {
+  const [files, setFiles] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [warnings, setWarnings] = useState([])
   const fileRef = useRef(null)
 
-  async function handleFiles(fileList) {
-    const file = fileList?.[0]
-    if (!file) return
+  async function refresh() {
+    setFiles(await listFiles(dataset.id).catch(() => []))
+  }
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const fs = await listFiles(dataset.id).catch(() => [])
+      if (alive) setFiles(fs)
+    })()
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset.id])
+
+  async function handleAdd(fileList) {
+    const picked = Array.from(fileList || [])
+    if (!picked.length) return
     setBusy(true)
     setError(null)
     try {
-      const result = await uploadDataset(file)
-      onUploaded(result)
+      const res = await addFiles(dataset.id, picked)
+      setWarnings(res?.warnings || [])
+      await refresh()
+      onChanged?.()
     } catch (e) {
       setError(String(e?.message || e))
     } finally {
@@ -170,43 +199,96 @@ function UploadPanel({ columns, onUploaded }) {
     }
   }
 
+  async function handleRemove(fileId) {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await removeFile(dataset.id, fileId)
+      setWarnings(res?.warnings || [])
+      await refresh()
+      onChanged?.()
+    } catch (e) {
+      setError(String(e?.message || e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <Card className="gap-0 rounded-xl border p-5">
         <SectionTitle
           icon={<Upload size={15} className="text-primary" />}
-          sub="CSV or Excel — parsed and profiled server-side. Uploading creates a new dataset."
+          sub="CSV or Excel files with the same columns — appended into one dataset, profiled server-side."
         >
-          Upload dataset files
+          Files
         </SectionTitle>
-        <div
-          onClick={() => fileRef.current?.click()}
-          onDrop={(e) => {
-            e.preventDefault()
-            handleFiles(e.dataTransfer.files)
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-secondary/40 px-6 py-8 text-center transition-colors hover:bg-secondary/80"
-        >
+
+        {warnings.length > 0 && (
+          <div className="mb-3 flex flex-col gap-1 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-[12px] text-primary">
+            {warnings.map((w, i) => (
+              <span key={i}>{w}</span>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2.5">
+          {files === null ? (
+            <span className="text-[12px] italic text-muted-foreground">Loading files…</span>
+          ) : files.length === 0 ? (
+            <span className="text-[12px] text-muted-foreground">No files yet — add one below.</span>
+          ) : (
+            files.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5"
+              >
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                  <FileSpreadsheet size={17} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-mono text-[13px] text-foreground">{f.filename}</div>
+                  <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+                    {f.row_count != null ? `${Number(f.row_count).toLocaleString()} rows` : '—'} ·{' '}
+                    {f.column_count ?? 0} cols
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handleRemove(f.id)}
+                  aria-label={`Remove ${f.filename}`}
+                  className="flex-shrink-0 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))
+          )}
+
           <input
             ref={fileRef}
             type="file"
             accept=".csv,.xlsx,.xls"
+            multiple
             className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
+            onChange={(e) => handleAdd(e.target.files)}
           />
-          {busy ? (
-            <span className="text-[12px] italic text-muted-foreground">Uploading &amp; profiling…</span>
-          ) : (
-            <>
-              <Upload size={22} className="mb-2 text-muted-foreground" />
-              <span className="text-[12px] font-medium text-foreground">Click or drag to upload</span>
-              <span className="mt-1 text-[11px] text-muted-foreground">
-                <strong>.csv · .xlsx · .xls</strong>
-              </span>
-            </>
-          )}
-          {error && <span className="mt-2 text-[10.5px] text-destructive">{error}</span>}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+            onDrop={(e) => {
+              e.preventDefault()
+              handleAdd(e.dataTransfer.files)
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-secondary/40 px-4 py-4 text-[12.5px] text-muted-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+          >
+            <Plus size={15} />
+            {busy ? 'Working…' : 'Add files'}
+          </button>
+          {error && <span className="text-[11px] text-destructive">{error}</span>}
         </div>
       </Card>
 
@@ -381,7 +463,7 @@ function DqPanel({ run, bundle }) {
 }
 
 // ── Dataset detail (inline view that replaces the list) ───────────────────────
-function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
+function DatasetDetail({ d, onBack, onOpenStudy }) {
   const isEmpty = !d.cols || d.cols === '—' || d.cols === 0
   const [sub, setSub] = useState(isEmpty ? 'upload' : 'mapping')
   const [columns, setColumns] = useState(null)
@@ -509,7 +591,7 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
       <SubTabs
         className="mb-1"
         tabs={[
-          { id: 'upload', label: 'Upload', icon: <Upload size={14} /> },
+          { id: 'upload', label: 'Files', icon: <Upload size={14} /> },
           { id: 'privacy', label: 'Privacy', icon: <Shield size={14} />, badge: 'beta' },
           { id: 'mapping', label: 'Mapping', icon: <Workflow size={14} /> },
           { id: 'dq', label: 'Data Quality', icon: <Activity size={14} /> },
@@ -520,8 +602,17 @@ function DatasetDetail({ d, onBack, onOpenStudy, onUploaded }) {
         onChange={goto}
       />
 
-      {/* ── UPLOAD ── */}
-      {sub === 'upload' && <UploadPanel columns={columns} onUploaded={onUploaded} />}
+      {/* ── FILES ── */}
+      {sub === 'upload' && (
+        <FilesPanel
+          dataset={d}
+          columns={columns}
+          onChanged={async () => {
+            setColumns(await listColumns(d.id).catch(() => []))
+            setMeta(await apiJson(`/datasets/${d.id}`).catch(() => null))
+          }}
+        />
+      )}
 
       {/* ── PRIVACY (beta placeholder) ── */}
       {sub === 'privacy' && (
@@ -706,25 +797,21 @@ const MODAL_INPUT_CLS =
   'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground ' +
   'placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15'
 
-function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
+function AddDatasetModal({ studies, onClose, onUploaded }) {
   const [name, setName] = useState('')
   const [studyId, setStudyId] = useState('')
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState(null) // { done, total, name }
   const [error, setError] = useState(null)
-  const [failed, setFailed] = useState([]) // [{ name, message }]
   const fileRef = useRef(null)
-  const multi = files.length > 1
 
   function pickFiles(fileList) {
     const picked = Array.from(fileList || [])
     if (!picked.length) return
     setFiles(picked)
-    setFailed([])
     setError(null)
-    // Pre-fill the name from the single file (single-file flow only).
-    if (picked.length === 1 && !name.trim()) {
+    // Pre-fill the name from the first file if the user hasn't typed one.
+    if (!name.trim()) {
       setName(picked[0].name.replace(/\.(csv|xlsx|xls)$/i, ''))
     }
   }
@@ -733,50 +820,24 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
     setFiles((prev) => prev.filter((_, i) => i !== idx))
   }
 
+  // One or more files → ONE dataset (same columns, appended). Land in its detail.
   async function submit() {
     if (!files.length || busy) return
     setBusy(true)
     setError(null)
-    setFailed([])
-    // Single file → legacy flow: editable name + jump into the dataset detail.
-    if (files.length === 1) {
-      try {
-        const result = await uploadDataset(files[0], {
-          name: name.trim() || undefined,
-          studyId: studyId || undefined,
-        })
-        onUploaded(result)
-      } catch (e) {
-        setError(String(e?.message || e))
-        setBusy(false)
-      }
-      return
+    try {
+      const result = await uploadDataset(files, {
+        name: name.trim() || undefined,
+        studyId: studyId || undefined,
+      })
+      onUploaded(result)
+    } catch (e) {
+      setError(String(e?.message || e))
+      setBusy(false)
     }
-    // Multi → one dataset per file (file name server-side), sequential.
-    const { ok, failed: fail } = await uploadDatasets(files, {
-      studyId: studyId || undefined,
-      onProgress: (done, total, current) => setProgress({ done, total, name: current }),
-    })
-    if (ok.length) onRefresh()
-    if (!fail.length) {
-      onClose()
-      return
-    }
-    // Partial/total failure: keep the modal open with the error details
-    // (the successful datasets are already refreshed in the list in the background).
-    setFailed(fail)
-    setError(`${fail.length} of ${files.length} files failed — successes were added`)
-    setProgress(null)
-    setBusy(false)
   }
 
-  const ctaLabel = busy
-    ? progress
-      ? `Uploading ${progress.done} / ${progress.total}…`
-      : 'Uploading…'
-    : multi
-      ? `Add ${files.length} datasets`
-      : 'Add dataset'
+  const ctaLabel = busy ? 'Uploading…' : 'Add dataset'
 
   return (
     <div
@@ -788,8 +849,8 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
           <div>
             <h2 className="text-[16px] font-semibold text-foreground">Add dataset</h2>
             <p className="mt-1 text-[13px] text-muted-foreground">
-              Register cohort datasets — files are parsed and profiled server-side. Select multiple
-              files to create one dataset per file.
+              Register a cohort dataset — select one or more CSV/Excel files with the same
+              columns to combine them into one dataset.
             </p>
           </div>
           <button
@@ -802,17 +863,15 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
         </div>
 
         <div className="flex flex-col gap-4 p-5">
-          {!multi && (
-            <label className="block">
-              <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Dataset name</div>
-              <input
-                className={MODAL_INPUT_CLS}
-                placeholder="e.g. cohort_2026"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-          )}
+          <label className="block">
+            <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Dataset name</div>
+            <input
+              className={MODAL_INPUT_CLS}
+              placeholder="e.g. cohort_2026"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
           <label className="block">
             <div className="mb-1.5 text-[12.5px] font-medium text-foreground">Study</div>
             <select className={MODAL_INPUT_CLS} value={studyId} onChange={(e) => setStudyId(e.target.value)}>
@@ -826,7 +885,7 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
           </label>
           <div className="block">
             <div className="mb-1.5 text-[12.5px] font-medium text-foreground">
-              File{multi ? 's' : ''} <span className="text-[#C0392B]">*</span>
+              File{files.length > 1 ? 's' : ''} <span className="text-[#C0392B]">*</span>
             </div>
             <input
               ref={fileRef}
@@ -844,12 +903,10 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
               <Upload size={15} className="flex-shrink-0" />
               {files.length === 0
                 ? 'Choose CSV or Excel files'
-                : files.length === 1
-                  ? <span className="truncate font-mono text-foreground">{files[0].name}</span>
-                  : `${files.length} files selected`}
+                : `${files.length} file${files.length === 1 ? '' : 's'} selected`}
             </button>
-            <p className="mt-1.5 text-[11px] text-muted-foreground">.csv · .xlsx · .xls</p>
-            {multi && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">.csv · .xlsx · .xls — same columns, appended</p>
+            {files.length > 0 && (
               <ul className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto">
                 {files.map((f, i) => (
                   <li
@@ -872,22 +929,7 @@ function AddDatasetModal({ studies, onClose, onUploaded, onRefresh }) {
               </ul>
             )}
           </div>
-          {busy && multi && progress && (
-            <div className="truncate text-[11.5px] text-muted-foreground">
-              Uploading {progress.done} / {progress.total}
-              {progress.name ? ` — ${progress.name}` : ''}…
-            </div>
-          )}
           {error && <div className="text-[12px] text-destructive">{error}</div>}
-          {failed.length > 0 && (
-            <ul className="flex flex-col gap-0.5 text-[11px] text-destructive">
-              {failed.map((f) => (
-                <li key={f.name} className="truncate">
-                  <span className="font-mono">{f.name}</span> — {f.message}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border p-5">
@@ -947,7 +989,6 @@ export function DatasetsPage() {
           d={selectedDataset}
           onBack={() => setSelectedDataset(null)}
           onOpenStudy={() => openStudy(selectedDataset.study)}
-          onUploaded={handleUploaded}
         />
       </WorkspacePage>
     )
@@ -991,7 +1032,8 @@ export function DatasetsPage() {
                   {d.study || '—'} · updated {d.when}
                 </div>
               </div>
-              <div className="w-32 flex-shrink-0 text-right font-mono text-[12.5px] text-muted-foreground">
+              <div className="w-40 flex-shrink-0 text-right font-mono text-[12.5px] text-muted-foreground">
+                {d.files > 1 ? `${d.files} files · ` : ''}
                 {d.rows} rows · {d.cols} cols
               </div>
               <div className="flex w-24 flex-shrink-0 justify-end">
@@ -1007,7 +1049,6 @@ export function DatasetsPage() {
           studies={studies}
           onClose={() => setAdding(false)}
           onUploaded={handleUploaded}
-          onRefresh={refresh}
         />
       )}
     </WorkspacePage>

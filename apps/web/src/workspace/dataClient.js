@@ -46,6 +46,7 @@ const normDatasets = (rows, studyNameById = new Map()) =>
     name: d.name,
     rows: d.row_count != null ? d.row_count.toLocaleString() : '—',
     cols: d.column_count ?? '—',
+    files: d.file_count ?? 0,
     study: studyNameById.get(d.study_id) ?? '',
     state: d.status ?? 'pending',
     when: relTime(d.created_at),

@@ -1,35 +1,29 @@
 // Helpers for the intake pipeline (upload → map → DQ), wired to the FastAPI backend.
 import { apiFetch, apiJson } from '../api'
 
-export async function uploadDataset(file, { name, studyId } = {}) {
+// Create ONE dataset from one or more CSV/Excel files (same columns, appended).
+export async function uploadDataset(files, { name, studyId } = {}) {
   const fd = new FormData()
-  fd.append('file', file)
+  for (const f of Array.from(files || [])) fd.append('files', f)
   if (name) fd.append('name', name)
   if (studyId) fd.append('study_id', studyId)
   const res = await apiFetch('/datasets/upload', { method: 'POST', body: fd })
   if (!res.ok) throw new Error(`upload ${res.status}: ${(await res.text()).slice(0, 300)}`)
-  return res.json() // { dataset, columns }
+  return res.json() // { dataset, columns, files, warnings }
 }
 
-// Upload multiple files — one dataset per file. Sequential (avoids N concurrent
-// multipart POSTs to Modal) and deterministic for progress. An error on one file
-// does not stop the others. Returns { ok: [results], failed: [{ name, message }] }.
-export async function uploadDatasets(files, { studyId, onProgress } = {}) {
-  const list = Array.from(files || [])
-  const ok = []
-  const failed = []
-  for (let i = 0; i < list.length; i++) {
-    const file = list[i]
-    onProgress?.(i, list.length, file.name)
-    try {
-      ok.push(await uploadDataset(file, { studyId }))
-    } catch (e) {
-      failed.push({ name: file.name, message: String(e?.message || e) })
-    }
-  }
-  onProgress?.(list.length, list.length, null)
-  return { ok, failed }
+// Append more files to an existing dataset → re-profiled { dataset, columns, files, warnings }.
+export async function addFiles(id, files) {
+  const fd = new FormData()
+  for (const f of Array.from(files || [])) fd.append('files', f)
+  const res = await apiFetch(`/datasets/${id}/files`, { method: 'POST', body: fd })
+  if (!res.ok) throw new Error(`add files ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  return res.json()
 }
+
+export const removeFile = (id, fileId) =>
+  apiJson(`/datasets/${id}/files/${fileId}`, { method: 'DELETE' })
+export const listFiles = (id) => apiJson(`/datasets/${id}/files`)
 
 export const mapDataset = (id) => apiJson(`/datasets/${id}/map`, { method: 'POST' })
 export const runDq = (id) => apiJson(`/datasets/${id}/dq`, { method: 'POST' })

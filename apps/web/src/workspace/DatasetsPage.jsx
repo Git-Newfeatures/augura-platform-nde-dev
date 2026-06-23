@@ -127,31 +127,6 @@ function StatusBadge({ d }) {
   return null
 }
 
-// ── Placeholder content (beta tabs — Privacy / Validation / Lineage) ───────────
-const PRIVACY_ROWS = [
-  { col: 'member_id', kind: 'Direct (record number)', action: 'Pseudonymised → member_id', tone: 'ok' },
-  { col: 'age', kind: 'Quasi (age)', action: 'Retained · low re-id risk', tone: 'ok' },
-  { col: 'sex', kind: 'Quasi (demographic)', action: 'Retained · low re-id risk', tone: 'ok' },
-  { col: 'visit_date_*', kind: 'Quasi (dates)', action: 'Shifted · intervals kept', tone: 'ok' },
-  { col: 'region', kind: 'Quasi (geo)', action: 'Generalised to region', tone: 'warn' },
-  { col: 'hba1c_*', kind: 'Clinical measure', action: 'No identifier · retained', tone: 'none' },
-]
-const VALIDATION_ROWS = [
-  { check: 'Row count', detail: 'Matches manifest · within expected range', tone: 'ok' },
-  { check: 'Missingness', detail: 'Max 6.1% on hba1c_12m · all under 10% threshold', tone: 'ok' },
-  { check: 'Type checks', detail: 'Every column matches its declared type', tone: 'ok' },
-  { check: 'Constant columns', detail: 'No zero-variance columns detected', tone: 'ok' },
-  { check: 'Duplicate rows', detail: '2 near-duplicate member_id × visit pairs', tone: 'warn' },
-  { check: 'Primary key', detail: 'member_id × visit unique across all rows', tone: 'ok' },
-]
-const LINEAGE_STEPS = [
-  { kind: 'source', label: 'Uploaded file', detail: 'Original wide-format spreadsheet · sha256:a7f2…' },
-  { kind: 'transform', label: 'Server-side parse + profile', detail: 'Columns typed, null %, distinct counts' },
-  { kind: 'transform', label: 'Taxonomy mapping', detail: 'Columns bound to Augura concepts' },
-  { kind: 'transform', label: 'Data-quality pass', detail: 'Completeness, validity, consistency checks' },
-]
-const LINEAGE_USES = ['Causal model', 'Power simulation']
-
 const BetaNote = ({ children }) => (
   <div className="rounded-xl border border-dashed border-border bg-muted/40 p-4 text-[12px] leading-[1.55] text-muted-foreground">
     {children}
@@ -614,29 +589,14 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
         />
       )}
 
-      {/* ── PRIVACY (beta placeholder) ── */}
+      {/* ── PRIVACY (beta — backend pass pending) ── */}
       {sub === 'privacy' && (
         <div className="flex flex-col gap-4">
           <BetaNote>
             <strong className="text-foreground">Privacy (beta).</strong> A PII/PHI scan will gate the dataset before
-            mapping. Wiring to a backend privacy pass is pending — the rows below are an illustrative preview.
+            mapping. This view activates once the backend privacy pass is wired — no preview data is shown.
           </BetaNote>
-          <Card className="gap-0 rounded-xl border p-5">
-            <SectionTitle icon={<Shield size={15} className="text-primary" />} sub="Direct and quasi-identifiers, with the action taken">
-              Identifiers detected &amp; handled
-            </SectionTitle>
-            <div className="flex flex-col gap-2">
-              {PRIVACY_ROWS.map((r) => (
-                <div key={r.col} className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${TONE[r.tone].wrap}`}>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-[12px] text-foreground">{r.col}</div>
-                    <div className="text-[11.5px] text-muted-foreground">{r.kind}</div>
-                  </div>
-                  <Tag color={TONE[r.tone].tag}>{r.action}</Tag>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <EmptyState icon={Shield} title="Privacy scan coming soon" subtitle="Backend privacy pass not yet wired." />
         </div>
       )}
 
@@ -708,81 +668,25 @@ function DatasetDetail({ d, onBack, onOpenStudy }) {
         </div>
       )}
 
-      {/* ── VALIDATION (beta placeholder) ── */}
+      {/* ── VALIDATION (beta — backend gate pending) ── */}
       {sub === 'validation' && (
         <div className="flex flex-col gap-4">
           <BetaNote>
             <strong className="text-foreground">Validation (beta).</strong> A release-gate summary (row count,
-            missingness, types, duplicates, primary key) will live here once wired. Preview below.
+            missingness, types, duplicates, primary key) will live here once wired — no preview data is shown.
           </BetaNote>
-          <Card className="gap-0 rounded-xl border p-5">
-            <SectionTitle icon={<CheckCircle2 size={15} className="text-primary" />} sub="Row count, missingness, types, constants, duplicates">
-              Data-quality checks
-            </SectionTitle>
-            <div className="flex flex-col gap-2">
-              {VALIDATION_ROWS.map((r) => (
-                <ScanRow
-                  key={r.check}
-                  left={r.check}
-                  kind={r.detail}
-                  right={r.tone === 'warn' ? 'Warn' : 'Pass'}
-                  rightTone={TONE[r.tone].text}
-                  badge={r.tone}
-                />
-              ))}
-            </div>
-          </Card>
+          <EmptyState icon={CheckCircle2} title="Release-gate summary coming soon" subtitle="Backend validation pass not yet wired." />
         </div>
       )}
 
-      {/* ── LINEAGE (beta placeholder) ── */}
+      {/* ── LINEAGE (beta — backend trace pending) ── */}
       {sub === 'lineage' && (
         <div className="flex flex-col gap-4">
           <BetaNote>
             <strong className="text-foreground">Lineage (beta).</strong> Every transformation from source to current
-            state — versioned and replayable. Backend trace pending; preview below.
+            state — versioned and replayable — will appear here once the backend trace is wired.
           </BetaNote>
-          <Card className="gap-0 rounded-xl border p-5">
-            <SectionTitle icon={<GitBranch size={15} className="text-primary" />} sub="Source → transforms → uses">
-              Transformation trace
-            </SectionTitle>
-            <div className="flex flex-col">
-              {LINEAGE_STEPS.map((s) => (
-                <div key={s.label} className="flex gap-3">
-                  <div className="flex w-4 flex-shrink-0 flex-col items-center">
-                    <span
-                      className={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${
-                        s.kind === 'source' ? 'bg-primary' : 'border-2 border-primary bg-card'
-                      }`}
-                    />
-                    <span className="w-px flex-1 bg-border" />
-                  </div>
-                  <div className="pb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12.5px] font-semibold text-foreground">{s.label}</span>
-                      <Tag color={s.kind === 'source' ? 'b' : 'g'}>{s.kind === 'source' ? 'Source' : 'Transform'}</Tag>
-                    </div>
-                    <div className="mt-0.5 text-[12px] leading-[1.45] text-muted-foreground">{s.detail}</div>
-                  </div>
-                </div>
-              ))}
-              <div className="flex gap-3">
-                <div className="flex w-4 flex-shrink-0 flex-col items-center">
-                  <ArrowRight size={14} className="rotate-90 text-primary" />
-                </div>
-                <div>
-                  <div className="text-[12.5px] font-semibold text-foreground">Used by</div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {LINEAGE_USES.map((u) => (
-                      <Tag key={u} color="p">
-                        {u}
-                      </Tag>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
+          <EmptyState icon={GitBranch} title="Transformation trace coming soon" subtitle="Backend lineage trace not yet wired." />
         </div>
       )}
     </div>

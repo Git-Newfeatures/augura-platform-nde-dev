@@ -5,10 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export default function ResetPassword() {
-  console.log('PATHNAME:', window.location.pathname)
-  console.log('HASH:', window.location.hash)
-  console.log('HREF:', window.location.href)
-
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);

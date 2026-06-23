@@ -1,4 +1,4 @@
-"""Logique du module datasets : CRUD, colonnes (profiling), lecture cohortes."""
+"""Datasets module logic: CRUD, columns (profiling), cohort reads."""
 
 from uuid import UUID, uuid4
 
@@ -18,7 +18,7 @@ class DatasetService:
     async def _require_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> Dataset:
         dataset = await self.repo.get_dataset(tenant.tenant_id, dataset_id)
         if dataset is None:
-            raise NotFoundError("dataset introuvable", dataset_id=str(dataset_id))
+            raise NotFoundError("dataset not found", dataset_id=str(dataset_id))
         return dataset
 
     @staticmethod

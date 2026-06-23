@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 
 import httpx
+from anyio.to_thread import run_sync
 
 from augura_api.core.config import Settings
 
@@ -84,6 +85,39 @@ async def _supabase_get(settings: Settings, ref: str) -> bytes:
     return resp.content
 
 
+async def _supabase_exists(settings: Settings, ref: str) -> bool:
+    # Range request: transfers 1 byte instead of the whole object just to test presence.
+    headers = {**_auth_headers(settings), "Range": "bytes=0-0"}
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(_object_url(settings, ref), headers=headers)
+    if resp.status_code == 404:
+        return False
+    if resp.status_code not in (200, 206):
+        raise OSError(f"Supabase Storage head failed ({resp.status_code}): {resp.text}")
+    return True
+
+
+# ─── local-disk helpers (sync — run off the event loop via run_sync) ─────────────
+
+
+def _write_disk(root: Path, ref: str, data: bytes) -> None:
+    dest = root / ref
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+
+
+def _read_disk(root: Path, storage_path: str) -> bytes:
+    target = (root / storage_path).resolve()
+    if not str(target).startswith(str(root)):
+        raise FileNotFoundError("artifact path outside the allowed directory")
+    return target.read_bytes()
+
+
+def _exists_disk(root: Path, storage_path: str) -> bool:
+    target = (root / storage_path).resolve()
+    return str(target).startswith(str(root)) and target.is_file()
+
+
 # ─── public interface (async, backend-agnostic) ─────────────────────────────────
 
 
@@ -93,9 +127,7 @@ async def save_bytes(settings: Settings, *, org_id: str, name: str, data: bytes)
     if _use_supabase(settings):
         await _supabase_put(settings, ref, data)
     else:
-        dest = _root(settings) / ref
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(data)
+        await run_sync(_write_disk, _root(settings), ref, data)
     return ref
 
 
@@ -104,20 +136,10 @@ async def read_bytes(settings: Settings, storage_path: str) -> bytes:
     On the disk backend, rejects any escape outside the artifacts directory."""
     if _use_supabase(settings):
         return await _supabase_get(settings, storage_path)
-    root = _root(settings).resolve()
-    target = (root / storage_path).resolve()
-    if not str(target).startswith(str(root)):
-        raise FileNotFoundError("artifact path outside the allowed directory")
-    return target.read_bytes()
+    return await run_sync(_read_disk, _root(settings).resolve(), storage_path)
 
 
 async def exists(settings: Settings, storage_path: str) -> bool:
     if _use_supabase(settings):
-        try:
-            await _supabase_get(settings, storage_path)
-        except FileNotFoundError:
-            return False
-        return True
-    root = _root(settings).resolve()
-    target = (root / storage_path).resolve()
-    return str(target).startswith(str(root)) and target.is_file()
+        return await _supabase_exists(settings, storage_path)
+    return await run_sync(_exists_disk, _root(settings).resolve(), storage_path)

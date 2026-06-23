@@ -1,7 +1,7 @@
 [project]
 name = "augura-api"
 version = "0.1.0"
-description = "Augura API — monolithe modulaire FastAPI"
+description = "Augura API — modular FastAPI monolith"
 readme = "README.md"
 authors = [
     { name = "Quentin Caron", email = "quentin.caron0@icloud.com" }

@@ -5,17 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  // Build output + non-app folders (reference designs, standalone sub-project,
-  // backups, Python sim, data fixtures) are not part of the app and not linted.
-  globalIgnores([
-    'dist',
-    'docs',
-    'backup',
-    'augura-corpus-intelligence',
-    'simulation',
-    'user-data',
-    'validation_dataset_doc',
-  ]),
+  // Build output is the only non-app folder under apps/web.
+  globalIgnores(['dist']),
 
   // App source — runs in the browser.
   {
@@ -45,13 +36,14 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/static-components': 'warn',
       'react-hooks/immutability': 'warn',
+      // Debug logging must not ship; warn/error are intentional diagnostics.
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
 
-  // Server-side: Vercel serverless functions, the shared agent runtime +
-  // tools, Node build/utility scripts, and the test suites.
+  // Root config files run under Node (vite.config.js, eslint.config.js).
   {
-    files: ['api/**/*.js', 'agents/**/*.js', 'tools/**/*.js', 'test/**/*.js', 'e2e/**/*.js', 'scripts/**/*.js', '*.js'],
+    files: ['*.js'],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 2022,

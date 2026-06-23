@@ -131,7 +131,10 @@ def enqueue_job(
         import modal
 
         on_modal = not modal.is_local()
-    except Exception:  # noqa: BLE001 — modal absent/uninitialized ⇒ local path
+    except ImportError:
+        # modal not installed ⇒ local path. Any OTHER failure (e.g. a real
+        # misconfiguration inside a Modal container) must surface, not silently
+        # fall back to BackgroundTasks (which Modal does not run → job stuck).
         on_modal = False
 
     if on_modal:

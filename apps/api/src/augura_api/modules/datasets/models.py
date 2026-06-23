@@ -58,6 +58,25 @@ class DatasetColumn(Base):
     final_canonical_id: Mapped[str | None] = mapped_column(Text)
 
 
+class DatasetFile(Base):
+    __tablename__ = "dataset_files"
+
+    id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    dataset_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("datasets.id", ondelete="CASCADE")
+    )
+    filename: Mapped[str] = mapped_column(Text)
+    storage_path: Mapped[str] = mapped_column(Text)
+    row_count: Mapped[int | None] = mapped_column(Integer)
+    headers: Mapped[list[Any] | None] = mapped_column(JSONB)
+    position: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
 class CohortMember(Base):
     __tablename__ = "cohort_members"
 

@@ -23,6 +23,9 @@ class _FakeDatasetRepo:
     async def get_dataset(self, tenant_id: object, dataset_id: object) -> object:
         return SimpleNamespace(storage_path="org/x/f.csv", name="f.csv")
 
+    async def list_files(self, dataset_id: object) -> list[object]:
+        return [SimpleNamespace(filename="f.csv", storage_path="org/x/f.csv")]
+
 
 def _tenant() -> CurrentTenant:
     return CurrentTenant(tenant_id=TenantId(uuid4()), user_id=UserId(uuid4()), role="owner")

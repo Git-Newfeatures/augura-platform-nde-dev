@@ -26,19 +26,30 @@ class DqService:
         *,
         weight_profile: str = "exploratory",
     ) -> schemas.DqRunResult:
+        from augura_api.modules.datasets.combine import combine_sheets
+        from augura_api.modules.datasets.parsing import Sheet
+
         dataset = await self.datasets.get_dataset(tenant.tenant_id, dataset_id)
-        if dataset is None or not dataset.storage_path:
+        if dataset is None:
+            raise NotFoundError("dataset not found", dataset_id=str(dataset_id))
+        files = await self.datasets.list_files(dataset_id)
+        if not files:
             raise NotFoundError("dataset not found or has no file", dataset_id=str(dataset_id))
+        parsed: list[tuple[str, list[Sheet]]] = []
+        raw = b""
         try:
-            data = await read_bytes(settings, dataset.storage_path)
+            for f in files:
+                data = await read_bytes(settings, f.storage_path)
+                raw += data
+                parsed.append((f.filename, parse_upload(f.filename, data)))
         except FileNotFoundError as exc:
-            # The stored ref points to nothing readable (e.g. bytes written to Modal's
+            # A stored ref points to nothing readable (e.g. bytes written to Modal's
             # ephemeral, per-container disk before the move to the object store): clean 404.
             raise NotFoundError("dataset file unavailable", dataset_id=str(dataset_id)) from exc
-        sheets = parse_upload(dataset.name, data)
+        combined = combine_sheets(parsed)
         bundle = run_dq(
-            [{"name": s.name, "headers": s.headers, "rows": s.rows} for s in sheets],
-            raw_bytes=data,
+            [{"name": s.name, "headers": s.headers, "rows": s.rows} for s in combined],
+            raw_bytes=raw,
             weight_profile=weight_profile,
         )
         row = await self.repo.create_bundle(

@@ -69,7 +69,7 @@ async def test_upload_then_map_persists_proposals(
             ).bindparams(i=str(tenant), s="it-" + uuid4().hex[:8])
         )
         up = await DatasetService(DatasetRepo(session)).upload_dataset(
-            _tenant(tenant), settings, filename="c.csv", data=csv, name=None, study_id=None
+            _tenant(tenant), settings, files=[("c.csv", csv)], name=None, study_id=None
         )
         result = await MappingService(
             MappingRepo(session), DatasetRepo(session), SemanticRepo(session)

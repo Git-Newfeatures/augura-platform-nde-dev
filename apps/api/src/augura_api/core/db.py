@@ -5,6 +5,7 @@ the RLS policies (supabase/policies.sql) rely on it. The API connects with a Pos
 role that is NOT exempt from RLS (spec §7).
 """
 
+import ssl
 from collections.abc import AsyncIterator
 
 from sqlalchemy import MetaData, TextClause, text
@@ -40,6 +41,12 @@ _engines: dict[str, AsyncEngine] = {}
 _sessionmakers: dict[str, async_sessionmaker[AsyncSession]] = {}
 
 
+def clear_engine_cache() -> None:
+    """Evict all cached engines (test seam — lets tests swap create_async_engine)."""
+    _engines.clear()
+    _sessionmakers.clear()
+
+
 def to_asyncpg_url(database_url: str) -> str:
     """Force the asyncpg driver (Supabase provides a `postgresql://` URL)."""
     if database_url.startswith("postgresql+asyncpg://"):
@@ -57,7 +64,8 @@ def get_engine(settings: Settings) -> AsyncEngine:
     url = to_asyncpg_url(settings.database_url)
     engine = _engines.get(url)
     if engine is None:
-        engine = create_async_engine(url, pool_pre_ping=True)
+        ctx = ssl.create_default_context()  # check_hostname=True, verify_mode=CERT_REQUIRED
+        engine = create_async_engine(url, pool_pre_ping=True, connect_args={"ssl": ctx})
         _engines[url] = engine
     return engine
 

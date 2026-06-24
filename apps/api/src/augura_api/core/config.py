@@ -116,6 +116,20 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _require_tls_db_in_prod(self) -> "Settings":
+        # PHI-bearing SQL must use TLS. asyncpg does NOT negotiate TLS unless told to,
+        # so in prod we require an explicit sslmode/ssl in the URL and verify it at
+        # connect time (core/db.py). Fail-fast at boot, like the CORS guard above.
+        if self.env == "prod" and self.database_url is not None:
+            url = self.database_url.lower()
+            if "sslmode=" not in url and "ssl=" not in url:
+                raise ValueError(
+                    "AUGURA_DATABASE_URL must request TLS in prod "
+                    "(append ?sslmode=require — connection is then certificate-verified)."
+                )
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:

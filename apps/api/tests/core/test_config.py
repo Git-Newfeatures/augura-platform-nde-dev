@@ -83,3 +83,27 @@ def test_ctgov_relay_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setenv("AUGURA_CTGOV_RELAY_URL", "   ")
     assert Settings().ctgov_relay_url is None  # pyright: ignore[reportCallIssue]
+
+
+def test_prod_requires_tls_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """In prod a DB URL without sslmode/ssl must fail fast at boot."""
+    monkeypatch.setenv("AUGURA_ENV", "prod")
+    monkeypatch.setenv("AUGURA_CORS_ORIGINS", "https://app.augura.io")
+    monkeypatch.setenv(
+        "AUGURA_DATABASE_URL", "postgresql://u:p@db.example.supabase.co:5432/postgres"
+    )
+    with pytest.raises(ValidationError):
+        Settings()  # pyright: ignore[reportCallIssue]
+
+
+def test_prod_accepts_tls_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUGURA_ENV", "prod")
+    monkeypatch.setenv("AUGURA_CORS_ORIGINS", "https://app.augura.io")
+    monkeypatch.setenv(
+        "AUGURA_DATABASE_URL",
+        "postgresql://u:p@db.example.supabase.co:5432/postgres?sslmode=require",
+    )
+    monkeypatch.setenv("AUGURA_SUPABASE_URL", "https://proj.supabase.co")
+    monkeypatch.setenv("AUGURA_SUPABASE_SERVICE_ROLE_KEY", "svc")
+    s = Settings()  # pyright: ignore[reportCallIssue]
+    assert s.database_url is not None

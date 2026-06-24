@@ -4,8 +4,11 @@ Identical in intent to Nico's Anthropic tool: select / discard / assign
 roles, and propose missing concepts/relations for the causal pathway.
 """
 
+import json
+
 from anthropic.types import ToolParam
 
+from augura_api.modules.causal.roles import dagitty_json
 from augura_api.modules.causal.schemas import MappedConcept, Picot
 from augura_api.modules.causal.subgraph import ConceptMeta, Relation
 from augura_api.modules.semantic import vocab
@@ -180,8 +183,23 @@ SYSTEM_PROMPT = (
     "- mediator: an intermediate variable on the causal pathway exposure→outcome\n"
     "- effect_modifier: changes the magnitude/direction of the exposure-outcome relationship\n"
     "- collider: caused by both exposure and outcome (conditioning opens a spurious path)\n"
-    "- other: a relevant variable not fitting one of the causal roles above"
+    "- other: a relevant variable not fitting one of the causal roles above\n\n"
+    "Reason in two stages within this single response:\n"
+    "Stage A — Independent derivation: first reason through the causal question from your own "
+    "medical knowledge: which variables lie on the exposure→outcome path, which are confounders, "
+    "which are mediators, and the key mechanisms.\n"
+    "Stage B — Subgraph comparison: then compare your independent model against the CANDIDATE "
+    "ONTOLOGY RELATIONS and the DETERMINISTIC STRUCTURAL ROLES provided. Keep relations that "
+    "align, exclude those that do not fit the clinical context, and add anything missing from the "
+    "candidate set (present in your independent model) via proposed_relations/proposed_concepts. "
+    "Begin llm_reasoning with a short summary of your Stage A independent model."
 )
+
+
+def _roles_lines(roles: dict[str, str]) -> str:
+    if not roles:
+        return "  (none)"
+    return "\n".join(f"  {cid}: {role}" for cid, role in sorted(roles.items()))
 
 
 def _concept_lines(mapped: list[MappedConcept]) -> str:
@@ -259,7 +277,10 @@ def build_user_prompt(
     mapped: list[MappedConcept],
     candidates: list[Relation],
     inferred: list[tuple[str, ConceptMeta]],
+    structural_roles: dict[str, str] | None = None,
 ) -> str:
+    structural_roles = structural_roles or {}
+    dag_json = json.dumps(dagitty_json(candidates, structural_roles))
     inferred_section = (
         "\nONTOLOGY SUBGRAPH CONCEPTS (inferred neighbors — usable in proposed_relations "
         f"without declaring in proposed_concepts):\n{_inferred_lines(inferred)}\n"
@@ -273,7 +294,10 @@ def build_user_prompt(
         f"{_concept_lines(mapped) or '  (none mapped)'}\n"
         f"{inferred_section}\n"
         f"CANDIDATE ONTOLOGY RELATIONS (retrieved for this concept set):\n"
-        f"{_relation_lines(candidates) or '  (none found)'}\n"
+        f"{_relation_lines(candidates) or '  (none found)'}\n\n"
+        f"DETERMINISTIC STRUCTURAL ROLES (pre-LLM, from graph topology + PICOT):\n"
+        f"{_roles_lines(structural_roles)}\n\n"
+        f"CANDIDATE DAG (dagitty-like JSON):\n  {dag_json}\n"
         f"{_node_roles_requirement(mapped, picot)}\n"
         "Return the filter_dag_relations tool call selecting/excluding relations, assigning "
         "node_roles, and proposing concepts/relations only where the candidate set is "

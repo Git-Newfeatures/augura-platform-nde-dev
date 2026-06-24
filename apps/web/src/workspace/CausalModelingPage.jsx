@@ -309,12 +309,17 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
 }
 
 function Result({ dag, onAccepted }) {
+  const measured = dag.nodes.filter((n) => n.observed).length
+  const structuralRoles = dag.llm_context?.structural_roles || {}
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <QualityBadge q={dag.quality} />
         <Badge variant="secondary">{dag.nodes.length} nodes</Badge>
         <Badge variant="secondary">{dag.edges.length} edges</Badge>
+        <Badge variant="outline" className="text-muted-foreground">
+          {measured} measured · {dag.nodes.length - measured} unmeasured
+        </Badge>
         {dag.graph.adjusted_ids.length > 0 && (
           <Badge variant="outline" className="text-amber-700">
             Adjustment set: {dag.graph.adjusted_ids.length}
@@ -333,6 +338,22 @@ function Result({ dag, onAccepted }) {
           <DagSvg nodes={dag.nodes} edges={dag.edges} />
           <Legend />
         </>
+      )}
+
+      {Object.keys(structuralRoles).length > 0 && (
+        <Card className="p-4">
+          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            Structural roles (deterministic, pre-LLM)
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(structuralRoles).map(([cid, role]) => (
+              <Badge key={cid} variant="outline" className="text-[10.5px]">
+                <span className="font-mono">{cid}</span>
+                <span className="ml-1 text-muted-foreground">· {role}</span>
+              </Badge>
+            ))}
+          </div>
+        </Card>
       )}
 
       {dag.llm_context?.reasoning && (

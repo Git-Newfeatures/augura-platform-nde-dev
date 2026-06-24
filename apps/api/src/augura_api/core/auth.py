@@ -18,11 +18,14 @@ from uuid import UUID
 
 import httpx
 import jwt
+import structlog
 from jwt import PyJWKSet
 
 from augura_api.core.config import Settings
 from augura_api.core.errors import UnauthorizedError
 from augura_api.core.ids import UserId
+
+log = structlog.get_logger(__name__)
 
 JwksFetcher = Callable[[], Awaitable[dict[str, Any]]]
 
@@ -55,7 +58,8 @@ def verify_token(
             options={"require": ["exp", "sub"]},
         )
     except jwt.PyJWTError as exc:
-        raise UnauthorizedError("invalid jwt", reason=str(exc)) from exc
+        log.info("jwt_rejected", reason=str(exc))
+        raise UnauthorizedError("invalid jwt") from exc
 
     sub = claims.get("sub")
     if not isinstance(sub, str):
@@ -63,7 +67,8 @@ def verify_token(
     try:
         user_id = UserId(UUID(sub))
     except ValueError as exc:
-        raise UnauthorizedError("sub is not a uuid", sub=sub) from exc
+        log.info("jwt_sub_not_uuid")
+        raise UnauthorizedError("invalid jwt") from exc
 
     email = claims.get("email")
     return Principal(

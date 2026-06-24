@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
+
+from augura_api.core.config import Settings
 
 log = structlog.get_logger(__name__)
 
@@ -63,7 +67,7 @@ class UnsupportedMediaTypeError(AppError):
     title = "Unsupported media type"
 
 
-def register_error_handlers(app: FastAPI) -> None:
+def register_error_handlers(app: FastAPI, settings: Settings | None = None) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
         body: dict[str, Any] = {
@@ -74,7 +78,11 @@ def register_error_handlers(app: FastAPI) -> None:
             "code": exc.code,
         }
         if exc.context:
-            body["context"] = exc.context
+            # Always log server-side for debugging; only echo to the client in dev
+            # so identifiers and internal detail never leak in prod responses.
+            log.info("app_error", code=exc.code, context=exc.context)
+            if settings is None or settings.env != "prod":
+                body["context"] = exc.context
         return JSONResponse(
             status_code=exc.http_status,
             content=body,

@@ -1,5 +1,6 @@
 import httpx
 
+from augura_api.core.config import Settings
 from augura_api.core.errors import NotFoundError
 from augura_api.main import create_app
 
@@ -25,6 +26,27 @@ async def test_app_error_renders_problem_details() -> None:
     assert body["detail"] == "study not found"
     assert body["code"] == "not_found"
     assert body["context"] == {"study_id": "s1"}
+
+
+async def test_context_suppressed_in_prod() -> None:
+    cfg = Settings(  # pyright: ignore[reportCallIssue]
+        env="prod",
+        cors_origins="https://app.augura.io",
+        supabase_url="https://proj.supabase.co",
+        supabase_service_role_key="svc",
+    )
+    app = create_app(cfg)
+
+    @app.get("/boom-prod")
+    async def boom_prod() -> None:
+        raise NotFoundError("study not found", study_id="s1")
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.get("/boom-prod")
+    body = r.json()
+    assert body["detail"] == "study not found"
+    assert "context" not in body  # internal ids never reach the client in prod
 
 
 async def test_storage_error_renders_problem_details_with_cors() -> None:

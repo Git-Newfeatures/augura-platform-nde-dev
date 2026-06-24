@@ -36,7 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    register_error_handlers(app)
+    register_error_handlers(app, cfg)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

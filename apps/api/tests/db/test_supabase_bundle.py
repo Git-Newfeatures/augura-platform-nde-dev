@@ -325,6 +325,17 @@ def test_outbox_events_is_append_only() -> None:
     assert re.search(r"revoke[^;]*on outbox_events from augura_app", policies, re.S)
 
 
+def test_datasets_bucket_provisioned_private() -> None:
+    """The datasets bucket is created private in the bundle (guarded so bare-Postgres
+    CI is a no-op)."""
+    policies = _read("policies.sql").lower()
+    assert "storage.buckets" in policies
+    assert "'datasets'" in policies
+    # Pin the privacy intent: the conflict path must force public = false (not merely
+    # mention "public" — a public=true block would otherwise slip through).
+    assert re.search(r"public\s*=\s*false", policies)
+
+
 def test_post_baseline_tables_each_have_a_migration() -> None:
     """Any table in schema.sql that isn't part of the 0001 baseline MUST also be
     created by a >=0002 migration, or it will be missing on already-migrated prod DBs."""

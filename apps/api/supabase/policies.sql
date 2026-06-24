@@ -385,4 +385,17 @@ create policy snapshot_tenant_study_access on literature_snapshots
         )
     );
 
+-- ── Object storage: the datasets bucket must exist and be PRIVATE ─────────
+-- Guarded: the `storage` schema only exists on Supabase, not on the bare CI
+-- Postgres (pgvector) where the bundle is also applied → no-op there.
+do $$
+begin
+    if exists (select 1 from information_schema.schemata where schema_name = 'storage') then
+        insert into storage.buckets (id, name, public)
+        values ('datasets', 'datasets', false)
+        on conflict (id) do update set public = false;
+    end if;
+end
+$$;
+
 commit;

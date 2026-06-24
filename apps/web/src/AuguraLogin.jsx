@@ -58,9 +58,6 @@ export default function AuguraLogin() {
           <Card className="mb-3 rounded-lg border-border p-[14px_16px]">
             <div className="mb-[3px] flex items-center gap-2 text-[13px] font-medium text-foreground">
               Augura
-              <span className="rounded-[3px] border border-primary/30 bg-secondary px-1.5 py-px font-mono text-[9px] tracking-[0.06em] text-primary">
-                SECURE
-              </span>
             </div>
             <div className="text-[11px] text-muted-foreground">Clinical Evidence Intelligence</div>
           </Card>

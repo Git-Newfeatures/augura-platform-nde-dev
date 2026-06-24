@@ -249,7 +249,7 @@ export function StudySettings({ study, projectId }) {
         <div className="mb-1 flex items-center gap-2 text-[15px] font-semibold text-foreground"><Shield size={15} className="text-primary" /> Data & retention</div>
         <div className="mt-2 flex flex-col gap-2.5 text-[12.5px] text-foreground/80">
           <div className="flex items-center justify-between"><span>Dataset retention</span><Badge variant="secondary" className="text-primary">12 months</Badge></div>
-          <div className="flex items-center justify-between"><span>De-identification</span><Badge variant="secondary" className="text-primary">Pseudonymised ✓</Badge></div>
+          <div className="flex items-center justify-between"><span>De-identification</span><Badge variant="outline" className="text-muted-foreground">Not yet enforced</Badge></div>
           <div className="flex items-center justify-between"><span>Default export format</span><Badge variant="outline" className="text-muted-foreground">DiGA dossier (PDF)</Badge></div>
         </div>
       </Card>

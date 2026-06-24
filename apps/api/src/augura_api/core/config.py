@@ -141,6 +141,18 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _require_object_store_in_prod(self) -> "Settings":
+        # The local-disk storage backend writes unencrypted bytes to the (ephemeral,
+        # per-container) Modal FS. In prod the object store is mandatory: fail-fast
+        # rather than silently degrade to plaintext-on-disk.
+        if self.env == "prod" and not (self.supabase_url and self.supabase_service_role_key):
+            raise ValueError(
+                "AUGURA_SUPABASE_URL and AUGURA_SUPABASE_SERVICE_ROLE_KEY are required "
+                "in prod (object store) — the local-disk fallback is dev/test only."
+            )
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:

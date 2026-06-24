@@ -125,3 +125,21 @@ def test_prod_accepts_tls_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUGURA_SUPABASE_SERVICE_ROLE_KEY", "svc")
     s = Settings()  # pyright: ignore[reportCallIssue]
     assert s.database_url is not None
+
+
+def test_prod_requires_supabase_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUGURA_ENV", "prod")
+    monkeypatch.setenv("AUGURA_CORS_ORIGINS", "https://app.augura.io")
+    monkeypatch.delenv("AUGURA_SUPABASE_URL", raising=False)
+    monkeypatch.delenv("AUGURA_SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    with pytest.raises(ValidationError):
+        Settings()  # pyright: ignore[reportCallIssue]
+
+
+def test_prod_with_supabase_storage_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUGURA_ENV", "prod")
+    monkeypatch.setenv("AUGURA_CORS_ORIGINS", "https://app.augura.io")
+    monkeypatch.setenv("AUGURA_SUPABASE_URL", "https://proj.supabase.co")
+    monkeypatch.setenv("AUGURA_SUPABASE_SERVICE_ROLE_KEY", "svc")
+    s = Settings()  # pyright: ignore[reportCallIssue]
+    assert s.supabase_url is not None and s.supabase_service_role_key is not None

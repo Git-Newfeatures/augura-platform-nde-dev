@@ -41,11 +41,10 @@ end
 $$;
 grant augura_app to augura_api;
 
--- Lockdown of the default Supabase grants (PostgREST). All data access
--- goes through the backend (role augura_app); anon/authenticated must not
--- read/write the tables directly. We strip the default privileges then
--- re-grant the only legitimate direct write: the INSERT of login events by
--- the front (App.jsx) in the authenticated role.
+-- Lockdown of the default Supabase grants (PostgREST). ALL data access goes
+-- through the backend (role augura_app); anon/authenticated must not read/write
+-- the tables directly. Login events are now recorded via the backend
+-- (POST /analytics/events/login, Task 2), not a direct PostgREST insert.
 -- Guarded by existence: anon/authenticated are specific to Supabase; on a bare
 -- Postgres (CI pgvector, alembic upgrade head) these roles do not exist → no-op.
 do $$
@@ -60,7 +59,6 @@ begin
             on all tables in schema public from authenticated;
         alter default privileges in schema public
             revoke insert, update, delete, truncate, references, trigger on tables from authenticated;
-        grant insert on usage_events to authenticated;
     end if;
 end
 $$;
@@ -183,40 +181,51 @@ create policy tenant_or_global on chunks
     )
     with check (org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 
--- ── usage_events: tenant or system row (org_id NULL) ─────────────────────
+-- ── usage_events: append-only audit (tenant/system reads; INSERT only) ────
 alter table usage_events enable row level security;
 alter table usage_events force row level security;
-create policy tenant_or_system on usage_events
+drop policy if exists tenant_or_system on usage_events;
+drop policy if exists usage_events_read on usage_events;
+drop policy if exists usage_events_insert on usage_events;
+create policy usage_events_read on usage_events
+    for select
     using (
         org_id is null
         or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
-    )
+    );
+create policy usage_events_insert on usage_events
+    for insert
     with check (
         org_id is null
         or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid
     );
+-- Append-only at the privilege level too: no UPDATE/DELETE/TRUNCATE for the app role.
+revoke update, delete, truncate on usage_events from augura_app;
 
--- ── Infra tables (non tenant): RLS "backend session gate" ────────────────
--- agent_cache (shared deterministic cache) and outbox_events (system audit) are
--- not tenant-scoped, but must NEVER be reachable via PostgREST
--- (anon/authenticated, without app.tenant_id). RLS enabled + gate on the presence
--- of the backend context: anon denied, backend (context set) allowed.
-do $$
-declare
-    t text;
-begin
-    foreach t in array array['agent_cache', 'outbox_events']
-    loop
-        execute format('alter table %I enable row level security;', t);
-        execute format('alter table %I force row level security;', t);
-        execute format($f$
-            create policy backend_session on %I
-            using (nullif(current_setting('app.tenant_id', true), '') is not null)
-            with check (nullif(current_setting('app.tenant_id', true), '') is not null);
-        $f$, t);
-    end loop;
-end
-$$;
+-- ── agent_cache: shared deterministic cache, backend-session gated (read/write) ──
+alter table agent_cache enable row level security;
+alter table agent_cache force row level security;
+drop policy if exists backend_session on agent_cache;
+create policy backend_session on agent_cache
+    using (nullif(current_setting('app.tenant_id', true), '') is not null)
+    with check (nullif(current_setting('app.tenant_id', true), '') is not null);
+
+-- ── outbox_events: append-only system audit, backend-session gated ────────
+alter table outbox_events enable row level security;
+alter table outbox_events force row level security;
+drop policy if exists backend_session on outbox_events;
+drop policy if exists outbox_events_read on outbox_events;
+drop policy if exists outbox_events_insert on outbox_events;
+create policy outbox_events_read on outbox_events
+    for select
+    using (nullif(current_setting('app.tenant_id', true), '') is not null);
+create policy outbox_events_insert on outbox_events
+    for insert
+    with check (nullif(current_setting('app.tenant_id', true), '') is not null);
+-- NOTE: a future outbox relay/dispatcher that sets outbox_events.processed_at must run
+-- under a privileged worker role (BYPASSRLS) — like the seed/worker path — because
+-- augura_app is intentionally denied UPDATE here to keep the audit trail append-only.
+revoke update, delete, truncate on outbox_events from augura_app;
 
 -- ── Reference catalogs (cesl_sources, cesl_study_designs) ─────────────────
 -- Global, read-only for tenant sessions. RLS enabled + "backend session"

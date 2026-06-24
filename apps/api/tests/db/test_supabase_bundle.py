@@ -310,6 +310,21 @@ def _tables_created_in_migrations() -> set[str]:
     return tables
 
 
+def test_usage_events_is_append_only() -> None:
+    """The login-event forgery vector (authenticated INSERT) is removed and the app
+    role cannot UPDATE/DELETE audit rows (Part 11 / HIPAA 164.312(b))."""
+    policies = _read("policies.sql").lower()
+    assert "grant insert on usage_events to authenticated" not in policies
+    assert "create policy usage_events_insert on usage_events" in policies
+    assert re.search(r"revoke[^;]*update[^;]*on usage_events from augura_app", policies, re.S)
+
+
+def test_outbox_events_is_append_only() -> None:
+    policies = _read("policies.sql").lower()
+    assert "create policy outbox_events_insert on outbox_events" in policies
+    assert re.search(r"revoke[^;]*on outbox_events from augura_app", policies, re.S)
+
+
 def test_post_baseline_tables_each_have_a_migration() -> None:
     """Any table in schema.sql that isn't part of the 0001 baseline MUST also be
     created by a >=0002 migration, or it will be missing on already-migrated prod DBs."""

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 
 from augura_api.core.deps import CurrentTenantDep, SessionDep, require_role
 from augura_api.core.tenancy import CurrentTenant
@@ -43,3 +43,27 @@ async def artifacts(
     """Tenant's versioned & hashed artifacts (provenance/reproducibility) —
     feeds the Lineage tab."""
     return await AnalyticsService(session).artifacts(tenant, limit=limit, study_id=study_id)
+
+
+@router.post("/events/login", status_code=status.HTTP_204_NO_CONTENT)
+async def login_event(
+    body: schemas.LoginEventIn,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+) -> None:
+    """Record an attributed login event. user_id/org_id come from the verified
+    JWT + resolved tenant (core/deps), not the client — the audit row is
+    trustworthy (Part 11 attributability).
+
+    Lazy-imports log_usage to avoid a circular import with analytics/__init__.py,
+    which imports this router before defining log_usage."""
+    from augura_api.modules.analytics import log_usage  # noqa: PLC0415 — circular-safe lazy import
+
+    await log_usage(
+        session,
+        tenant_id=tenant.tenant_id,
+        user_id=tenant.user_id,
+        event_type="login",
+        route=body.route,
+        metadata={"source": "web"},
+    )

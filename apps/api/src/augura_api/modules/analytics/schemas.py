@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class RecentEvent(BaseModel):
@@ -29,6 +29,17 @@ class ActivityEvent(BaseModel):
     route: str | None = None
     created_at: datetime
     metadata: dict[str, object] | None = None
+
+
+class LoginEventIn(BaseModel):
+    """Client payload for a login telemetry event. Identity is NEVER taken from
+    here — user_id/org_id come from the authenticated context server-side. Extra
+    fields are rejected (extra='forbid') so a client cannot even attempt to smuggle
+    a user_id/event_type into the audit trail."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    route: str | None = None
 
 
 class ArtifactOut(BaseModel):

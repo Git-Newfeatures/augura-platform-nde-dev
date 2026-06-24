@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { supabase } from './supabase'
+import { apiFetch } from './api'
 import AuguraLogin from './AuguraLogin'
 import ResetPassword from './ResetPassword'
 import LucisApp from './LucisApp'
@@ -28,11 +29,12 @@ function AuthenticatedApp() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         sessionStorage.clear()
-        supabase.from('usage_events').insert({
-          user_id: session.user.id,
-          event_type: 'login',
-          metadata: { route: window.location.pathname },
-        }).then(() => {}).catch(() => {})
+        // Attributed login event via the backend (user_id/org_id stamped from the
+        // verified JWT). Best-effort: never block the UI on telemetry.
+        apiFetch('/analytics/events/login', {
+          method: 'POST',
+          body: JSON.stringify({ route: window.location.pathname }),
+        }).catch(() => {})
       }
       setSession(session ?? null)
     })

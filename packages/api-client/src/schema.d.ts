@@ -151,6 +151,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analytics/events/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Event
+         * @description Record an attributed login event. user_id/org_id come from the verified
+         *     JWT + resolved tenant (core/deps), not the client — the audit row is
+         *     trustworthy (Part 11 attributability).
+         *
+         *     Lazy-imports log_usage to avoid a circular import with analytics/__init__.py,
+         *     which imports this router before defining log_usage.
+         */
+        post: operations["login_event_analytics_events_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/causal/dag": {
         parameters: {
             query?: never;
@@ -2615,6 +2640,17 @@ export interface components {
              */
             verified: boolean;
         };
+        /**
+         * LoginEventIn
+         * @description Client payload for a login telemetry event. Identity is NEVER taken from
+         *     here — user_id/org_id come from the authenticated context server-side. Extra
+         *     fields are rejected (extra='forbid') so a client cannot even attempt to smuggle
+         *     a user_id/event_type into the audit trail.
+         */
+        LoginEventIn: {
+            /** Route */
+            route?: string | null;
+        };
         /** MapResult */
         MapResult: {
             /** Avg Confidence */
@@ -3855,6 +3891,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ArtifactOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_event_analytics_events_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginEventIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

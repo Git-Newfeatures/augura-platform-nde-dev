@@ -3630,6 +3630,25 @@
         "title": "LiteratureSnapshot",
         "type": "object"
       },
+      "LoginEventIn": {
+        "additionalProperties": false,
+        "description": "Client payload for a login telemetry event. Identity is NEVER taken from\nhere — user_id/org_id come from the authenticated context server-side. Extra\nfields are rejected (extra='forbid') so a client cannot even attempt to smuggle\na user_id/event_type into the audit trail.",
+        "properties": {
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          }
+        },
+        "title": "LoginEventIn",
+        "type": "object"
+      },
       "MapResult": {
         "properties": {
           "avg_confidence": {
@@ -6583,6 +6602,41 @@
           }
         },
         "summary": "Artifacts",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/analytics/events/login": {
+      "post": {
+        "description": "Record an attributed login event. user_id/org_id come from the verified\nJWT + resolved tenant (core/deps), not the client — the audit row is\ntrustworthy (Part 11 attributability).\n\nLazy-imports log_usage to avoid a circular import with analytics/__init__.py,\nwhich imports this router before defining log_usage.",
+        "operationId": "login_event_analytics_events_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login Event",
         "tags": [
           "analytics"
         ]

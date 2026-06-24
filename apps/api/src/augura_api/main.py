@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from augura_api.core.config import Settings, get_settings
 from augura_api.core.errors import register_error_handlers
 from augura_api.core.logging import RequestIdMiddleware, configure_logging
+from augura_api.core.security_headers import SecurityHeadersMiddleware
 from augura_api.modules.agents import router as agents_router
 from augura_api.modules.analytics import router as analytics_router
 from augura_api.modules.causal import router as causal_router
@@ -25,6 +26,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title=cfg.app_name, version=cfg.version)
     app.add_middleware(RequestIdMiddleware)
+    if cfg.env == "prod":
+        app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cfg.cors_origin_list,

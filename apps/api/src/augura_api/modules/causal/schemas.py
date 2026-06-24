@@ -43,6 +43,31 @@ class CausalDagRequest(BaseModel):
     clinical_question: str | None = None
 
 
+# ── Question parsing (Phase 1 — Haiku pass alongside the regex parser) ──────────
+
+
+class ParseQuestionRequest(BaseModel):
+    question: str
+
+
+class ParsedQuestion(BaseModel):
+    """Structured PICOT/PECO frame extracted by the LLM. Mirrors the regex parser so the two
+    can be compared side by side. `moderators` (effect modifiers) is what the regex misses."""
+
+    population: str | None = None
+    intervention: str | None = None
+    comparator: str | None = None
+    outcomes: list[str] = []
+    timeframe: str | None = None
+    moderators: list[str] = []
+    therapeutic_area: str | None = None
+
+
+class ParseQuestionResponse(BaseModel):
+    parsed: ParsedQuestion
+    model: str
+
+
 # ── LLM output (permissive port of DAG_FILTER_TOOL — cf. normalizeLLMResult) ──
 
 Role = Literal[

@@ -3763,6 +3763,114 @@
         "title": "OutcomeOut",
         "type": "object"
       },
+      "ParseQuestionRequest": {
+        "properties": {
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "ParseQuestionRequest",
+        "type": "object"
+      },
+      "ParseQuestionResponse": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "parsed": {
+            "$ref": "#/components/schemas/ParsedQuestion"
+          }
+        },
+        "required": [
+          "parsed",
+          "model"
+        ],
+        "title": "ParseQuestionResponse",
+        "type": "object"
+      },
+      "ParsedQuestion": {
+        "description": "Structured PICOT/PECO frame extracted by the LLM. Mirrors the regex parser so the two\ncan be compared side by side. `moderators` (effect modifiers) is what the regex misses.",
+        "properties": {
+          "comparator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparator"
+          },
+          "intervention": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention"
+          },
+          "moderators": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Moderators",
+            "type": "array"
+          },
+          "outcomes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "population": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population"
+          },
+          "therapeutic_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Therapeutic Area"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          }
+        },
+        "title": "ParsedQuestion",
+        "type": "object"
+      },
       "Picot": {
         "properties": {
           "comparator": {
@@ -6460,6 +6568,48 @@
           }
         },
         "summary": "Dag",
+        "tags": [
+          "causal"
+        ]
+      }
+    },
+    "/causal/parse-question": {
+      "post": {
+        "description": "Phase 1: Haiku structured parse of a clinical question into a PICOT frame (+ moderators),\nshown side by side with the browser's regex parser.",
+        "operationId": "parse_question_route_causal_parse_question_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseQuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseQuestionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Question Route",
         "tags": [
           "causal"
         ]

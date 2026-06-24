@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Network, Sparkles, TriangleAlert, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -7,7 +7,7 @@ import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { Loading, EmptyState } from '@/workspace/CollectionStates'
 import { SubTabs } from '@/cockpit/SubTabs'
 import { apiJson } from '@/api'
-import { parsePICOT } from '@/semantic/picot-parser'
+import { parsePICOT, findConceptInTaxonomy } from '@/semantic/picot-parser'
 import { enrichApply } from '@/workspace/dataClient'
 import { resetSemanticStore, initSemanticStore } from '@/lib/semantic-store'
 
@@ -400,50 +400,113 @@ function picotFromQuestion(question) {
   }
 }
 
-// Surfaces the structured PICOT extracted from the clinical question.
-function PicotView({ picot }) {
-  if (!picot) return null
-  const rows = [
-    ['Population', picot.population],
-    ['Intervention / exposure', picot.intervention],
-    ['Comparator', picot.comparator],
-    ['Timeframe', picot.timeframe],
-    ['Therapeutic area', picot.therapeutic_area],
-  ]
-  const outcomes = (picot.outcomes || []).map((o) => o.label || o.concept_id).filter(Boolean)
+// Uniform PICOT frame from the regex parser output (parsePICOT) for side-by-side comparison.
+function regexFrame(p) {
+  return {
+    population: p.population ?? null,
+    intervention: p.intervention ?? null,
+    comparator: p.comparator ?? null,
+    outcomes: (p.outcomes || []).map((o) => o.label || o.concept_id).filter(Boolean),
+    timeframe:
+      Array.isArray(p.time_window) && p.time_window.length ? p.time_window.join(', ') : null,
+    moderators: [],
+    therapeutic_area: p.therapeutic_areas?.[0] ?? null,
+  }
+}
+
+// ✓ when the text resolves to a taxonomy concept, "· gap" when it does not.
+function Mark({ value }) {
+  if (!value || (typeof value === 'string' && !value.trim())) {
+    return <span className="text-muted-foreground/50">—</span>
+  }
+  let matched = false
+  try {
+    matched = !!findConceptInTaxonomy(value)
+  } catch {
+    matched = false
+  }
   return (
-    <Card className="flex flex-col gap-2 p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-        Parsed question (PICOT)
-      </div>
-      <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex items-baseline gap-2 text-[12.5px]">
-            <span className="w-36 shrink-0 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
-              {k}
-            </span>
-            <span className="text-foreground">
-              {v || <span className="text-muted-foreground/50">—</span>}
-            </span>
-          </div>
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-foreground">{value}</span>
+      {matched ? (
+        <span className="text-emerald-600" title="matched a taxonomy concept">
+          ✓
+        </span>
+      ) : (
+        <span className="text-amber-600" title="no taxonomy match (gap)">
+          · gap
+        </span>
+      )}
+    </span>
+  )
+}
+
+function FrameCell({ frame, field, kind }) {
+  if (!frame) return <span className="text-muted-foreground/40">—</span>
+  const v = frame[field]
+  if (kind === 'list') {
+    const items = (v || []).filter(Boolean)
+    if (!items.length) return <span className="text-muted-foreground/50">—</span>
+    return (
+      <span className="flex flex-col gap-1">
+        {items.map((it, i) => (
+          <Mark key={i} value={it} />
         ))}
-        <div className="flex items-baseline gap-2 text-[12.5px] sm:col-span-2">
-          <span className="w-36 shrink-0 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
-            Outcomes
-          </span>
-          <span className="flex flex-wrap gap-1.5">
-            {outcomes.length ? (
-              outcomes.map((o, i) => (
-                <Badge key={i} variant="secondary" className="text-[10.5px]">
-                  {o}
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground/50">—</span>
-            )}
-          </span>
-        </div>
+      </span>
+    )
+  }
+  return <Mark value={v} />
+}
+
+const FRAME_ROWS = [
+  ['Population', 'population', 'scalar'],
+  ['Intervention / exposure', 'intervention', 'scalar'],
+  ['Comparator', 'comparator', 'scalar'],
+  ['Outcomes', 'outcomes', 'list'],
+  ['Moderators', 'moderators', 'list'],
+  ['Timeframe', 'timeframe', 'scalar'],
+  ['Therapeutic area', 'therapeutic_area', 'scalar'],
+]
+
+// Side-by-side audit of the deterministic regex parse vs the Haiku parse, with a ✓/gap marker
+// on each element showing whether it resolved to a taxonomy concept (Phase 1).
+function ParseCompare({ regex, haiku, haikuBusy, haikuError }) {
+  if (!regex) return null
+  return (
+    <Card className="flex flex-col gap-1.5 p-4">
+      <div className="grid grid-cols-[150px_1fr_1fr] gap-x-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+        <span>Element</span>
+        <span>Regex parser</span>
+        <span className="flex items-center gap-2">
+          Haiku
+          {haikuBusy && (
+            <span className="text-[10px] font-normal normal-case text-muted-foreground/70">
+              improving…
+            </span>
+          )}
+        </span>
       </div>
+      {FRAME_ROWS.map(([label, field, kind]) => (
+        <div
+          key={field}
+          className="grid grid-cols-[150px_1fr_1fr] items-start gap-x-4 border-t border-border/50 pt-1.5 text-[12.5px]"
+        >
+          <span className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
+            {label}
+          </span>
+          <FrameCell frame={regex} field={field} kind={kind} />
+          {haikuError ? (
+            <span className="text-[11px] text-muted-foreground/50">—</span>
+          ) : (
+            <FrameCell frame={haiku} field={field} kind={kind} />
+          )}
+        </div>
+      ))}
+      {haikuError && (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Haiku parse unavailable: {haikuError}
+        </p>
+      )}
     </Card>
   )
 }
@@ -453,7 +516,9 @@ export function CausalModelingPage() {
   const [datasets, setDatasets] = useState(null)
   const [datasetId, setDatasetId] = useState('')
   const [question, setQuestion] = useState('')
-  const [picot, setPicot] = useState(null)
+  const [haiku, setHaiku] = useState(null) // { q, parsed } — keyed to the question it parsed
+  const [haikuBusy, setHaikuBusy] = useState(false)
+  const [haikuError, setHaikuError] = useState(null) // { q, msg }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dag, setDag] = useState(null)
@@ -473,9 +538,48 @@ export function CausalModelingPage() {
     }
   }, [])
 
-  function parseQuestion() {
-    setPicot(picotFromQuestion(question))
-  }
+  // Load the semantic layer so taxonomy ✓/gap matching works.
+  useEffect(() => {
+    initSemanticStore().catch(() => {})
+  }, [])
+
+  // Phase 1: regex parses instantly (useMemo below); Haiku parses 700 ms after typing stops.
+  useEffect(() => {
+    if (question.trim().length <= 10) return
+    let alive = true
+    const id = setTimeout(async () => {
+      setHaikuBusy(true)
+      try {
+        const res = await apiJson('/causal/parse-question', {
+          method: 'POST',
+          body: JSON.stringify({ question }),
+        })
+        if (alive) setHaiku({ q: question, parsed: res.parsed })
+      } catch (e) {
+        if (alive) setHaikuError({ q: question, msg: String(e?.message || e) })
+      } finally {
+        if (alive) setHaikuBusy(false)
+      }
+    }, 700)
+    return () => {
+      alive = false
+      clearTimeout(id)
+    }
+  }, [question])
+
+  // Instant deterministic parse — pure derivation, recomputed when the question changes.
+  const regexParse = useMemo(() => {
+    if (question.trim().length <= 10) return null
+    try {
+      return regexFrame(parsePICOT(question))
+    } catch {
+      return null
+    }
+  }, [question])
+  // Haiku result/error keyed to the question they were computed for (no stale flashes).
+  const haikuParse = haiku && haiku.q === question ? haiku.parsed : null
+  const haikuErr = haikuError && haikuError.q === question ? haikuError.msg : null
+  const showHaikuBusy = haikuBusy && !haikuParse && !haikuErr && question.trim().length > 10
 
   async function generate() {
     if (!question.trim()) {
@@ -500,7 +604,7 @@ export function CausalModelingPage() {
             confidence: c.confidence,
           }))
       }
-      const parsed = picot ?? picotFromQuestion(question)
+      const parsed = picotFromQuestion(question)
       const result = await apiJson('/causal/dag', {
         method: 'POST',
         body: JSON.stringify({
@@ -547,27 +651,30 @@ export function CausalModelingPage() {
               />
             </label>
             <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] text-muted-foreground">
+                Parsed automatically as you type — regex instantly, Haiku a moment later.
+              </p>
               <Button
-                variant="outline"
-                onClick={parseQuestion}
+                onClick={() => setSub('dag')}
                 disabled={!question.trim()}
-                className="gap-1.5"
+                className="ml-auto gap-1.5"
               >
-                <Sparkles className="h-3.5 w-3.5" />
-                Parse question
-              </Button>
-              <Button onClick={() => setSub('dag')} disabled={!question.trim()} className="gap-1.5">
                 Continue to DAG
               </Button>
             </div>
           </Card>
-          {picot ? (
-            <PicotView picot={picot} />
+          {regexParse ? (
+            <ParseCompare
+              regex={regexParse}
+              haiku={haikuParse}
+              haikuBusy={showHaikuBusy}
+              haikuError={haikuErr}
+            />
           ) : (
             <EmptyState
               icon={Sparkles}
               title="Frame your causal question"
-              subtitle="Enter a clinical question and parse it into PICOT (population, intervention, comparator, outcomes, timeframe)."
+              subtitle="Type a clinical question (10+ characters). It's parsed into PICOT with a ✓/gap marker per element from the taxonomy."
             />
           )}
         </div>

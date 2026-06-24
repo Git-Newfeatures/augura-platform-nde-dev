@@ -204,6 +204,19 @@ end;
 $$;
 
 revoke all on function public.upsert_semantic_release(jsonb, jsonb) from public;
+-- On Supabase, the `anon` / `authenticated` roles receive an EXPLICIT default EXECUTE
+-- grant on functions in `public` that SURVIVES the `from public` revoke above. Without
+-- stripping it, anyone with the anon key can call this SECURITY DEFINER function via
+-- /rest/v1/rpc/upsert_semantic_release and write the governed semantic layer (RLS bypassed).
+-- Guarded by existence: these roles are absent on bare Postgres (CI, alembic) → no-op.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke execute on function public.upsert_semantic_release(jsonb, jsonb) from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'revoke execute on function public.upsert_semantic_release(jsonb, jsonb) from authenticated';
+  end if;
+end $$;
 -- Grant to the group role augura_app (augura_api inherits it via `grant augura_app to augura_api`,
 -- cf. policies.sql): this is the role carried by the runtime AND the integration tests.
 -- Conditional because the role may be missing on a fresh Postgres before policies.sql.

@@ -171,6 +171,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/causal/parse-question": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Question Route
+         * @description Phase 1: Haiku structured parse of a clinical question into a PICOT frame (+ moderators),
+         *     shown side by side with the browser's regex parser.
+         */
+        post: operations["parse_question_route_causal_parse_question_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/corpus/coverage": {
         parameters: {
             query?: never;
@@ -2622,6 +2643,44 @@ export interface components {
             /** Verdict Label */
             verdict_label?: string | null;
         };
+        /** ParseQuestionRequest */
+        ParseQuestionRequest: {
+            /** Question */
+            question: string;
+        };
+        /** ParseQuestionResponse */
+        ParseQuestionResponse: {
+            /** Model */
+            model: string;
+            parsed: components["schemas"]["ParsedQuestion"];
+        };
+        /**
+         * ParsedQuestion
+         * @description Structured PICOT/PECO frame extracted by the LLM. Mirrors the regex parser so the two
+         *     can be compared side by side. `moderators` (effect modifiers) is what the regex misses.
+         */
+        ParsedQuestion: {
+            /** Comparator */
+            comparator?: string | null;
+            /** Intervention */
+            intervention?: string | null;
+            /**
+             * Moderators
+             * @default []
+             */
+            moderators: string[];
+            /**
+             * Outcomes
+             * @default []
+             */
+            outcomes: string[];
+            /** Population */
+            population?: string | null;
+            /** Therapeutic Area */
+            therapeutic_area?: string | null;
+            /** Timeframe */
+            timeframe?: string | null;
+        };
         /** Picot */
         Picot: {
             /** Comparator */
@@ -3779,6 +3838,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CausalDagResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_question_route_causal_parse_question_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParseQuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParseQuestionResponse"];
                 };
             };
             /** @description Validation Error */

@@ -187,7 +187,9 @@ async def handle_enrich_propose(ctx: JobContext) -> str | None:
 
     result = await propose(
         client=client,
-        model=ctx.settings.agent_model_dag,
+        # North Star Phase 2.1: a larger, more capable model (Opus) proposes the taxonomy
+        # concepts + relations that fill the question's unresolved gaps.
+        model=ctx.settings.agent_model_deep,
         bundle=bundle,
         questions=payload.get("questions"),
         selected_concepts=payload.get("selected_concepts"),

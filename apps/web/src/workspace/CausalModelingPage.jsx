@@ -168,6 +168,36 @@ function DagSvg({ nodes, edges }) {
                   </tspan>
                 ))}
               </text>
+              {/* Node source mark (spec): ✓ for taxonomy-resolved concepts, a "proposed"
+                  badge for LLM-proposed ones. */}
+              {n.source === 'llm_proposed' ? (
+                <>
+                  <rect x={rx + 5} y={ry - 7} width={52} height={13} rx={6} fill="#EF9F27" />
+                  <text
+                    x={rx + 31}
+                    y={ry + 2.5}
+                    textAnchor="middle"
+                    fontSize="8"
+                    fontWeight="700"
+                    fill="#FFFFFF"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    proposed
+                  </text>
+                </>
+              ) : (
+                <text
+                  x={rx + NODE_W - 9}
+                  y={ry + 13}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fontWeight="700"
+                  fill={s.text}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  ✓
+                </text>
+              )}
             </g>
           )
         })}
@@ -188,6 +218,15 @@ function Legend() {
           {r.label}
         </span>
       ))}
+      <span className="flex items-center gap-1.5">
+        <span className="text-emerald-600">✓</span> taxonomy-resolved
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="rounded bg-[#EF9F27] px-1 py-px text-[9px] font-bold text-white">
+          proposed
+        </span>
+        LLM-proposed
+      </span>
     </div>
   )
 }

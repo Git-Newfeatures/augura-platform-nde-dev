@@ -393,8 +393,6 @@ def build_varcheck_user_message(*, product_description: str, sheets: list[dict[s
     ]
     for sheet in sheets:
         parts.append(f"\nSheet: {sheet['name']}")
-        headers: list[str] = sheet.get("headers", [])
-        sample: list[list[Any]] = sheet.get("sample", [])
         for stat in sheet.get("column_stats", []):
             col = stat["column"]
             kind = stat.get("value_kind", "?")
@@ -405,14 +403,9 @@ def build_varcheck_user_message(*, product_description: str, sheets: list[dict[s
             rng = ""
             if kind == "numeric" and stat.get("min") is not None:
                 rng = f" | range: {stat.get('min')}–{stat.get('max')}"
-            sample_vals: list[Any] = []
-            if headers and col in headers:
-                idx = headers.index(col)
-                sample_vals = [r[idx] for r in sample if idx < len(r) and r[idx] not in ("", None)][
-                    :5
-                ]
-            sample_str = f" | sample: {sample_vals}" if sample_vals else ""
-            parts.append(f"  - {col} | kind: {kind} | null%: {null_str}{rng}{distinct}{sample_str}")
+            # PHI minimization: only column statistics cross the LLM boundary —
+            # never raw cell values (HIPAA minimum-necessary / GDPR Art 5(1)(c)).
+            parts.append(f"  - {col} | kind: {kind} | null%: {null_str}{rng}{distinct}")
     return "\n".join(parts)
 
 

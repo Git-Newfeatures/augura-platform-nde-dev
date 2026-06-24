@@ -85,6 +85,24 @@ def test_ctgov_relay_url_optional(monkeypatch: pytest.MonkeyPatch) -> None:
     assert Settings().ctgov_relay_url is None  # pyright: ignore[reportCallIssue]
 
 
+def test_prod_rejects_hs256_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """HS256 (symmetric) JWT verification must be unreachable in prod."""
+    monkeypatch.setenv("AUGURA_ENV", "prod")
+    monkeypatch.setenv("AUGURA_CORS_ORIGINS", "https://app.augura.io")
+    monkeypatch.setenv("AUGURA_SUPABASE_URL", "https://proj.supabase.co")
+    monkeypatch.setenv("AUGURA_SUPABASE_SERVICE_ROLE_KEY", "svc")
+    monkeypatch.setenv("AUGURA_SUPABASE_JWT_SECRET", "super-secret")
+    with pytest.raises(ValidationError, match="HS256"):
+        Settings()  # pyright: ignore[reportCallIssue]
+
+
+def test_dev_allows_hs256_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUGURA_ENV", "dev")
+    monkeypatch.setenv("AUGURA_SUPABASE_JWT_SECRET", "local-secret")
+    s = Settings()  # pyright: ignore[reportCallIssue]
+    assert s.supabase_jwt_secret == "local-secret"
+
+
 def test_prod_requires_tls_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """In prod a DB URL without sslmode/ssl must fail fast at boot."""
     monkeypatch.setenv("AUGURA_ENV", "prod")

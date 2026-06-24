@@ -130,6 +130,17 @@ class Settings(BaseSettings):
                 )
         return self
 
+    @model_validator(mode="after")
+    def _forbid_symmetric_jwt_in_prod(self) -> "Settings":
+        # HS256 uses one shared secret to sign AND verify: a leak = tenant-wide token
+        # forgery. Prod must verify with the asymmetric Supabase JWKS only.
+        if self.env == "prod" and self.supabase_jwt_secret is not None:
+            raise ValueError(
+                "AUGURA_SUPABASE_JWT_SECRET (HS256) must not be set in prod — "
+                "use AUGURA_SUPABASE_JWKS_URL (asymmetric) instead."
+            )
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:

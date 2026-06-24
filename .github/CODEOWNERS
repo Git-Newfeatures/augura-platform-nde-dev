@@ -1,0 +1,10 @@
+# Code ownership — every PR requires review from the listed owner(s).
+# Swap @QuentinCar0n for a team (e.g. @Augura-Health/engineering) once one exists.
+
+# Default owner for everything in the repo.
+*                                   @QuentinCar0n
+
+# Compliance-critical surfaces require explicit owner review.
+/apps/api/supabase/                 @QuentinCar0n
+/apps/api/src/augura_api/core/      @QuentinCar0n
+/.github/                           @QuentinCar0n

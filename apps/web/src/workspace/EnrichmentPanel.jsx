@@ -147,7 +147,7 @@ function RelationItem({ relation, checked, onToggle, conceptLabels }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function EnrichmentPanel() {
+export function EnrichmentPanel({ externalQuestion = null, onApplied = null } = {}) {
   const [phase,    setPhase]    = useState('idle')   // idle | running | review | applying | done | error
   const [progress, setProgress] = useState(0)
   const [artifact, setArtifact] = useState(null)
@@ -184,7 +184,8 @@ export function EnrichmentPanel() {
 
   // ── Run the analysis ──────────────────────────────────────────────────────
   const runPropose = useCallback(async () => {
-    if (!question.trim()) return
+    const q = (externalQuestion ?? question).trim()
+    if (!q) return
     setPhase('running')
     setError('')
     setProgress(0)
@@ -194,7 +195,7 @@ export function EnrichmentPanel() {
 
     try {
       // Use parsePICOT to extract the PICOT terms from the free-text question
-      const parsed = parsePICOT(question.trim())
+      const parsed = parsePICOT(q)
       const body = {
         questions: [
           {
@@ -239,7 +240,7 @@ export function EnrichmentPanel() {
       setError(String(e?.message ?? e))
       setPhase('error')
     }
-  }, [question])
+  }, [externalQuestion, question])
 
   // ── Apply the selected proposals ──────────────────────────────────────────
   const applySelected = useCallback(async () => {
@@ -261,11 +262,12 @@ export function EnrichmentPanel() {
       resetSemanticStore()
       await initSemanticStore()
       setPhase('done')
+      onApplied?.(data)
     } catch (e) {
       setError(String(e?.message ?? e))
       setPhase('error')
     }
-  }, [artifact, selected])
+  }, [artifact, selected, onApplied])
 
   // ── Derived data for the review phase ─────────────────────────────────────
   const proposals  = artifact?.proposals || {}
@@ -292,26 +294,32 @@ export function EnrichmentPanel() {
       {/* ── Question input (always visible except in done) ── */}
       {phase !== 'done' && (
         <div className="flex flex-col gap-3">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-foreground">
-              Clinical question (PICOT)
-            </label>
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              disabled={phase === 'running' || phase === 'applying'}
-              placeholder="e.g. In adults with type 2 diabetes, does empagliflozin reduce cardiovascular mortality compared with placebo?"
-              rows={3}
-              className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-            />
-          </div>
+          {externalQuestion == null && (
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-foreground">
+                Clinical question (PICOT)
+              </label>
+              <textarea
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                disabled={phase === 'running' || phase === 'applying'}
+                placeholder="e.g. In adults with type 2 diabetes, does empagliflozin reduce cardiovascular mortality compared with placebo?"
+                rows={3}
+                className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+            </div>
+          )}
           <button
             onClick={runPropose}
-            disabled={!question.trim() || phase === 'running' || phase === 'applying'}
+            disabled={
+              !(externalQuestion ?? question).trim() ||
+              phase === 'running' ||
+              phase === 'applying'
+            }
             className="flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Sparkles size={13} />
-            Run analysis
+            {externalQuestion == null ? 'Run analysis' : 'Propose taxonomy fixes'}
           </button>
         </div>
       )}

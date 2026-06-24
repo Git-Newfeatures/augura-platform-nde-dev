@@ -9,6 +9,7 @@ import { SubTabs } from '@/cockpit/SubTabs'
 import { apiJson } from '@/api'
 import { parsePICOT, findConceptInTaxonomy } from '@/semantic/picot-parser'
 import { enrichApply } from '@/workspace/dataClient'
+import { EnrichmentPanel } from '@/workspace/EnrichmentPanel'
 import { resetSemanticStore, initSemanticStore } from '@/lib/semantic-store'
 
 // Causal modeling (port of Nico's /causal view, rewired onto the backend).
@@ -468,6 +469,24 @@ const FRAME_ROWS = [
   ['Therapeutic area', 'therapeutic_area', 'scalar'],
 ]
 
+// PICOT element values that did NOT resolve to a taxonomy concept (the gaps to enrich).
+function frameGaps(frame) {
+  if (!frame) return []
+  const vals = []
+  for (const [, field, kind] of FRAME_ROWS) {
+    const v = frame[field]
+    if (kind === 'list') (v || []).forEach((x) => x && vals.push(String(x)))
+    else if (v && String(v).trim()) vals.push(String(v))
+  }
+  return vals.filter((v) => {
+    try {
+      return !findConceptInTaxonomy(v)
+    } catch {
+      return false
+    }
+  })
+}
+
 // Side-by-side audit of the deterministic regex parse vs the Haiku parse, with a ✓/gap marker
 // on each element showing whether it resolved to a taxonomy concept (Phase 1).
 function ParseCompare({ regex, haiku, haikuBusy, haikuError }) {
@@ -522,6 +541,8 @@ export function CausalModelingPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dag, setDag] = useState(null)
+  const [storeVersion, setStoreVersion] = useState(0) // bumped after enrichment reloads the store
+  const [proceedWithGaps, setProceedWithGaps] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -567,7 +588,8 @@ export function CausalModelingPage() {
     }
   }, [question])
 
-  // Instant deterministic parse — pure derivation, recomputed when the question changes.
+  // Instant deterministic parse — pure derivation; re-runs when the question OR the (reloaded)
+  // semantic store changes, so ✓/gap markers refresh after enrichment.
   const regexParse = useMemo(() => {
     if (question.trim().length <= 10) return null
     try {
@@ -575,11 +597,16 @@ export function CausalModelingPage() {
     } catch {
       return null
     }
-  }, [question])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, storeVersion])
   // Haiku result/error keyed to the question they were computed for (no stale flashes).
   const haikuParse = haiku && haiku.q === question ? haiku.parsed : null
   const haikuErr = haikuError && haikuError.q === question ? haikuError.msg : null
   const showHaikuBusy = haikuBusy && !haikuParse && !haikuErr && question.trim().length > 10
+  // Gaps drive the enrichment gate: the Haiku frame if present, else the regex frame.
+  const activeFrame = haikuParse ?? regexParse
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- frameGaps reads the in-memory store
+  const gaps = useMemo(() => frameGaps(activeFrame), [activeFrame, storeVersion])
 
   async function generate() {
     if (!question.trim()) {
@@ -677,6 +704,50 @@ export function CausalModelingPage() {
               subtitle="Type a clinical question (10+ characters). It's parsed into PICOT with a ✓/gap marker per element from the taxonomy."
             />
           )}
+
+          {regexParse &&
+            (gaps.length === 0 ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-[12px] text-emerald-800">
+                All PICOT elements resolved to taxonomy concepts ✓ — ready to generate.
+              </div>
+            ) : (
+              <Card className="flex flex-col gap-3 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[12px] font-semibold text-amber-700">
+                    {gaps.length} taxonomy gap{gaps.length === 1 ? '' : 's'} — resolve before
+                    generating
+                  </div>
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={proceedWithGaps}
+                      onChange={(e) => setProceedWithGaps(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-primary"
+                    />
+                    Proceed with gaps
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {gaps.map((g, i) => (
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className="border-amber-300 text-[10.5px] text-amber-700"
+                    >
+                      {g}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Propose taxonomy concepts + relations to cover these gaps, review, and apply — the
+                  parse re-checks automatically.
+                </p>
+                <EnrichmentPanel
+                  externalQuestion={question}
+                  onApplied={() => setStoreVersion((v) => v + 1)}
+                />
+              </Card>
+            ))}
         </div>
       )}
 
@@ -699,7 +770,11 @@ export function CausalModelingPage() {
                   ))}
                 </select>
               </label>
-              <Button onClick={generate} disabled={!question.trim() || busy} className="gap-1.5">
+              <Button
+                onClick={generate}
+                disabled={!question.trim() || busy || (gaps.length > 0 && !proceedWithGaps)}
+                className="gap-1.5"
+              >
                 <Sparkles className="h-3.5 w-3.5" />
                 {busy ? 'Generating…' : 'Generate causal model'}
               </Button>
@@ -707,6 +782,12 @@ export function CausalModelingPage() {
             {!question.trim() && (
               <p className="text-[12px] text-muted-foreground">
                 Enter a clinical question in the “Causal question” tab first.
+              </p>
+            )}
+            {question.trim() && gaps.length > 0 && !proceedWithGaps && (
+              <p className="text-[12px] text-amber-700">
+                {gaps.length} unresolved taxonomy gap{gaps.length === 1 ? '' : 's'} — resolve them in
+                the “Causal question” tab, or check “Proceed with gaps”.
               </p>
             )}
             {error && <p className="text-[12px] text-red-700">{error}</p>}

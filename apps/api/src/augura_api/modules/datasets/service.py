@@ -117,7 +117,9 @@ class DatasetService:
         await self._require_dataset(tenant, dataset_id)
         return await self._files_out(dataset_id)
 
-    async def _reprofile(self, settings: Settings, dataset_id: UUID) -> list[schemas.ColumnOut]:
+    async def _reprofile(
+        self, settings: Settings, tenant: CurrentTenant, dataset_id: UUID
+    ) -> list[schemas.ColumnOut]:
         # Re-read every file, build the union of columns and concatenate rows, then
         # profile the union once. Called after any add/remove so dataset_columns and
         # datasets.row_count always reflect the full set of files.
@@ -129,7 +131,7 @@ class DatasetService:
         files = await self.repo.list_files(dataset_id)
         parsed: list[tuple[str, list[Sheet]]] = []
         for f in files:
-            data = await read_bytes(settings, f.storage_path)
+            data = await read_bytes(settings, f.storage_path, expected_org=str(tenant.tenant_id))
             parsed.append((f.filename, parse_upload(f.filename, data)))
         combined = combine_sheets(parsed)
 
@@ -197,7 +199,7 @@ class DatasetService:
                 headers=file_headers(sheets),
                 position=pos,
             )
-        columns = await self._reprofile(settings, dataset.id)
+        columns = await self._reprofile(settings, tenant, dataset.id)
         files_out = await self._files_out(dataset.id)
         refreshed = await self._require_dataset(tenant, dataset.id)
         return schemas.UploadResult(
@@ -249,7 +251,7 @@ class DatasetService:
                 position=pos,
             )
             pos += 1
-        columns = await self._reprofile(settings, dataset_id)
+        columns = await self._reprofile(settings, tenant, dataset_id)
         files_out = await self._files_out(dataset_id)
         refreshed = await self._require_dataset(tenant, dataset_id)
         return schemas.UploadResult(
@@ -267,7 +269,7 @@ class DatasetService:
         if target is None:
             raise NotFoundError("file not found", file_id=str(file_id))
         await self.repo.delete_file(dataset_id, file_id)
-        columns = await self._reprofile(settings, dataset_id)
+        columns = await self._reprofile(settings, tenant, dataset_id)
         files_out = await self._files_out(dataset_id)
         refreshed = await self._require_dataset(tenant, dataset_id)
         return schemas.UploadResult(

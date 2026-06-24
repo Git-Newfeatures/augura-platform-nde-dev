@@ -42,6 +42,16 @@ def build_ref(org_id: str, name: str) -> str:
     return f"org/{_safe(org_id)}/{_safe(name)}"
 
 
+def _assert_org(storage_path: str, expected_org: str | None) -> None:
+    """Defense-in-depth: refuse a key outside the caller's org prefix, independent
+    of DB RLS (the service_role key bypasses Storage RLS)."""
+    if expected_org is None:
+        return
+    prefix = f"org/{_safe(expected_org)}/"
+    if not storage_path.startswith(prefix):
+        raise FileNotFoundError("storage path outside the caller's org")
+
+
 # ─── backend selection ──────────────────────────────────────────────────────────
 
 
@@ -131,15 +141,19 @@ async def save_bytes(settings: Settings, *, org_id: str, name: str, data: bytes)
     return ref
 
 
-async def read_bytes(settings: Settings, storage_path: str) -> bytes:
-    """Reads an artifact from its relative storage_path. Raises FileNotFoundError if absent.
-    On the disk backend, rejects any escape outside the artifacts directory."""
+async def read_bytes(
+    settings: Settings, storage_path: str, *, expected_org: str | None = None
+) -> bytes:
+    """Reads an artifact from its relative storage_path. Raises FileNotFoundError if absent
+    or (when expected_org is given) outside that org's prefix."""
+    _assert_org(storage_path, expected_org)
     if _use_supabase(settings):
         return await _supabase_get(settings, storage_path)
     return await run_sync(_read_disk, _root(settings).resolve(), storage_path)
 
 
-async def exists(settings: Settings, storage_path: str) -> bool:
+async def exists(settings: Settings, storage_path: str, *, expected_org: str | None = None) -> bool:
+    _assert_org(storage_path, expected_org)
     if _use_supabase(settings):
         return await _supabase_exists(settings, storage_path)
     return await run_sync(_exists_disk, _root(settings).resolve(), storage_path)

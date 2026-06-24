@@ -39,7 +39,9 @@ class DqService:
         raw = b""
         try:
             for f in files:
-                data = await read_bytes(settings, f.storage_path)
+                data = await read_bytes(
+                    settings, f.storage_path, expected_org=str(tenant.tenant_id)
+                )
                 raw += data
                 parsed.append((f.filename, parse_upload(f.filename, data)))
         except FileNotFoundError as exc:

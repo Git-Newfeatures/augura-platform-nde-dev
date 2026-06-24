@@ -32,7 +32,7 @@ def _tenant() -> CurrentTenant:
 
 
 async def test_run_maps_missing_bytes_to_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _boom(settings: object, path: str) -> bytes:
+    async def _boom(settings: object, path: str, **_kwargs: object) -> bytes:
         raise FileNotFoundError(path)
 
     monkeypatch.setattr(dq_service, "read_bytes", _boom)

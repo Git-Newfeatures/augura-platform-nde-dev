@@ -132,3 +132,13 @@ async def test_supabase_read_bytes_404_raises_filenotfound(
     _install_fake_http(monkeypatch, _FakeResp(404, b"not found"))
     with pytest.raises(FileNotFoundError):
         await storage.read_bytes(settings, "org/o/missing.csv")
+
+
+async def test_read_bytes_rejects_foreign_org_prefix(tmp_path: object) -> None:
+    settings = _disk_settings(tmp_path)
+    ref = await storage.save_bytes(settings, org_id="org-1", name="f.csv", data=b"hi")
+    # Correct org: allowed.
+    assert await storage.read_bytes(settings, ref, expected_org="org-1") == b"hi"
+    # Foreign org: refused before any backend access.
+    with pytest.raises(FileNotFoundError):
+        await storage.read_bytes(settings, ref, expected_org="org-2")

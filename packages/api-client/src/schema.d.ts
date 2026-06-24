@@ -1404,6 +1404,11 @@ export interface components {
             /** Edges */
             edges: components["schemas"]["augura_api__modules__causal__schemas__DagEdge"][];
             /**
+             * Excluded Relations
+             * @default []
+             */
+            excluded_relations: components["schemas"]["ExcludedRelationOut"][];
+            /**
              * Format
              * @default augura.intake.dag/1
              */
@@ -2228,6 +2233,50 @@ export interface components {
             payload: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ExcludedRelationOut
+         * @description An ontology relation the LLM excluded from the DAG, surfaced for ontology review
+         *     (Step 3.4 — remove vs add-qualifier).
+         */
+        ExcludedRelationOut: {
+            /**
+             * Exclusion Reason
+             * @default
+             */
+            exclusion_reason: string;
+            /**
+             * Object Id
+             * @default
+             */
+            object_id: string;
+            /**
+             * Object Label
+             * @default
+             */
+            object_label: string;
+            /**
+             * Predicate
+             * @default
+             */
+            predicate: string;
+            /**
+             * Recommendation
+             * @default qualifier
+             */
+            recommendation: string;
+            /** Relation Id */
+            relation_id: string;
+            /**
+             * Subject Id
+             * @default
+             */
+            subject_id: string;
+            /**
+             * Subject Label
+             * @default
+             */
+            subject_label: string;
         };
         /** FeedDocument */
         FeedDocument: {

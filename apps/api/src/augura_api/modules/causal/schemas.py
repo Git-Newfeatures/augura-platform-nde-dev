@@ -86,6 +86,9 @@ class SelectedRelation(BaseModel):
 class ExcludedRelation(BaseModel):
     relation_id: str
     exclusion_reason: str = ""
+    # Step 3.4 — Opus' recommendation for the ontology: "remove" (wrong in general) or
+    # "qualifier" (true in general but not in this clinical context).
+    recommendation: str = "qualifier"
 
 
 class NodeRole(BaseModel):
@@ -170,6 +173,20 @@ class Graph(BaseModel):
     latent_ids: list[str] = []
 
 
+class ExcludedRelationOut(BaseModel):
+    """An ontology relation the LLM excluded from the DAG, surfaced for ontology review
+    (Step 3.4 — remove vs add-qualifier)."""
+
+    relation_id: str
+    subject_id: str = ""
+    subject_label: str = ""
+    object_id: str = ""
+    object_label: str = ""
+    predicate: str = ""
+    exclusion_reason: str = ""
+    recommendation: str = "qualifier"
+
+
 class MissingVariable(BaseModel):
     concept_id: str
     label: str
@@ -201,3 +218,4 @@ class CausalDagResponse(BaseModel):
     quality: Quality
     llm_context: dict[str, Any] = {}
     proposed_relations: list[ProposedRelation] = []
+    excluded_relations: list[ExcludedRelationOut] = []

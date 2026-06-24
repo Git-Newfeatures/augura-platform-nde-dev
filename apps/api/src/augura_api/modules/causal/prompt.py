@@ -64,6 +64,14 @@ DAG_FILTER_TOOL: ToolParam = {
                     "properties": {
                         "relation_id": {"type": "string"},
                         "exclusion_reason": {"type": "string"},
+                        "recommendation": {
+                            "type": "string",
+                            "enum": ["remove", "qualifier"],
+                            "description": (
+                                "remove = the relation is wrong/misleading in general; "
+                                "qualifier = true in general but not in this clinical context"
+                            ),
+                        },
                     },
                 },
             },

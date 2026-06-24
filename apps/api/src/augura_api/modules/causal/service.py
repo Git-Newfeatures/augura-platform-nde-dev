@@ -122,6 +122,9 @@ class CausalService:
                 result.output, result.model, len(candidates), len(relations), structural_roles
             ),
             proposed_relations=result.output.proposed_relations,
+            excluded_relations=_excluded_out(
+                result.output.excluded_relations, candidates, meta_index
+            ),
         )
 
 
@@ -133,6 +136,36 @@ def _inferred_concepts(
         (cid, meta_index.get(cid, ConceptMeta(cid, "unknown", 0)))
         for cid in sorted(ids - mapped_ids)
     ]
+
+
+def _excluded_out(
+    excluded: list[schemas.ExcludedRelation],
+    candidates: list[Relation],
+    meta_index: dict[str, ConceptMeta],
+) -> list[schemas.ExcludedRelationOut]:
+    """Join the LLM's excluded relation ids back to the candidate relations + concept labels so
+    the frontend can review each one for the ontology (remove vs add-qualifier, Step 3.4)."""
+    by_id = {r.id: r for r in candidates}
+    out: list[schemas.ExcludedRelationOut] = []
+    for ex in excluded:
+        rel = by_id.get(ex.relation_id)
+        subj = rel.subject_concept_id if rel else ""
+        obj = rel.object_concept_id if rel else ""
+        ms = meta_index.get(subj)
+        mo = meta_index.get(obj)
+        out.append(
+            schemas.ExcludedRelationOut(
+                relation_id=ex.relation_id,
+                subject_id=subj,
+                subject_label=ms.label if ms else subj,
+                object_id=obj,
+                object_label=mo.label if mo else obj,
+                predicate=rel.predicate if rel else "",
+                exclusion_reason=ex.exclusion_reason,
+                recommendation=ex.recommendation or "qualifier",
+            )
+        )
+    return out
 
 
 def _llm_context(

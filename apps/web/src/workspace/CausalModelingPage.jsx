@@ -308,6 +308,182 @@ function ProposedEdges({ edges, nodes, onAccepted }) {
   )
 }
 
+// Step 3.4 — feedback to the semantic layer for relations the LLM excluded from the DAG.
+const QUALIFIER_TYPES = [
+  'population',
+  'comorbidity',
+  'age_range',
+  'sex',
+  'therapeutic_context',
+  'biomarker_threshold',
+  'temporal_context',
+]
+const QUALIFIER_EFFECTS = [
+  'restricts_applicability',
+  'attenuates_strength',
+  'amplifies_strength',
+  'reverses_polarity',
+]
+
+function ExcludedRelations({ excluded, onAccepted }) {
+  const [states, setStates] = useState({}) // relation_id → null | 'working' | 'done' | errorString
+  const [qualifying, setQualifying] = useState(null) // relation_id whose qualifier form is open
+  const [qform, setQform] = useState({
+    qualifier_type: QUALIFIER_TYPES[0],
+    qualifier_effect: QUALIFIER_EFFECTS[0],
+    qualifier_value: '',
+  })
+
+  if (!excluded || excluded.length === 0) return null
+
+  async function doApply(relId, body) {
+    setStates((s) => ({ ...s, [relId]: 'working' }))
+    try {
+      await enrichApply(body)
+      resetSemanticStore()
+      await initSemanticStore()
+      setStates((s) => ({ ...s, [relId]: 'done' }))
+      setQualifying(null)
+      onAccepted?.()
+    } catch (err) {
+      setStates((s) => ({ ...s, [relId]: mapAcceptError(err) }))
+    }
+  }
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        Excluded relations — review for the ontology ({excluded.length})
+      </div>
+      <ul className="flex flex-col gap-2.5">
+        {excluded.map((ex) => {
+          const st = states[ex.relation_id] ?? null
+          const isDone = st === 'done'
+          const isWorking = st === 'working'
+          const isErr = st !== null && !isDone && !isWorking
+          return (
+            <li
+              key={ex.relation_id}
+              className="flex flex-col gap-1.5 border-b border-border/50 pb-2.5 last:border-0"
+            >
+              <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
+                <span className="font-medium text-foreground">
+                  {ex.subject_label || ex.subject_id}
+                </span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {ex.predicate || '→'}
+                </span>
+                <span className="font-medium text-foreground">
+                  {ex.object_label || ex.object_id}
+                </span>
+                <Badge variant="outline" className="ml-1 text-[10px] text-muted-foreground">
+                  rec: {ex.recommendation}
+                </Badge>
+              </div>
+              {ex.exclusion_reason && (
+                <p className="text-[11.5px] text-muted-foreground">{ex.exclusion_reason}</p>
+              )}
+              {isDone ? (
+                <span className="flex items-center gap-1 text-[12px] text-emerald-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Applied
+                </span>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 border-red-300 px-2 text-[11.5px] text-red-700 hover:bg-red-50"
+                    disabled={isWorking}
+                    onClick={() =>
+                      doApply(ex.relation_id, {
+                        deactivate_relation: { relation_id: ex.relation_id },
+                      })
+                    }
+                  >
+                    {isWorking ? 'Working…' : 'Remove from ontology'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11.5px]"
+                    disabled={isWorking}
+                    onClick={() =>
+                      setQualifying(qualifying === ex.relation_id ? null : ex.relation_id)
+                    }
+                  >
+                    Add qualifier
+                  </Button>
+                </div>
+              )}
+              {qualifying === ex.relation_id && !isDone && (
+                <div className="mt-1 flex flex-wrap items-end gap-2 rounded-md border border-border bg-muted/30 p-2">
+                  <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                    Type
+                    <select
+                      value={qform.qualifier_type}
+                      onChange={(e) => setQform((f) => ({ ...f, qualifier_type: e.target.value }))}
+                      className="rounded border border-border bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+                    >
+                      {QUALIFIER_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                    Effect
+                    <select
+                      value={qform.qualifier_effect}
+                      onChange={(e) =>
+                        setQform((f) => ({ ...f, qualifier_effect: e.target.value }))
+                      }
+                      className="rounded border border-border bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+                    >
+                      {QUALIFIER_EFFECTS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-1 flex-col gap-0.5 text-[10px] text-muted-foreground">
+                    Value
+                    <input
+                      value={qform.qualifier_value}
+                      onChange={(e) => setQform((f) => ({ ...f, qualifier_value: e.target.value }))}
+                      placeholder="e.g. type 2 diabetes"
+                      className="rounded border border-border bg-background px-1.5 py-1 text-[11.5px] text-foreground"
+                    />
+                  </label>
+                  <Button
+                    size="sm"
+                    className="h-7 px-2 text-[11.5px]"
+                    disabled={isWorking || !qform.qualifier_value.trim()}
+                    onClick={() =>
+                      doApply(ex.relation_id, {
+                        add_qualifier: {
+                          relation_id: ex.relation_id,
+                          qualifier_type: qform.qualifier_type,
+                          qualifier_value: qform.qualifier_value.trim(),
+                          qualifier_effect: qform.qualifier_effect,
+                        },
+                      })
+                    }
+                  >
+                    {isWorking ? 'Saving…' : 'Apply qualifier'}
+                  </Button>
+                </div>
+              )}
+              {isErr && <span className="text-[11.5px] text-red-700">{st}</span>}
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
+  )
+}
+
 function Result({ dag, onAccepted }) {
   const measured = dag.nodes.filter((n) => n.observed).length
   const structuralRoles = dag.llm_context?.structural_roles || {}
@@ -395,6 +571,9 @@ function Result({ dag, onAccepted }) {
 
       {/* Proposed-edges section — only if the DAG contains any. */}
       <ProposedEdges edges={dag.edges} nodes={dag.nodes} onAccepted={onAccepted} />
+
+      {/* Excluded relations — review for the ontology (remove / add qualifier). */}
+      <ExcludedRelations excluded={dag.excluded_relations} onAccepted={onAccepted} />
     </div>
   )
 }

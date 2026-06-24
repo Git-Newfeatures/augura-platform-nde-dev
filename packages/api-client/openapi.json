@@ -380,6 +380,14 @@
             "title": "Edges",
             "type": "array"
           },
+          "excluded_relations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExcludedRelationOut"
+            },
+            "title": "Excluded Relations",
+            "type": "array"
+          },
           "format": {
             "default": "augura.intake.dag/1",
             "title": "Format",
@@ -2765,6 +2773,55 @@
           "event_type"
         ],
         "title": "EventAppendRequest",
+        "type": "object"
+      },
+      "ExcludedRelationOut": {
+        "description": "An ontology relation the LLM excluded from the DAG, surfaced for ontology review\n(Step 3.4 — remove vs add-qualifier).",
+        "properties": {
+          "exclusion_reason": {
+            "default": "",
+            "title": "Exclusion Reason",
+            "type": "string"
+          },
+          "object_id": {
+            "default": "",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_label": {
+            "default": "",
+            "title": "Object Label",
+            "type": "string"
+          },
+          "predicate": {
+            "default": "",
+            "title": "Predicate",
+            "type": "string"
+          },
+          "recommendation": {
+            "default": "qualifier",
+            "title": "Recommendation",
+            "type": "string"
+          },
+          "relation_id": {
+            "title": "Relation Id",
+            "type": "string"
+          },
+          "subject_id": {
+            "default": "",
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_label": {
+            "default": "",
+            "title": "Subject Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "relation_id"
+        ],
+        "title": "ExcludedRelationOut",
         "type": "object"
       },
       "FeedDocument": {

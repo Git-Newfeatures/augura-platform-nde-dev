@@ -157,6 +157,28 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: pip-audit (backend dependencies)
+        working-directory: apps/api
+        run: |
+          uv sync --dev
+          uv run --with pip-audit pip-audit || (echo "::warning::pip-audit found advisories" && exit 1)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: npm audit (frontend dependencies)
+        working-directory: apps/web
+        run: npm audit --audit-level=high
+
   commit-trailers:
     # Server-side enforcement of the no-AI-attribution-trailer rule (the local
     # .githooks/commit-msg hook is opt-in per clone).

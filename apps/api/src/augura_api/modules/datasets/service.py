@@ -3,11 +3,12 @@
 from uuid import UUID, uuid4
 
 from augura_api.core.config import Settings
-from augura_api.core.errors import NotFoundError
+from augura_api.core.errors import BadRequestError, NotFoundError
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules import analytics
 from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.models import Dataset
+from augura_api.modules.datasets.parsing import Sheet
 from augura_api.modules.datasets.repo import DatasetRepo
 
 
@@ -20,6 +21,23 @@ class DatasetService:
         if dataset is None:
             raise NotFoundError("dataset not found", dataset_id=str(dataset_id))
         return dataset
+
+    async def _reject_pii_headers(self, parsed: list[tuple[str, list[Sheet]]]) -> None:
+        """Fail closed if any uploaded column header matches an active PII pattern
+        (direct identifiers must not be persisted). 400 with the flagged columns."""
+        from augura_api.modules.datasets.pii import PiiPattern, scan_headers_for_pii
+
+        rows = await self.repo.list_active_pii_patterns()
+        patterns = [PiiPattern(key=k, pattern=p) for k, p in rows]
+        headers: list[str] = [h for _fn, sheets in parsed for s in sheets for h in s.headers]
+        hits = scan_headers_for_pii(headers, patterns)
+        if hits:
+            flagged = sorted({h.column for h in hits})
+            raise BadRequestError(
+                "upload rejected: column headers look like direct identifiers (remove or "
+                "pseudonymize them before upload)",
+                columns=flagged,
+            )
 
     @staticmethod
     def _to_out(dataset: Dataset, column_count: int, file_count: int = 0) -> schemas.DatasetOut:
@@ -177,6 +195,7 @@ class DatasetService:
 
         # Parse everything first so a bad file aborts before any write (raises 413/415/400).
         parsed = [(fn, parse_upload(fn, data), data) for fn, data in files]
+        await self._reject_pii_headers([(fn, sheets) for fn, sheets, _data in parsed])
         dataset = await self.repo.create_dataset(
             tenant.tenant_id,
             name=name or files[0][0],
@@ -228,6 +247,7 @@ class DatasetService:
                     established.append(h)
 
         parsed = [(fn, parse_upload(fn, data), data) for fn, data in files]
+        await self._reject_pii_headers([(fn, sheets) for fn, sheets, _data in parsed])
         warnings: list[str] = []
         pos = await self.repo.next_position(dataset_id)
         for fn, sheets, data in parsed:

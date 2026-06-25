@@ -1851,15 +1851,18 @@ on conflict (code) do nothing;
 -- PII column-name patterns (was PII_PATTERNS). `pattern` is the JS regex SOURCE
 -- (no slashes/flags); the client rebuilds `new RegExp(pattern, "i")`.
 insert into pii_pattern_catalog (key, label, pattern, sort_order, active) values
-  ('name',     'name field',     '\b(first_?name|last_?name|full_?name|given_?name|family_?name)\b', 10, true),
-  ('email',    'email',          '\bemail|e_mail|e-mail\b',                                          20, true),
-  ('phone',    'phone',          '\bphone|mobile|telephone\b',                                       30, true),
-  ('address',  'postal address', '\baddress|street|postal|zip_?code|postcode\b',                     40, true),
-  ('dob',      'date of birth',  '\b(dob|date_?of_?birth|birth_?date|birthday)\b',                   50, true),
-  ('govid',    'government ID',  '\b(ssn|social_?security|national_?id|nhs_?number|nin)\b',          60, true),
-  ('passport', 'passport',       '\bpassport\b',                                                     70, true),
-  ('ip',       'IP address',     '\bip_?address\b',                                                  80, true),
-  ('device',   'device ID',      '\bdevice_?id\b',                                                   90, true)
+  -- Substring patterns (NOT \b-anchored) so prefixed columns like patient_email /
+  -- subject_dob / patient_first_name are caught. \bnin\b stays anchored to avoid
+  -- matching substrings such as "washington".
+  ('name',     'name field',     '(first|last|full|given|family|sur)_?name',              10, true),
+  ('email',    'email',          'e[_-]?mail',                                            20, true),
+  ('phone',    'phone',          'phone|mobile|telephone|fax',                            30, true),
+  ('address',  'postal address', 'address|street|postal|zip_?code|postcode',              40, true),
+  ('dob',      'date of birth',  'dob|date_?of_?birth|birth_?date|birthday',              50, true),
+  ('govid',    'government ID',  'ssn|social_?security|national_?id|nhs_?number|\bnin\b', 60, true),
+  ('passport', 'passport',       'passport',                                              70, true),
+  ('ip',       'IP address',     'ip_?address',                                           80, true),
+  ('device',   'device ID',      'device_?id',                                            90, true)
 on conflict (key) do nothing;
 
 -- Biomarker plausibility ranges (was RANGES). `pattern` is the JS regex source.

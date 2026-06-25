@@ -220,6 +220,19 @@ class DatasetRepo:
         )
         return list(res.scalars().all())
 
+    async def list_active_pii_patterns(self) -> list[tuple[str, str]]:
+        """(key, pattern) for active PII catalog rows. Global read-only catalog
+        (RLS backend_read allows it under a tenant session)."""
+        from sqlalchemy import text
+
+        res = await self.session.execute(
+            text(
+                "select key, pattern from pii_pattern_catalog"
+                " where active = true order by sort_order"
+            )
+        )
+        return [(row.key, row.pattern) for row in res.all()]
+
     async def import_cohort(
         self,
         tenant_id: TenantId,

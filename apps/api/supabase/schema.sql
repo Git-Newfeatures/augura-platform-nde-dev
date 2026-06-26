@@ -372,6 +372,21 @@ create table if not exists outbox_events (
 create index if not exists ix_outbox_unprocessed
     on outbox_events(created_at) where processed_at is null;
 
+-- ── audit_events: append-only change log of regulated records (HIPAA 164.312(b), GDPR) ──
+create table if not exists audit_events (
+    id uuid primary key default gen_random_uuid(),
+    table_name text not null,
+    row_pk text,
+    op char(1) not null,            -- 'I' | 'U' | 'D'
+    actor_user_id uuid,             -- from app.user_id GUC (NULL for privileged/no-context writes)
+    org_id uuid,                    -- from app.tenant_id GUC
+    old_row jsonb,
+    new_row jsonb,
+    occurred_at timestamptz not null default now()
+);
+create index if not exists ix_audit_events_org_occurred on audit_events (org_id, occurred_at desc);
+create index if not exists ix_audit_events_table_pk on audit_events (table_name, row_pk);
+
 -- Versioned & hashed artifacts — reproducibility backbone (spec §2).
 -- Every reproducible object (dataset snapshot, QC report, mapping, DAG, SAP, run)
 -- is stored here: canonical content + SHA-256 + provenance + pre-specification lock.

@@ -68,6 +68,8 @@ EXPECTED_TABLES = {
     "biomarker_range_catalog",
     "variable_group_catalog",
     "variable_role_catalog",
+    # Compliance / audit (Phase 3).
+    "audit_events",
 }
 
 # Reference catalogs (frontend real-only cleanup): global, read-only.
@@ -293,6 +295,7 @@ POST_BASELINE_TABLES = {
     "literature_queries",
     "semantic_releases",
     "dataset_files",
+    "audit_events",
 } | REFERENCE_CATALOGS
 
 # Everything the baseline bundle (0001 applies schema.sql wholesale) already created.
@@ -346,3 +349,12 @@ def test_post_baseline_tables_each_have_a_migration() -> None:
         "tables in schema.sql with no >=0002 migration (would be missing on prod): "
         f"{sorted(unguarded)}. Add a migration, or add to BASELINE_TABLES if it predates 0002."
     )
+
+
+def test_audit_events_append_only() -> None:
+    """audit_events carries the INSERT policy, the trigger function, and the
+    revoke that makes it append-only for augura_app (HIPAA 164.312(b) / GDPR)."""
+    policies = _read("policies.sql").lower()
+    assert "create policy audit_events_insert" in policies
+    assert "audit_row_change" in policies
+    assert re.search(r"revoke[^;]*on audit_events from augura_app", policies, re.S)

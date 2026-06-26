@@ -227,6 +227,51 @@ create policy outbox_events_insert on outbox_events
 -- augura_app is intentionally denied UPDATE here to keep the audit trail append-only.
 revoke update, delete, truncate on outbox_events from augura_app;
 
+-- ── audit_events: append-only change log of regulated records (HIPAA 164.312(b), GDPR) ──
+alter table audit_events enable row level security;
+alter table audit_events force row level security;
+drop policy if exists audit_events_read on audit_events;
+drop policy if exists audit_events_insert on audit_events;
+create policy audit_events_read on audit_events
+    for select using (
+        org_id is null
+        or org_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
+create policy audit_events_insert on audit_events
+    for insert with check (true);   -- writes come only from the trigger, inside a backend txn
+revoke update, delete, truncate on audit_events from augura_app;
+
+create or replace function audit_row_change() returns trigger
+language plpgsql as $$
+declare
+    v_user uuid := nullif(current_setting('app.user_id', true), '')::uuid;
+    v_org  uuid := nullif(current_setting('app.tenant_id', true), '')::uuid;
+    v_pk   text := to_jsonb(coalesce(NEW, OLD)) ->> 'id';
+begin
+    insert into audit_events(table_name, row_pk, op, actor_user_id, org_id, old_row, new_row)
+    values (
+        TG_TABLE_NAME, v_pk, substr(TG_OP, 1, 1), v_user, v_org,
+        case when TG_OP in ('UPDATE','DELETE') then to_jsonb(OLD) else null end,
+        case when TG_OP in ('INSERT','UPDATE') then to_jsonb(NEW) else null end
+    );
+    return null;  -- AFTER trigger: return value ignored
+end;
+$$;
+
+do $$
+declare t text;
+begin
+    foreach t in array array[
+        'studies','study_state','datasets','dataset_columns','dataset_files',
+        'cohort_members','cohort_biomarkers','generated_documents','artifacts',
+        'dq_bundles','simulation_runs','simulation_results'
+    ] loop
+        execute format('drop trigger if exists audit_change on %I;', t);
+        execute format(
+            'create trigger audit_change after insert or update or delete on %I '
+            'for each row execute function audit_row_change();', t);
+    end loop;
+end $$;
+
 -- ── Reference catalogs (cesl_sources, cesl_study_designs) ─────────────────
 -- Global, read-only for tenant sessions. RLS enabled + "backend session"
 -- gate on READ only (FOR SELECT): anon/PostgREST denied, backend

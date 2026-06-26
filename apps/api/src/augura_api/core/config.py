@@ -84,12 +84,17 @@ class Settings(BaseSettings):
     # Default OFF: flip to True only after MFA enrollment is live for all users.
     require_mfa: bool = False  # enforce aal2 on PHI routes once MFA enrollment is live
 
+    # Observability — error tracking. Set AUGURA_SENTRY_DSN to activate Sentry in prod.
+    # When absent (default) or blank, the SDK is never initialised: dev/CI/test are unaffected.
+    sentry_dsn: str | None = None
+
     @field_validator(
         "anthropic_api_key",
         "openai_api_key",
         "ncbi_api_key",
         "ctgov_relay_url",
         "ctgov_proxy_url",
+        "sentry_dsn",
         mode="after",
     )
     @classmethod

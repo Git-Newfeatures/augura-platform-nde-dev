@@ -1,3 +1,4 @@
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,6 +23,16 @@ from augura_api.modules.studies import router as studies_router
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     cfg = settings if settings is not None else get_settings()
+    # Initialise Sentry only when a DSN is explicitly configured. The blank-string
+    # validator in Settings normalises "" → None, so this check is unambiguous.
+    # send_default_pii=False is mandatory: PHI must not leave the service boundary.
+    if cfg.sentry_dsn is not None:
+        sentry_sdk.init(
+            dsn=cfg.sentry_dsn,
+            environment=cfg.env,
+            send_default_pii=False,
+            traces_sample_rate=0.0,
+        )
     configure_logging(cfg.log_level)
 
     app = FastAPI(title=cfg.app_name, version=cfg.version)

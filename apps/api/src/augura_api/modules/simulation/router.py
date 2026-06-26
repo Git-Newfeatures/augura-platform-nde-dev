@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, BackgroundTasks, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, WriteTenantDep
 from augura_api.jobs.runner import enqueue_job
 from augura_api.modules.simulation import schemas
 from augura_api.modules.simulation.service import SimulationService, compute_power_response
@@ -33,7 +33,7 @@ async def list_runs(
 @router.post("", response_model=schemas.SimulationRunCreated, status_code=status.HTTP_202_ACCEPTED)
 async def create_simulation(
     req: schemas.SimulationRequest,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
     background_tasks: BackgroundTasks,

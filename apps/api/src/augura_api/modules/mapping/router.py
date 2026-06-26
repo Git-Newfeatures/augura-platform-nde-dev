@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep
+from augura_api.core.deps import SessionDep, WriteTenantDep
 from augura_api.modules.datasets.repo import DatasetRepo
 from augura_api.modules.mapping import schemas
 from augura_api.modules.mapping.repo import MappingRepo
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/datasets", tags=["mapping"])
     status_code=status.HTTP_201_CREATED,
 )
 async def map_dataset(
-    dataset_id: UUID, tenant: CurrentTenantDep, session: SessionDep
+    dataset_id: UUID, tenant: WriteTenantDep, session: SessionDep
 ) -> schemas.MapResult:
     service = MappingService(MappingRepo(session), DatasetRepo(session), SemanticRepo(session))
     return await service.map_dataset(tenant, dataset_id)

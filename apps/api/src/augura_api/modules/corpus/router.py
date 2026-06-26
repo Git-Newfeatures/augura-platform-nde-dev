@@ -10,7 +10,7 @@ import structlog
 from fastapi import APIRouter
 from fastapi.responses import Response, StreamingResponse
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, WriteTenantDep
 from augura_api.core.errors import BadRequestError
 from augura_api.core.llm.embeddings import Embedder, get_embedder
 from augura_api.core.llm.runtime import AgentUpstreamError, get_anthropic_client
@@ -133,7 +133,7 @@ async def search(
 @router.post("/literature", response_model=schemas.LiteratureSearchResult)
 async def literature(
     req: schemas.LiteratureSearchRequest,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.LiteratureSearchResult:
@@ -170,7 +170,7 @@ async def literature(
 @router.post("/literature/ingest", response_model=schemas.LiteratureSearchResult)
 async def literature_ingest(
     req: schemas.LiteratureIngestRequest,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.LiteratureSearchResult:
@@ -255,7 +255,7 @@ async def literature_retrieve(
 
 @router.post("/literature/snapshots", response_model=schemas.LiteratureSnapshot)
 async def create_snapshot(
-    req: schemas.SnapshotWriteRequest, tenant: CurrentTenantDep, session: SessionDep
+    req: schemas.SnapshotWriteRequest, tenant: WriteTenantDep, session: SessionDep
 ) -> schemas.LiteratureSnapshot:
     """Freezes the result set + annotations: computes the content_hash, pins the
     model/prompt version, persists. The response carries the hash (self-verifiable)."""
@@ -281,7 +281,7 @@ async def read_snapshot(
 
 @router.post("/literature/sessions", response_model=schemas.SearchSession)
 async def create_session(
-    req: schemas.SessionCreateRequest, tenant: CurrentTenantDep, session: SessionDep
+    req: schemas.SessionCreateRequest, tenant: WriteTenantDep, session: SessionDep
 ) -> schemas.SearchSession:
     return await _live_service(session).create_session(tenant, req)
 
@@ -301,16 +301,14 @@ async def get_session(
 
 
 @router.delete("/literature/sessions", status_code=204)
-async def clear_sessions(tenant: CurrentTenantDep, session: SessionDep) -> Response:
+async def clear_sessions(tenant: WriteTenantDep, session: SessionDep) -> Response:
     """Clears the tenant's "Recent queries" history (one-click cleanup)."""
     await _live_service(session).clear_sessions(tenant)
     return Response(status_code=204)
 
 
 @router.delete("/literature/sessions/{session_id}", status_code=204)
-async def delete_session(
-    session_id: UUID, tenant: CurrentTenantDep, session: SessionDep
-) -> Response:
+async def delete_session(session_id: UUID, tenant: WriteTenantDep, session: SessionDep) -> Response:
     """Deletes a single entry from the "Recent queries" history (single deletion)."""
     await _live_service(session).delete_session(tenant, session_id)
     return Response(status_code=204)
@@ -320,7 +318,7 @@ async def delete_session(
 async def append_event(
     session_id: UUID,
     req: schemas.EventAppendRequest,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
 ) -> schemas.LiteratureEvent:
     return await _live_service(session).append_event(tenant, session_id, req)

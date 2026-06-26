@@ -8,7 +8,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Form, UploadFile, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, WriteTenantDep
 from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.repo import DatasetRepo
 from augura_api.modules.datasets.service import DatasetService
@@ -27,7 +27,7 @@ async def list_datasets(tenant: CurrentTenantDep, session: SessionDep) -> list[s
 
 @router.post("", response_model=schemas.DatasetOut, status_code=status.HTTP_201_CREATED)
 async def create_dataset(
-    data: schemas.DatasetCreate, tenant: CurrentTenantDep, session: SessionDep
+    data: schemas.DatasetCreate, tenant: WriteTenantDep, session: SessionDep
 ) -> schemas.DatasetOut:
     return await _service(session).create_dataset(tenant, data)
 
@@ -45,7 +45,7 @@ async def list_cohorts(
     status_code=status.HTTP_201_CREATED,
 )
 async def import_cohort(
-    payload: schemas.CohortImportRequest, tenant: CurrentTenantDep, session: SessionDep
+    payload: schemas.CohortImportRequest, tenant: WriteTenantDep, session: SessionDep
 ) -> schemas.CohortImportResult:
     """Ingests a longitudinal cohort (members + biomarkers) — the write path
     for the cohort_* tables, read by OutcomeSelection/SimulationEngine."""
@@ -68,7 +68,7 @@ async def cohort_biomarkers(
 
 @router.post("/upload", response_model=schemas.UploadResult, status_code=status.HTTP_201_CREATED)
 async def upload_dataset(
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
     files: list[UploadFile],
@@ -99,7 +99,7 @@ async def list_columns(
 async def replace_columns(
     dataset_id: UUID,
     payload: schemas.ColumnsPut,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
 ) -> list[schemas.ColumnOut]:
     return await _service(session).replace_columns(tenant, dataset_id, payload)
@@ -119,7 +119,7 @@ async def list_files(
 )
 async def add_files(
     dataset_id: UUID,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
     files: list[UploadFile],
@@ -132,7 +132,7 @@ async def add_files(
 async def remove_file(
     dataset_id: UUID,
     file_id: UUID,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
 ) -> schemas.UploadResult:
@@ -142,7 +142,7 @@ async def remove_file(
 @router.post("/{dataset_id}/data-dictionary", response_model=schemas.DataDictionaryResult)
 async def parse_data_dictionary(
     dataset_id: UUID,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
     file: UploadFile,

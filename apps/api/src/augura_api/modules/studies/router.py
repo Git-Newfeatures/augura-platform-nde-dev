@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, WriteTenantDep
 from augura_api.core.ids import StudyId
 from augura_api.modules.studies import schemas
 from augura_api.modules.studies.repo import StudyRepo
@@ -24,7 +24,7 @@ async def list_studies(tenant: CurrentTenantDep, session: SessionDep) -> list[sc
 
 @router.post("", response_model=schemas.StudyOut, status_code=status.HTTP_201_CREATED)
 async def create_study(
-    data: schemas.StudyCreate, tenant: CurrentTenantDep, session: SessionDep
+    data: schemas.StudyCreate, tenant: WriteTenantDep, session: SessionDep
 ) -> schemas.StudyOut:
     return await _service(session).create_study(tenant, data)
 
@@ -40,7 +40,7 @@ async def get_study(
 async def update_study(
     study_id: UUID,
     data: schemas.StudyUpdate,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
 ) -> schemas.StudyOut:
     return await _service(session).update_study(tenant, StudyId(study_id), data)
@@ -57,7 +57,7 @@ async def get_state(
 async def put_state(
     study_id: UUID,
     payload: schemas.StudyStatePut,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
 ) -> schemas.StudyStateOut:
     return await _service(session).save_state(tenant, StudyId(study_id), payload)

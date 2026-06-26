@@ -8,7 +8,13 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from fastapi.responses import Response
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, require_role
+from augura_api.core.deps import (
+    CurrentTenantDep,
+    SessionDep,
+    SettingsDep,
+    WriteTenantDep,
+    require_role,
+)
 from augura_api.core.errors import NotFoundError
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.jobs.runner import enqueue_job
@@ -79,7 +85,7 @@ async def enrich_apply(
 )
 async def enrich_propose(
     req: enrich_schemas.EnrichProposeRequest,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
     background_tasks: BackgroundTasks,

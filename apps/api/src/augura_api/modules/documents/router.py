@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, status
 from fastapi.responses import Response
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, WriteTenantDep
 from augura_api.jobs.runner import enqueue_job
 from augura_api.modules.documents import schemas
 from augura_api.modules.documents.service import DocumentService
@@ -25,7 +25,7 @@ async def list_documents(
 )
 async def generate(
     req: schemas.GenerateRequest,
-    tenant: CurrentTenantDep,
+    tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
     background_tasks: BackgroundTasks,

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep
+from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, WriteTenantDep
 from augura_api.modules.datasets.repo import DatasetRepo
 from augura_api.modules.dq import schemas
 from augura_api.modules.dq.repo import DqRepo
@@ -21,7 +21,7 @@ def _service(session: SessionDep) -> DqService:
     "/{dataset_id}/dq", response_model=schemas.DqRunResult, status_code=status.HTTP_201_CREATED
 )
 async def run_dq(
-    dataset_id: UUID, tenant: CurrentTenantDep, session: SessionDep, settings: SettingsDep
+    dataset_id: UUID, tenant: WriteTenantDep, session: SessionDep, settings: SettingsDep
 ) -> schemas.DqRunResult:
     return await _service(session).run(tenant, settings, dataset_id)
 

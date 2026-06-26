@@ -86,6 +86,10 @@ def require_role(*allowed: str) -> Callable[[CurrentTenant], Awaitable[CurrentTe
     return _require
 
 
+# Write-gating: only owner/member may mutate tenant data; viewer is read-only.
+WriteTenantDep = Annotated[CurrentTenant, Depends(require_role("owner", "member"))]
+
+
 async def get_session(
     tenant: CurrentTenantDep, settings: SettingsDep
 ) -> AsyncIterator[AsyncSession]:

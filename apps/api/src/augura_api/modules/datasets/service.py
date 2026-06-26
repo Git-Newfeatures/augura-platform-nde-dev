@@ -95,11 +95,18 @@ class DatasetService:
 
     async def get_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> schemas.DatasetOut:
         dataset = await self._require_dataset(tenant, dataset_id)
-        return self._to_out(
-            dataset,
-            await self.repo.count_columns(dataset_id),
-            await self.repo.count_files(dataset_id),
+        col_count = await self.repo.count_columns(dataset_id)
+        file_count = await self.repo.count_files(dataset_id)
+        # PHI read log — HIPAA 164.312(b): every PHI access is audited.
+        await analytics.log_usage(
+            self.repo.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="dataset.read",
+            route=f"/datasets/{dataset_id}",
+            metadata={"dataset_id": str(dataset_id)},
         )
+        return self._to_out(dataset, col_count, file_count)
 
     async def list_columns(
         self, tenant: CurrentTenant, dataset_id: UUID
@@ -139,12 +146,30 @@ class DatasetService:
         self, tenant: CurrentTenant, cohort_name: str
     ) -> list[schemas.CohortMemberOut]:
         rows = await self.repo.cohort_members(tenant.tenant_id, cohort_name)
+        # PHI read log — HIPAA 164.312(b): cohort member identifiers are PHI.
+        await analytics.log_usage(
+            self.repo.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="cohort.read",
+            route=f"/datasets/cohorts/{cohort_name}/members",
+            metadata={"cohort_name": cohort_name, "member_count": len(rows)},
+        )
         return [schemas.CohortMemberOut.model_validate(r) for r in rows]
 
     async def cohort_biomarkers(
         self, tenant: CurrentTenant, cohort_name: str
     ) -> list[schemas.CohortBiomarkerOut]:
         rows = await self.repo.cohort_biomarkers(tenant.tenant_id, cohort_name)
+        # PHI read log — HIPAA 164.312(b): biomarker data is PHI.
+        await analytics.log_usage(
+            self.repo.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="cohort.biomarkers.read",
+            route=f"/datasets/cohorts/{cohort_name}/biomarkers",
+            metadata={"cohort_name": cohort_name, "record_count": len(rows)},
+        )
         return [schemas.CohortBiomarkerOut.model_validate(r) for r in rows]
 
     async def _files_out(self, dataset_id: UUID) -> list[schemas.DatasetFileOut]:
@@ -165,7 +190,17 @@ class DatasetService:
         self, tenant: CurrentTenant, dataset_id: UUID
     ) -> list[schemas.DatasetFileOut]:
         await self._require_dataset(tenant, dataset_id)
-        return await self._files_out(dataset_id)
+        files = await self._files_out(dataset_id)
+        # PHI read log — file references are part of the PHI dataset record.
+        await analytics.log_usage(
+            self.repo.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="dataset.files.read",
+            route=f"/datasets/{dataset_id}/files",
+            metadata={"dataset_id": str(dataset_id), "file_count": len(files)},
+        )
+        return files
 
     async def _reprofile(
         self, settings: Settings, tenant: CurrentTenant, dataset_id: UUID

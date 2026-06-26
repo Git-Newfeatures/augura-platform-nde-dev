@@ -64,8 +64,16 @@ def get_engine(settings: Settings) -> AsyncEngine:
     url = to_asyncpg_url(settings.database_url)
     engine = _engines.get(url)
     if engine is None:
-        ctx = ssl.create_default_context()  # check_hostname=True, verify_mode=CERT_REQUIRED
-        engine = create_async_engine(url, pool_pre_ping=True, connect_args={"ssl": ctx})
+        # Verified TLS when prod (matching the prod-only _require_tls_db_in_prod boot guard)
+        # OR when the URL explicitly requests TLS. asyncpg REQUIRES TLS (no plaintext fallback)
+        # once a bare SSLContext is passed, so forcing it unconditionally would break a non-TLS
+        # dev/CI Postgres; gate it so those still connect while prod stays certificate-verified.
+        lowered = url.lower()
+        wants_tls = settings.env == "prod" or "sslmode=" in lowered or "ssl=" in lowered
+        connect_args: dict[str, object] = {}
+        if wants_tls:
+            connect_args["ssl"] = ssl.create_default_context()  # check_hostname + CERT_REQUIRED
+        engine = create_async_engine(url, pool_pre_ping=True, connect_args=connect_args)
         _engines[url] = engine
     return engine
 

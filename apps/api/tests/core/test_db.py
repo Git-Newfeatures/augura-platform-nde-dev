@@ -49,3 +49,51 @@ def test_engine_uses_verified_ssl_context(monkeypatch: pytest.MonkeyPatch) -> No
         assert ctx.verify_mode == ssl.CERT_REQUIRED
     finally:
         clear_engine_cache()  # don't leave the fake engine cached for other tests
+
+
+def test_engine_no_forced_ssl_for_nontls_dev(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dev/CI Postgres URL WITHOUT sslmode must NOT get a forced SSL context — asyncpg
+    would otherwise REQUIRE TLS (no plaintext fallback) and fail against a non-TLS server.
+    Regression guard: this is what broke the CI db-bundle / GDPR-erasure integration paths."""
+    captured: dict[str, object] = {}
+
+    def fake_create(url: object, **kwargs: object) -> object:
+        captured["connect_args"] = kwargs.get("connect_args")
+        return object()
+
+    monkeypatch.setattr(db_mod, "create_async_engine", fake_create)
+    clear_engine_cache()
+    settings = Settings(  # pyright: ignore[reportCallIssue]
+        env="dev", database_url="postgresql://u:p@host:5432/db"
+    )
+    try:
+        db_mod.get_engine(settings)
+        assert "ssl" not in (captured["connect_args"] or {})  # type: ignore[operator]
+    finally:
+        clear_engine_cache()
+
+
+def test_engine_forces_ssl_in_prod(monkeypatch: pytest.MonkeyPatch) -> None:
+    """In prod the engine is certificate-verified (belt-and-suspenders: the boot guard
+    already requires sslmode in the URL)."""
+    captured: dict[str, object] = {}
+
+    def fake_create(url: object, **kwargs: object) -> object:
+        captured["connect_args"] = kwargs.get("connect_args")
+        return object()
+
+    monkeypatch.setattr(db_mod, "create_async_engine", fake_create)
+    clear_engine_cache()
+    settings = Settings(  # pyright: ignore[reportCallIssue]
+        env="prod",
+        cors_origins="https://app.augura.io",
+        supabase_url="https://p.supabase.co",
+        supabase_service_role_key="svc",
+        database_url="postgresql://u:p@db.supabase.co:5432/postgres?sslmode=require",
+    )
+    try:
+        db_mod.get_engine(settings)
+        ctx = (captured["connect_args"] or {}).get("ssl")  # type: ignore[union-attr]
+        assert isinstance(ctx, ssl.SSLContext)
+    finally:
+        clear_engine_cache()

@@ -37,3 +37,19 @@ async def test_viewer_blocked_on_mutating_routes() -> None:
 
     assert clear.status_code == 403
     assert delete_one.status_code == 403
+
+
+async def test_viewer_not_blocked_on_pure_compute_causal_dag() -> None:
+    """POST /causal/dag is read+compute (no persistence) — it must NOT be write-gated, so a
+    viewer is not 403'd. Regression guard for the over-gating fixed after the Phase-2 audit."""
+    app = create_app()
+    app.dependency_overrides[get_current_tenant] = _viewer
+    app.dependency_overrides[get_session] = _session
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        # With no role gate, a viewer passes auth; the request then fails later (422 bad body
+        # or 503 no LLM key) — never 403. If /causal/dag were write-gated, a viewer would 403.
+        r = await client.post("/causal/dag", json={})
+
+    assert r.status_code != 403

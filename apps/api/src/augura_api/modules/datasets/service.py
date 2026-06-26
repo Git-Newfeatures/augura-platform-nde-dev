@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import structlog
 
 from augura_api.core.config import Settings
+from augura_api.core.db import get_sessionmaker, set_tenant_stmt, set_user_stmt
 from augura_api.core.errors import BadRequestError, NotFoundError
 from augura_api.core.storage import delete_bytes
 from augura_api.core.tenancy import CurrentTenant
@@ -20,9 +21,16 @@ _log = structlog.get_logger(__name__)
 async def purge_objects(settings: Settings, org_id: str, paths: list[str]) -> None:
     """Best-effort post-commit storage deletion.
 
-    Called as a FastAPI BackgroundTask so it runs AFTER the response is committed.
-    Per-path failures are logged and skipped — orphaned objects are recoverable;
-    orphaned DB rows (the inverse) are not.
+    Must be called AFTER the dedicated committed session has returned (i.e. after
+    DB rows are durably committed).  Per-path failures are logged and skipped —
+    orphaned objects are recoverable via a storage audit; orphaned DB rows are not.
+
+    NOTE: this is NOT called from a FastAPI BackgroundTask.  FastAPI 0.136.x runs
+    background tasks BEFORE yield-dependency teardown (i.e. before
+    get_session's `async with session.begin()` commits), so the old pattern was
+    incorrect: storage deletion could run before the DB commit.  The correct
+    pattern is: commit deterministically in a dedicated session, then call this
+    function synchronously in the same coroutine after that commit returns.
     """
     for path in paths:
         try:
@@ -307,54 +315,93 @@ class DatasetService:
 
     async def remove_file(
         self, tenant: CurrentTenant, settings: Settings, dataset_id: UUID, file_id: UUID
-    ) -> tuple[schemas.UploadResult, str]:
-        """Delete a file row from the dataset and return (result, storage_path).
+    ) -> schemas.UploadResult:
+        """Delete a file row from the dataset, reprofile, then purge the storage object.
 
-        The caller (router) is responsible for scheduling the storage object deletion
-        post-commit via a BackgroundTask so the DB is durably committed before any
-        irreversible object removal.
+        Ordering guarantee (mirrors erase_dataset — same FastAPI bg-task ordering fix):
+          1. Verify dataset ownership and retrieve the target file (request session).
+          2. In a DEDICATED committed session: delete the file row + reprofile so
+             both mutations are in the same committed transaction.
+          3. AFTER that commit returns, purge the storage object (best-effort).
+          4. Re-read the refreshed dataset/files/columns via the request session
+             for the UploadResult response shape.
         """
+        # Step 1: verify ownership and capture the file's storage path.
         await self._require_dataset(tenant, dataset_id)
         target = await self.repo.get_file(dataset_id, file_id)
         if target is None:
             raise NotFoundError("file not found", file_id=str(file_id))
-        storage_path = target.storage_path
-        await self.repo.delete_file(dataset_id, file_id)
+        removed_path: str | None = target.storage_path
+
+        # Step 2: delete the file row and reprofile in a dedicated committed session.
+        sm = get_sessionmaker(settings)
+        async with sm() as s, s.begin():
+            await s.execute(set_user_stmt(tenant.user_id))
+            await s.execute(set_tenant_stmt(tenant.tenant_id))
+            inner = DatasetService(DatasetRepo(s))
+            await inner.repo.delete_file(dataset_id, file_id)
+            await inner._reprofile(settings, tenant, dataset_id)
+        # s.begin() context has exited → deletion + reprofile are durably committed.
+
+        # Step 3: purge the storage object (best-effort, post-commit).
+        if removed_path:
+            await purge_objects(settings, str(tenant.tenant_id), [removed_path])
+
+        # Step 4: re-read the refreshed state via the request session for the response.
         columns = await self._reprofile(settings, tenant, dataset_id)
         files_out = await self._files_out(dataset_id)
         refreshed = await self._require_dataset(tenant, dataset_id)
-        return (
-            schemas.UploadResult(
-                dataset=self._to_out(refreshed, len(columns), len(files_out)),
-                columns=columns,
-                files=files_out,
-                warnings=[],
-            ),
-            storage_path,
+        return schemas.UploadResult(
+            dataset=self._to_out(refreshed, len(columns), len(files_out)),
+            columns=columns,
+            files=files_out,
+            warnings=[],
         )
 
-    async def erase_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> list[str]:
-        """GDPR Art 17 erasure: delete the dataset row + all child rows (cascade) and
-        return the storage_paths that must be purged AFTER the DB commit.
+    async def erase_dataset(
+        self, tenant: CurrentTenant, settings: Settings, dataset_id: UUID
+    ) -> None:
+        """GDPR Art 17 erasure: delete the dataset row + all child rows (cascade),
+        then purge the backing storage objects.
 
-        Deliberately performs NO storage I/O — the caller (router) schedules object
-        deletion as a BackgroundTask so the DB transaction is durably committed before
-        any irreversible byte removal.  If the commit fails the paths are never touched;
-        if object deletion later fails the objects are orphaned but the rows are gone
-        (recoverable via a storage audit, not the other way around).
+        Ordering guarantee:
+          1. Verify ownership via the request session (raises NotFoundError if not found).
+          2. Collect storage paths from the request session (read-only, no writes).
+          3. Commit the DB row deletion in a DEDICATED session whose transaction
+             commits deterministically when its context manager exits — this is the
+             durable point of no return for the rows.
+          4. Only AFTER that commit returns, call purge_objects (best-effort).
+
+        This avoids the FastAPI BackgroundTask ordering bug: on FastAPI 0.136.x,
+        background tasks execute BEFORE yield-dependency teardown, meaning they run
+        before get_session's `async with session.begin()` commits.  By using our own
+        dedicated session here we own the commit point and can sequence storage
+        deletion deterministically after it.
+
+        If the dedicated-session commit raises, purge_objects is never called and no
+        bytes are touched.  If purge_objects fails per-path, the objects are orphaned
+        (recoverable via storage audit) but the rows are already gone — the safe
+        direction.
 
         Note: broader erasure across generated_documents, artifacts, corpus chunks,
         literature_snapshots, and agent_cache is deferred to `erase_tenant_data` (a
         full-org erasure orchestrator, to be built as a follow-up to this task).
         """
+        # Step 1+2: verify ownership and gather paths (request session, read-only).
         dataset = await self._require_dataset(tenant, dataset_id)
         files = await self.repo.list_files(dataset.id)
-        storage_paths = [f.storage_path for f in files]
+        paths = [f.storage_path for f in files]
 
-        # Delete DB rows (cascade covers dataset_columns / dataset_files / etc.).
-        await self.repo.delete_dataset(tenant.tenant_id, dataset_id)
+        # Step 3: commit the deletion in a dedicated session we fully control.
+        sm = get_sessionmaker(settings)
+        async with sm() as s, s.begin():
+            await s.execute(set_user_stmt(tenant.user_id))
+            await s.execute(set_tenant_stmt(tenant.tenant_id))
+            await DatasetRepo(s).delete_dataset(tenant.tenant_id, dataset_id)
+        # s.begin() context has exited → rows are durably committed.
 
-        return storage_paths
+        # Step 4: purge storage objects synchronously (best-effort, post-commit).
+        await purge_objects(settings, str(tenant.tenant_id), paths)
 
     async def export_dataset(
         self, tenant: CurrentTenant, dataset_id: UUID

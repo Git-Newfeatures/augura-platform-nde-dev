@@ -1,7 +1,8 @@
 """Integration: GDPR Art 17 dataset erasure + Art 15/20 export bundle.
 
 Tests:
-- erase_dataset removes DB rows + backing storage objects (disk backend).
+- erase_dataset removes DB rows + backing storage objects (disk backend) with the
+  correct ordering: dedicated-session commit first, then storage purge.
 - erase_dataset on unknown dataset raises NotFoundError.
 - export_dataset returns a bundle with correct shape + emits a usage_events row.
 - export_dataset is tenant-isolated (foreign tenant cannot export).
@@ -23,7 +24,7 @@ from augura_api.core.ids import TenantId, UserId
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.analytics.models import UsageEvent
 from augura_api.modules.datasets.repo import DatasetRepo
-from augura_api.modules.datasets.service import DatasetService, purge_objects
+from augura_api.modules.datasets.service import DatasetService
 
 pytestmark = pytest.mark.integration
 
@@ -102,16 +103,14 @@ async def test_erase_dataset_removes_db_rows_and_storage_objects(
     # Sanity: the object exists on disk.
     assert await storage.exists(settings, storage_path)
 
-    paths: list[str] = []
+    # erase_dataset now manages its own dedicated committed session internally and
+    # calls purge_objects synchronously after commit — no BackgroundTask needed.
     async with sm() as session, session.begin():
         await _scope(session, tenant)
         svc = DatasetService(DatasetRepo(session))
-        paths = await svc.erase_dataset(owner, dataset_id)
+        await svc.erase_dataset(owner, settings, dataset_id)
 
-    # Simulate the post-commit BackgroundTask (runs after response/commit in prod).
-    await purge_objects(settings, str(tenant), paths)
-
-    # Storage object must be gone.
+    # Storage object must be gone (purge_objects ran synchronously after DB commit).
     assert not await storage.exists(settings, storage_path)
 
     # Dataset row must be gone (query without RLS as a sanity check via direct select).
@@ -122,16 +121,19 @@ async def test_erase_dataset_removes_db_rows_and_storage_objects(
 
 async def test_erase_dataset_unknown_id_raises_not_found(
     sm: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tenant = TenantId(uuid4())
     owner = CurrentTenant(tenant_id=tenant, user_id=USER, role="owner")
+    settings = _settings(tmp_path, monkeypatch)
 
     async with sm() as session, session.begin():
         await _scope(session, tenant)
         await _make_org(session, tenant)
         svc = DatasetService(DatasetRepo(session))
         with pytest.raises(NotFoundError):
-            await svc.erase_dataset(owner, uuid4())
+            await svc.erase_dataset(owner, settings, uuid4())
 
 
 async def test_erase_dataset_tenant_isolation(
@@ -164,7 +166,7 @@ async def test_erase_dataset_tenant_isolation(
         await _scope(session, tenant_b)
         await _make_org(session, tenant_b)
         with pytest.raises(NotFoundError):
-            await DatasetService(DatasetRepo(session)).erase_dataset(owner_b, dataset_id)
+            await DatasetService(DatasetRepo(session)).erase_dataset(owner_b, settings, dataset_id)
 
     # Sanity: tenant A's row must still exist.
     async with sm() as session:

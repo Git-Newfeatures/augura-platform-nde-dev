@@ -98,3 +98,82 @@ async def test_apply_release_writes_relation_and_bumps_current(
             )
         ).scalar_one()
         assert current == "test.0.1"
+
+
+async def test_apply_release_writes_affix_grammar(
+    sm: async_sessionmaker[AsyncSession],
+) -> None:
+    """The dimension-grammar payload (dimension_kinds + affix_archetypes …) is
+    upserted through the same SECURITY DEFINER release function."""
+    tenant = TenantId(uuid4())
+    async with sm() as session, session.begin():
+        await _scope(session, tenant, USER)
+        repo = SemanticRepo(session)
+
+        manifest = {"semantic_release_version": "test.affix.1", "description": "test affix B4"}
+        payload = {
+            "dimension_kinds": [
+                {
+                    "dimension_kind_id": "test_kind",
+                    "label": "Test Kind",
+                    "description": "test",
+                    "value_model": "closed_set",
+                    "default_comparability": "preserves",
+                    "structural_role": None,
+                    "review_status": "approved",
+                    "version": "test.affix.1",
+                    "active": True,
+                }
+            ],
+            "affix_archetypes": [
+                {
+                    "affix_archetype_id": "TEST_AFX_0001",
+                    "archetype_name": "Test affix",
+                    "dimension_kind_id": "test_kind",
+                    "position": "suffix",
+                    "separator_style": "_",
+                    "value_model": "closed_set",
+                    "comparability": "preserves",
+                    "anchor_concept_id": None,
+                    "operator": None,
+                    "extraction_rule": None,
+                    "requires_residual_maps": True,
+                    "requires_sibling_family": False,
+                    "evidence_weight": 1.0,
+                    "confidence_threshold": 0.6,
+                    "review_status": "approved",
+                    "version": "test.affix.1",
+                    "active": True,
+                }
+            ],
+            "affix_archetype_values": [
+                {
+                    "affix_archetype_id": "TEST_AFX_0001",
+                    "canonical_value": "test_value",
+                    "label": "Test Value",
+                    "review_status": "approved",
+                }
+            ],
+            "affix_archetype_aliases": [
+                {
+                    "affix_archetype_id": "TEST_AFX_0001",
+                    "token": "tv",
+                    "canonical_value": "test_value",
+                    "source": "test",
+                    "review_status": "approved",
+                }
+            ],
+        }
+        result = await repo.apply_release(manifest, payload)
+        assert result["version"] == "test.affix.1"
+        assert result["affix_archetypes"] == 1
+
+        archetype = (
+            await session.execute(
+                text(
+                    "select dimension_kind_id from affix_archetypes "
+                    "where affix_archetype_id = 'TEST_AFX_0001'"
+                )
+            )
+        ).scalar_one()
+        assert archetype == "test_kind"

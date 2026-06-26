@@ -21,7 +21,7 @@ from augura_api.modules.semantic.models import (
     UnitConversion,
 )
 
-# The 14 tables of the governed semantic layer exposed by GET /semantic/bundle
+# The 18 tables of the governed semantic layer exposed by GET /semantic/bundle
 # (in frontend-contract order; dq_predicates excluded — consumed by the DQ stack).
 # Hard-coded names (never user input) → no injection risk.
 _BUNDLE_TABLES = (
@@ -39,6 +39,11 @@ _BUNDLE_TABLES = (
     "ontology_relation_qualifiers",
     "dq_constraints",
     "table_archetypes",
+    # Dimension grammar / affix archetypes (A1).
+    "dimension_kinds",
+    "affix_archetypes",
+    "affix_archetype_values",
+    "affix_archetype_aliases",
 )
 
 # Bundle = a single jsonb object {table: [raw rows]} (port of the semantic_read_all RPC,
@@ -152,7 +157,7 @@ class SemanticRepo:
     # ── Governed bundle + release status (block read) ───────────────────────
 
     async def read_bundle(self) -> dict[str, Any]:
-        """The 14 semantic tables as a single jsonb object (GET /semantic/bundle)."""
+        """The 18 semantic tables as a single jsonb object (GET /semantic/bundle)."""
         res = await self.session.execute(text(_BUNDLE_SQL))
         return coerce_jsonb(res.scalar_one())
 

@@ -1,0 +1,821 @@
+{
+  "bundle_meta": {
+    "name": "Augura DQ Pressure-Test v2 — Ground Truth",
+    "dataset_version": "v2",
+    "description": "Engine-agnostic ground truth for the v2 synthetic health dataset. Each finding describes an observable data quality problem as a domain expert would recognise it — without referencing any check-ID taxonomy. The test question is: did the DQ engine independently surface the same problems?",
+    "tables": [
+      "01_patients.csv",
+      "02_biomarker_results.csv",
+      "03_dexa_results.csv",
+      "04_health_profile.csv",
+      "05_questionnaire_followup.csv",
+      "06_wearable_aggregates.csv",
+      "07_clinical_visits.csv",
+      "08_diagnoses.csv",
+      "09_medications.csv",
+      "10_recommendations.csv",
+      "11_protocols.csv"
+    ],
+    "patients": 15,
+    "sites": [
+      "SITE_A",
+      "SITE_B"
+    ],
+    "timepoints": [
+      "T0",
+      "T1",
+      "T2"
+    ],
+    "clean_directory": "../clean",
+    "degraded_directory": "../degraded",
+    "total_findings": 31,
+    "severity_counts": {
+      "hard": 17,
+      "soft": 14
+    },
+    "severity_definitions": {
+      "hard": "Factually or logically impossible — the value cannot be correct under any interpretation",
+      "soft": "Clinically implausible, statistically anomalous, or coherence-breaking — requires human review; may have a valid explanation but that explanation is absent from the data"
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "soft",
+      "table": "01_patients.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "P013"
+        ],
+        "reference_ids": [
+          "P009"
+        ],
+        "id_column": "patient_id"
+      },
+      "columns_involved": [
+        "birth_date",
+        "height_cm",
+        "weight_kg",
+        "gender",
+        "site_id"
+      ],
+      "what_a_human_expert_would_observe": "Two patients within the same site (SITE_B) have nearly identical demographics: P009 (female, born 1991-07-14, 162 cm, 57.5 kg) and P013 (female, born 1991-06-19, 162 cm, 57.8 kg). They share the same sex, site, and height exactly; their dates of birth are 25 days apart; and their weights differ by only 0.3 kg. The probability of two genuinely distinct patients matching across all five dimensions simultaneously is very low. The pattern is consistent with a record imported or merged twice under different identifiers.",
+      "expected_state": "Each row in the patients table represents a unique, distinguishable individual. Where demographic overlap is this tight within a single site, the record provenance should be verified against source documents before downstream analysis.",
+      "cross_references": [],
+      "notes": "Neither record is individually erroneous — the problem is the relationship between them.",
+      "category": "near_duplicate_entity"
+    },
+    {
+      "id": "F02",
+      "severity": "hard",
+      "table": "01_patients.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "P014"
+        ],
+        "reference_ids": [],
+        "id_column": "patient_id"
+      },
+      "columns_involved": [
+        "enrollment_date"
+      ],
+      "what_a_human_expert_would_observe": "P014's enrollment_date is 2026-03-05 — more than two years after all other study enrollments (January to March 2024) and in the future relative to any plausible data-capture date. An enrollment event dated in the future cannot have been observed; the record was either entered with a transposed year (likely intended as 2024-03-05) or created by a system that did not validate date ranges.",
+      "expected_state": "enrollment_date must be a calendar date in the past, within the study window of 2024-01-01 to 2024-12-31.",
+      "cross_references": [],
+      "notes": "P014's other data (biomarkers, visits, medications) all align with a 2024 enrollment.",
+      "category": "impossible_date"
+    },
+    {
+      "id": "F03",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-001"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "glucose_value"
+      ],
+      "what_a_human_expert_would_observe": "The glucose_value field for P001's T0 record contains the text string 'fasting' rather than a number. 'fasting' is a collection instruction or sample state descriptor — it describes how the sample was collected, not the measured concentration. It cannot be interpreted as a plasma glucose value and will cause any arithmetic operation or range check on this field to fail.",
+      "expected_state": "glucose_value must be a numeric concentration in the declared unit (mmol/L for SITE_A patients). The expected range for a fasting glucose is 3.5–15 mmol/L for this cohort.",
+      "cross_references": [],
+      "notes": "",
+      "category": "unparseable_value"
+    },
+    {
+      "id": "F04",
+      "severity": "soft",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-009"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "tsh_miu_l"
+      ],
+      "what_a_human_expert_would_observe": "P003's TSH at T2 is 0.02 mIU/L. This level indicates complete suppression of TSH secretion, consistent with severe or iatrogenic hyperthyroidism. However, three other tables describe a picture incompatible with this interpretation: (1) 04_health_profile records P003's chronic condition as HYPOTHYROIDISM; (2) 09_medications records levothyroxine 100 mcg — a hormone replacement for hypothyroidism that, if over-dosed, could suppress TSH, but the absence of any dose-review record or clinical note makes this unexplained; (3) P003's T0 TSH was 8.2 and T1 was 3.8, suggesting controlled but still elevated TSH — not a trajectory leading to suppression. Taken together, the T2 TSH of 0.02 contradicts the clinical context established across three tables.",
+      "expected_state": "A patient documented as hypothyroid and treated with levothyroxine should have TSH within the therapeutic target range (~0.5–3.0 mIU/L at T2). A TSH of 0.02 would require clinical explanation (over-replacement, autonomous thyroid nodule, etc.) corroborated by visit notes and a medication dose change.",
+      "cross_references": [
+        {
+          "table": "04_health_profile.csv",
+          "row_id": "P003",
+          "column": "chronic_conditions",
+          "context": "records HYPOTHYROIDISM"
+        },
+        {
+          "table": "09_medications.csv",
+          "row_id": "P003",
+          "column": "drug_name",
+          "context": "records Levothyroxine 100 mcg"
+        }
+      ],
+      "notes": "This finding requires joining biomarkers, health_profile, and medications — a cross-table coherence check.",
+      "category": "cross_table_clinical_incoherence"
+    },
+    {
+      "id": "F05",
+      "severity": "soft",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-011"
+        ],
+        "reference_ids": [
+          "BIO-010",
+          "BIO-012"
+        ],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "creatinine_value"
+      ],
+      "what_a_human_expert_would_observe": "P004's creatinine_value trajectory across the three timepoints is: T0 = 2.1 mg/dL, T1 = 8.9 mg/dL, T2 = 2.5 mg/dL. The T1 value is 4.2× the T0 baseline, followed by near-complete normalisation at T2. While acute-on-chronic kidney injury (AKI-on-CKD) could produce such a spike, full resolution to near-baseline within one 90-day window would be exceptional and would require acute hospitalisation, dialysis records, or at minimum extensive clinical documentation — none of which appears in the 07_clinical_visits table for P004. A spike-then-return pattern of this magnitude is a marker of a probable data entry error at T1 rather than a genuine biological event.",
+      "expected_state": "A CKD stage 3 patient's creatinine should show slow, monotonically increasing progression: T0 ≈ 2.1, T1 ≈ 2.3, T2 ≈ 2.5 mg/dL. A single-timepoint extreme deviation without corroborating clinical context is strongly suggestive of a transcription or entry error.",
+      "cross_references": [
+        {
+          "table": "07_clinical_visits.csv",
+          "row_id": "VIS-010 to VIS-012",
+          "column": "visit_notes_free_text",
+          "context": "no hospitalisation or AKI record for P004"
+        }
+      ],
+      "notes": "Pair with F06 — the eGFR on the same row is also internally contradictory.",
+      "category": "implausible_longitudinal_trajectory"
+    },
+    {
+      "id": "F06",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-011"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "creatinine_value",
+        "egfr_ml_min"
+      ],
+      "what_a_human_expert_would_observe": "On the same row (BIO-011, P004-T1), creatinine_value is 8.9 mg/dL while egfr_ml_min is 91. These two values directly contradict each other. The CKD-EPI 2021 creatinine equation for a 67-year-old male (P004's approximate age at T1) with creatinine 8.9 mg/dL yields an eGFR of approximately 5 mL/min/1.73 m² — indicating kidney failure, not the 91 mL/min/1.73 m² recorded, which would imply near-normal kidney function. Both values cannot be correct simultaneously; at minimum one was entered incorrectly or copied from a different record.",
+      "expected_state": "egfr_ml_min must be mathematically consistent with creatinine_value, patient age, and sex via the CKD-EPI formula. At creatinine 8.9 mg/dL for a 67-year-old male, eGFR ≈ 5 mL/min/1.73 m².",
+      "cross_references": [],
+      "notes": "Pair with F05 — same underlying data error produces two distinct observable problems on the same row.",
+      "category": "cross_column_formula_contradiction"
+    },
+    {
+      "id": "F07",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-014"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "hba1c_pct"
+      ],
+      "what_a_human_expert_would_observe": "hba1c_pct is 97.4. HbA1c is expressed as the percentage of haemoglobin that is glycated; the theoretical maximum is 100% and the absolute biological ceiling for diabetic patients in ketoacidosis is approximately 20%. A value of 97.4% is physiologically impossible for any living patient and indicates a unit conversion error (a value in mmol/mol, the IFCC unit, was likely entered without converting: 97.4 mmol/mol ≈ 11.1% NGSP, which would be consistent with poorly-controlled diabetes).",
+      "expected_state": "hba1c_pct must be in the range 4.0–20.0% (NGSP/DCCT units). For the SITE_A convention, values in mmol/mol (IFCC) must be converted: % = (mmol/mol ÷ 10.929) + 2.15.",
+      "cross_references": [],
+      "notes": "P005 is a 29-year-old female with iron-deficiency anaemia and no diabetes diagnosis; even if this were a unit error the underlying concern is the unit-mixing.",
+      "category": "impossible_value_hard_range"
+    },
+    {
+      "id": "F08",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-028"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "creatinine_value",
+        "creatinine_unit"
+      ],
+      "what_a_human_expert_would_observe": "BIO-028 (P010-T0, SITE_B) has creatinine_value = 1.1 with creatinine_unit = 'µmol/L'. A serum creatinine of 1.1 µmol/L is not clinically plausible — the physiological range for a human male is 62–115 µmol/L. All other SITE_B creatinine measurements are in the range 60–135 µmol/L. The value 1.1 is numerically consistent with mg/dL (normal male range 0.7–1.3 mg/dL), suggesting that the result was recorded in mg/dL-scale but the declared unit remained as µmol/L. The value and its unit are mismatched by a factor of approximately 88× (the mg/dL-to-µmol/L conversion factor).",
+      "expected_state": "SITE_B creatinine values are in µmol/L; the expected range for P010 at T0 is approximately 85–100 µmol/L. If the measurement was 1.1 mg/dL, the correct µmol/L equivalent is ~97 µmol/L.",
+      "cross_references": [],
+      "notes": "Site unit conventions: SITE_A = mg/dL; SITE_B = µmol/L. The mismatch is detectable by comparing value magnitude against declared unit and site context.",
+      "category": "unit_scale_mismatch"
+    },
+    {
+      "id": "F09",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-029"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "cortisol_nmol_l"
+      ],
+      "what_a_human_expert_would_observe": "cortisol_nmol_l is -99. Serum cortisol is a non-negative hormone concentration; negative values are physically impossible. The specific value -99 is a well-known sentinel code used in legacy lab and device systems to flag 'measurement not available', 'sample haemolysed', or 'analyser error'. Processing this as a low cortisol value (e.g., adrenal insufficiency workup) would be clinically dangerous.",
+      "expected_state": "cortisol_nmol_l must be a positive number. Physiological morning cortisol range: 100–700 nmol/L. A -99 entry must be treated as a missing value requiring re-collection, not as a clinical result.",
+      "cross_references": [],
+      "notes": "",
+      "category": "sentinel_in_numeric_field"
+    },
+    {
+      "id": "F10",
+      "severity": "soft",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-027"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "ldl_mmol_l"
+      ],
+      "what_a_human_expert_would_observe": "P009's LDL cholesterol at T2 is 14.7 mmol/L. The LDL values for all other patients across all timepoints range from 2.0 to 5.2 mmol/L; 14.7 is approximately 6 standard deviations above the dataset mean. The only clinical condition that produces LDL at this level is homozygous familial hypercholesterolaemia — an extremely rare genetic disorder requiring lifelong specialist management. P009 has no such diagnosis, no statin prescription, and a T0 LDL of 2.2 mmol/L, making a T2 value of 14.7 mmol/L a statistical extreme outlier that is almost certainly a data entry error (e.g., decimal point dropped: 1.47 → 14.7).",
+      "expected_state": "Expected P009 LDL at T2 ≈ 2.1 mmol/L based on stable trajectory. Values above 8.0 mmol/L warrant immediate clinical review; 14.7 mmol/L is a strong transcription-error signal.",
+      "cross_references": [
+        {
+          "table": "08_diagnoses.csv",
+          "row_id": "P009",
+          "column": "icd10_code",
+          "context": "no familial hypercholesterolaemia diagnosis"
+        },
+        {
+          "table": "09_medications.csv",
+          "row_id": "P009",
+          "column": "drug_name",
+          "context": "no lipid-lowering medication"
+        }
+      ],
+      "notes": "",
+      "category": "statistical_outlier"
+    },
+    {
+      "id": "F11",
+      "severity": "soft",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-025",
+          "BIO-026",
+          "BIO-027",
+          "BIO-028",
+          "BIO-029",
+          "BIO-030",
+          "BIO-031",
+          "BIO-032",
+          "BIO-033",
+          "BIO-034",
+          "BIO-035",
+          "BIO-036",
+          "BIO-037",
+          "BIO-038",
+          "BIO-039",
+          "BIO-040",
+          "BIO-041",
+          "BIO-042",
+          "BIO-043",
+          "BIO-044"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "vit_b12_pmol_l"
+      ],
+      "what_a_human_expert_would_observe": "vit_b12_pmol_l is blank (missing) for every row belonging to SITE_B patients (P009–P015, 20 rows). It is populated for every SITE_A row (P001–P008, 24 rows). The missingness rate is 0% at SITE_A and 100% at SITE_B. This perfect site-stratification of missing values is not consistent with random instrument failure or patient-level refusal — it indicates a systematic gap at the site level, most likely that SITE_B's laboratory did not include vitamin B12 in its standard panel. This is a protocol deviation or data integration failure that affects 45% of all rows in the column.",
+      "expected_state": "vit_b12_pmol_l should be collected for all patients per protocol. If SITE_B systematically omits B12 measurement, this should be declared in the study protocol and the missing values coded as PROTOCOL_NOT_APPLICABLE rather than left blank, so that the absence is not misinterpreted as random missingness.",
+      "cross_references": [],
+      "notes": "The 20 affected rows span P009–P015, noting P011 has only T0 and T1 records (no T2).",
+      "category": "site_concentrated_missingness"
+    },
+    {
+      "id": "F12",
+      "severity": "soft",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-018",
+          "BIO-035",
+          "BIO-041"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "ferritin_ng_ml",
+        "serum_iron_umol_l",
+        "transferrin_g_l"
+      ],
+      "what_a_human_expert_would_observe": "ferritin_ng_ml, serum_iron_umol_l, and transferrin_g_l are all simultaneously blank for exactly three patients — P006, P012, and P014 — but only at timepoint T2. At T0 and T1 the same three columns are fully populated for these patients. The co-missingness of all three columns at the same timepoint for three different patients is not a coincidence: the Pearson correlation of missingness between these three columns within T2 rows is 1.0. These three biomarkers form the clinical iron status panel; a panel is ordered and resulted as a unit — if it was not ordered, all three are missing; if it was ordered, all three are present. This pattern strongly suggests the iron panel was not ordered at T2 for these three patients, either due to an ordering error, a system configuration issue, or an undocumented protocol change.",
+      "expected_state": "The iron panel (ferritin, serum iron, transferrin) should be collected at every timepoint for all patients, particularly those with clinical indications for monitoring (P006 has liver disease, P012 hypogonadism, P014 multi-morbidity). Co-missingness of entire panels at a single timepoint across multiple patients should be flagged for clinical review.",
+      "cross_references": [],
+      "notes": "P006: T2 row is BIO-018. P012: T2 row is BIO-035. P014: T2 row is BIO-041.",
+      "category": "co_missing_ordered_panel"
+    },
+    {
+      "id": "F13",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-045"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "patient_id"
+      ],
+      "what_a_human_expert_would_observe": "BIO-045 contains a patient_id of 'P099'. There is no patient with ID P099 in the 01_patients.csv table. This biomarker record cannot be attributed to any known study participant — it has no demographic context, no site assignment via the patients table, and cannot contribute to any per-patient analysis. The record is either from a patient whose registration was never completed or was created by a data pipeline error.",
+      "expected_state": "Every row in the biomarker_results table must reference a patient_id that exists in the patients table. Orphan records must be quarantined and their provenance investigated before inclusion in any analysis.",
+      "cross_references": [
+        {
+          "table": "01_patients.csv",
+          "row_id": "P099",
+          "column": "patient_id",
+          "context": "does not exist"
+        }
+      ],
+      "notes": "",
+      "category": "orphan_foreign_key"
+    },
+    {
+      "id": "F14",
+      "severity": "hard",
+      "table": "02_biomarker_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "BIO-020",
+          "BIO-046"
+        ],
+        "reference_ids": [],
+        "id_column": "result_id"
+      },
+      "columns_involved": [
+        "patient_id",
+        "timepoint"
+      ],
+      "what_a_human_expert_would_observe": "Two distinct rows — BIO-020 and BIO-046 — both record a biomarker measurement for patient P007 at timepoint T1. The table's implicit grain is one blood draw per patient per timepoint; a patient cannot have two separate T1 results unless two samples were collected and both processed. The two rows have slightly different values for LDL (3.5 vs 3.3 mmol/L), CRP (1.8 vs 2.8 mg/L), and glucose (5.4 vs 5.7 mmol/L), suggesting either duplicate data entry (same sample entered twice with minor transcription differences) or two differently-timed samples both labelled as T1.",
+      "expected_state": "The combination of (patient_id, timepoint) must be unique in the biomarker_results table. Where two rows share this key, one must be identified as the authoritative record and the other removed, or the timepoint label corrected to reflect distinct collection windows.",
+      "cross_references": [],
+      "notes": "",
+      "category": "grain_duplicate"
+    },
+    {
+      "id": "F15",
+      "severity": "soft",
+      "table": "03_dexa_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "DEX-002"
+        ],
+        "reference_ids": [
+          "DEX-001"
+        ],
+        "id_column": "scan_id"
+      },
+      "columns_involved": [
+        "body_fat_pct"
+      ],
+      "what_a_human_expert_would_observe": "P001's body fat percentage drops from 38.5% at T0 (DEX-001) to 11.8% at T2 (DEX-002) — a reduction of 26.7 percentage points in 6 months. The maximum physiologically achievable body fat reduction through lifestyle intervention is approximately 3–5 percentage points per 6-month period, and even bariatric surgery rarely achieves more than 10 points in 6 months. Furthermore, at P001's T2 visit weight of approximately 78 kg, a body fat of 11.8% would imply fat mass of only 9.2 kg — inconsistent with a 162 cm woman at that weight. The value is implausible both in isolation and relative to the measured weight.",
+      "expected_state": "Expected body_fat_pct at T2 for P001 is approximately 36–37% based on the study trajectory. The T2 scan value appears to have been entered with the decimal place shifted (possibly 1.18 → 11.8, or a miskeyed value).",
+      "cross_references": [
+        {
+          "table": "07_clinical_visits.csv",
+          "row_id": "VIS-003",
+          "column": "weight_kg",
+          "context": "P001 weight at T2 ≈ 78 kg"
+        }
+      ],
+      "notes": "",
+      "category": "implausible_longitudinal_trajectory"
+    },
+    {
+      "id": "F16",
+      "severity": "hard",
+      "table": "03_dexa_results.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "DEX-014"
+        ],
+        "reference_ids": [],
+        "id_column": "scan_id"
+      },
+      "columns_involved": [
+        "lumbar_spine_t_score"
+      ],
+      "what_a_human_expert_would_observe": "The lumbar spine T-score for DEX-014 (P007-T2) is +8.2. DEXA T-scores are defined as the number of standard deviations the measured bone mineral density differs from the peak-bone-mass reference; the clinical range used across all major guidelines is approximately -4.0 to +3.0. A T-score of +8.2 does not correspond to any physiological bone density state — it is outside the measurable output range of any DEXA instrument. The value indicates a data entry, instrument calibration, or file-parsing error.",
+      "expected_state": "lumbar_spine_t_score must fall within the physiologically valid range of -4.0 to +3.0. P007's T0 lumbar T-score was -2.6 (osteoporosis); after 6 months of treatment (alendronic acid + vitamin D) a modest improvement to approximately -2.4 would be expected.",
+      "cross_references": [],
+      "notes": "",
+      "category": "impossible_value_hard_range"
+    },
+    {
+      "id": "F17",
+      "severity": "soft",
+      "table": "05_questionnaire_followup.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "QFU-017"
+        ],
+        "reference_ids": [],
+        "id_column": "response_id"
+      },
+      "columns_involved": [
+        "phq9_category"
+      ],
+      "what_a_human_expert_would_observe": "The phq9_category value 'MODERATE-SEVERE' does not belong to the PHQ-9 standard scoring categories. The PHQ-9 instrument defines four severity bands: None (0–4), Mild (5–9), Moderate (10–14), and Severe (15–27). There is no standard compound category 'MODERATE-SEVERE' in any PHQ-9 scoring algorithm. The value appears to have been entered by a clinician who created an ad hoc category, possibly to describe a borderline score. Inconsistent category labels break any population-level analysis of depression severity distribution.",
+      "expected_state": "phq9_category must be one of four standardised values: NONE, MILD, MODERATE, SEVERE. Borderline scores should be assigned to the nearest standard band; clinical nuance should be recorded in free-text notes, not in the controlled vocabulary field.",
+      "cross_references": [],
+      "notes": "",
+      "category": "invalid_coded_value"
+    },
+    {
+      "id": "F18",
+      "severity": "soft",
+      "table": "05_questionnaire_followup.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "QFU-030"
+        ],
+        "reference_ids": [
+          "QFU-029"
+        ],
+        "id_column": "response_id"
+      },
+      "columns_involved": [
+        "response_id",
+        "patient_id",
+        "timepoint"
+      ],
+      "what_a_human_expert_would_observe": "P015 has a T0 questionnaire record (QFU-029) but no T1 record. Every other active patient who has a T0 record also has a T1 record. P015 was alive at T1 (has T1 biomarker results in 02_biomarker_results.csv and a T1 clinical visit in 07_clinical_visits.csv), so the absence of a questionnaire at T1 is not explained by death or dropout. The gap occurs at the most important follow-up point for P015, whose clinical profile involves mental health concerns being actively monitored with PHQ-9 scoring.",
+      "expected_state": "A T1 questionnaire response for P015 (expected collection date approximately 2024-06-08, 90 days after enrollment 2024-03-09) should exist. Its absence creates an unexplained longitudinal gap in mental health monitoring for this patient.",
+      "cross_references": [
+        {
+          "table": "02_biomarker_results.csv",
+          "row_id": "P015-T1",
+          "column": "timepoint",
+          "context": "P015 has T1 biomarker data, confirming study participation at T1"
+        },
+        {
+          "table": "07_clinical_visits.csv",
+          "row_id": "VIS-044",
+          "column": "timepoint",
+          "context": "P015 has a T1 clinical visit"
+        }
+      ],
+      "notes": "QFU-030 was the T1 record; it is absent from the degraded dataset.",
+      "category": "missing_longitudinal_record"
+    },
+    {
+      "id": "F19",
+      "severity": "hard",
+      "table": "06_wearable_aggregates.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "WAR-008"
+        ],
+        "reference_ids": [],
+        "id_column": "record_id"
+      },
+      "columns_involved": [
+        "daily_steps_avg"
+      ],
+      "what_a_human_expert_would_observe": "daily_steps_avg is -5. A step count cannot be negative — it is a cumulative count of physical movements. The value -5 is a known sentinel used by some wearable device SDKs and EHR integrations to indicate 'data unavailable', 'sync failed', or 'watch not worn'. Treating -5 as a real step count would bias activity statistics significantly downward.",
+      "expected_state": "daily_steps_avg must be a non-negative integer. P002's step counts in other months are approximately 12,500–13,000; -5 is an obvious device-level data gap masquerading as a measurement.",
+      "cross_references": [],
+      "notes": "",
+      "category": "sentinel_in_numeric_field"
+    },
+    {
+      "id": "F20",
+      "severity": "hard",
+      "table": "06_wearable_aggregates.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "WAR-043"
+        ],
+        "reference_ids": [],
+        "id_column": "record_id"
+      },
+      "columns_involved": [
+        "sleep_hours_avg"
+      ],
+      "what_a_human_expert_would_observe": "sleep_hours_avg contains the text string 'not synced'. This is a device status message that was written into a numeric measurement field. The field represents a nightly sleep duration in hours; it cannot hold a status descriptor. 'not synced' indicates the wearable did not transmit data for that period, but the correct handling is a NULL or a coded missing-value indicator — not a status string embedded in a measurement column.",
+      "expected_state": "sleep_hours_avg must be a numeric value in the range 0–24 hours. When data is unavailable, the field should be blank or populated with a documented missing-data code; free-text device status messages must not appear in measurement columns.",
+      "cross_references": [],
+      "notes": "",
+      "category": "unparseable_value"
+    },
+    {
+      "id": "F21",
+      "severity": "hard",
+      "table": "06_wearable_aggregates.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "WAR-055"
+        ],
+        "reference_ids": [],
+        "id_column": "record_id"
+      },
+      "columns_involved": [
+        "resting_hr_bpm"
+      ],
+      "what_a_human_expert_would_observe": "resting_hr_bpm is 9999. The physiological range for resting heart rate in a living human is 30–200 bpm; 9999 is physically impossible. The value is a sentinel code used by device firmware and some ETL pipelines to signal 'no data', 'measurement failed', or 'sensor offline'. P014's actual resting heart rate from other months is approximately 79–81 bpm; using 9999 in any calculation (mean HR, range, percentile) would produce nonsensical results.",
+      "expected_state": "resting_hr_bpm must be a positive integer in the range 30–200 bpm. A value of 9999 must be treated as a system-generated missing-value placeholder, not as a clinical measurement.",
+      "cross_references": [],
+      "notes": "",
+      "category": "sentinel_in_numeric_field"
+    },
+    {
+      "id": "F22",
+      "severity": "soft",
+      "table": "07_clinical_visits.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "VIS-023"
+        ],
+        "reference_ids": [],
+        "id_column": "visit_id"
+      },
+      "columns_involved": [
+        "visit_date"
+      ],
+      "what_a_human_expert_would_observe": "VIS-023's visit_date is '08/05/2024', which uses a DD/MM/YYYY or MM/DD/YYYY format. Every other visit_date in the table uses ISO 8601 (YYYY-MM-DD). Beyond the format inconsistency, the date is ambiguous: '08/05/2024' could mean 8 May 2024 (British convention) or 5 August 2024 (American convention). P008's expected T1 visit is 90 days after enrollment 2024-02-05, which is 2024-05-05. The most likely correct date is 2024-05-08, but the non-standard format prevents automated parsing.",
+      "expected_state": "All visit_date values must use YYYY-MM-DD (ISO 8601). The source system should validate date format at entry; format deviations suggest the record was entered via a different interface (manual import, CSV upload, paper transcription) than other records.",
+      "cross_references": [],
+      "notes": "",
+      "category": "non_standard_date_format"
+    },
+    {
+      "id": "F23",
+      "severity": "hard",
+      "table": "07_clinical_visits.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "VIS-029"
+        ],
+        "reference_ids": [],
+        "id_column": "visit_id"
+      },
+      "columns_involved": [
+        "admission_datetime",
+        "discharge_datetime"
+      ],
+      "what_a_human_expert_would_observe": "VIS-029 (P010-T1) has admission_datetime of '2024-05-14 14:30' and discharge_datetime of '2024-05-14 11:00' — both on the same date but with discharge occurring 3 hours and 30 minutes before admission. An encounter cannot end before it begins. This is a classic data entry error where the admission and discharge times were transposed.",
+      "expected_state": "discharge_datetime must be strictly later than admission_datetime. The expected encounter was an outpatient visit of approximately 60–90 minutes, so a corrected discharge time would be approximately 15:30–16:00 on 2024-05-14.",
+      "cross_references": [],
+      "notes": "",
+      "category": "temporal_ordering_violation"
+    },
+    {
+      "id": "F24",
+      "severity": "hard",
+      "table": "07_clinical_visits.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "VIS-020",
+          "VIS-021"
+        ],
+        "reference_ids": [],
+        "id_column": "visit_id"
+      },
+      "columns_involved": [
+        "visit_date",
+        "admission_datetime",
+        "discharge_datetime",
+        "timepoint"
+      ],
+      "what_a_human_expert_would_observe": "P007's visit records show: T1 visit_date = 2024-08-01 and T2 visit_date = 2024-05-01. The T2 visit therefore precedes the T1 visit by 3 months, violating the expected temporal ordering (T0 < T1 < T2). P007's T0 visit was 2024-02-01, which correctly precedes both. The visit dates for T1 and T2 appear to have been transposed — the 2024-05-01 date is consistent with a T1 visit (90 days after T0) and 2024-08-01 is consistent with T2 (180 days after T0).",
+      "expected_state": "visit_dates must be monotonically increasing within each patient across timepoints. For P007: T0 = 2024-02-01, T1 expected ≈ 2024-05-01, T2 expected ≈ 2024-08-01. The labels T1 and T2 were transposed.",
+      "cross_references": [],
+      "notes": "The biomarker and DEXA data for P007 use the correct timepoint labels; only the visit dates are swapped.",
+      "category": "timepoint_ordering_violation"
+    },
+    {
+      "id": "F25",
+      "severity": "hard",
+      "table": "07_clinical_visits.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "VIS-045"
+        ],
+        "reference_ids": [],
+        "id_column": "visit_id"
+      },
+      "columns_involved": [
+        "visit_date",
+        "patient_id"
+      ],
+      "what_a_human_expert_would_observe": "VIS-045 records a clinical visit for P011 on 2024-08-18. The 01_patients.csv table records P011's death_date as 2024-06-02. VIS-045 therefore documents an in-person clinical visit occurring 77 days after the patient's recorded death. This is impossible and indicates either a data entry error (wrong patient ID assigned to the visit), a death date entry error, or a system that does not validate event dates against a patient's vital status.",
+      "expected_state": "No clinical or administrative event should be recorded for a deceased patient after their death_date. Any event recorded for P011 after 2024-06-02 must be investigated and corrected.",
+      "cross_references": [
+        {
+          "table": "01_patients.csv",
+          "row_id": "P011",
+          "column": "death_date",
+          "context": "death_date = 2024-06-02"
+        }
+      ],
+      "notes": "",
+      "category": "event_after_death"
+    },
+    {
+      "id": "F26",
+      "severity": "hard",
+      "table": "07_clinical_visits.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "VIS-040"
+        ],
+        "reference_ids": [],
+        "id_column": "visit_id"
+      },
+      "columns_involved": [
+        "systolic_bp_mmhg",
+        "diastolic_bp_mmhg"
+      ],
+      "what_a_human_expert_would_observe": "VIS-040 (P014-T1) records systolic_bp_mmhg = 88 and diastolic_bp_mmhg = 96, giving a blood pressure reading of 88/96 mmHg. Diastolic pressure is the pressure during ventricular relaxation and is always lower than systolic pressure (pressure during ventricular contraction) in any physiologically viable cardiovascular system. A reading where diastolic exceeds systolic is impossible. The cuff values were almost certainly transposed during data entry.",
+      "expected_state": "systolic_bp_mmhg must be strictly greater than diastolic_bp_mmhg at all times. P014 is documented as hypertensive; expected T1 blood pressure ≈ 152/93 mmHg. The most likely correct reading is 96/88 mmHg (transposition error).",
+      "cross_references": [],
+      "notes": "",
+      "category": "cross_column_physiological_impossibility"
+    },
+    {
+      "id": "F27",
+      "severity": "soft",
+      "table": "07_clinical_visits.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "VIS-044"
+        ],
+        "reference_ids": [],
+        "id_column": "visit_id"
+      },
+      "columns_involved": [
+        "weight_kg"
+      ],
+      "what_a_human_expert_would_observe": "P015's recorded weight drops from 59.4 kg at T0 to approximately 58.2 kg at T1 (a plausible 1.2 kg loss over 3 months) and then to 46.8 kg at T2 — an additional loss of 11.4 kg in the following 3 months. For a healthy 25-year-old woman with no documented malignancy, eating disorder, gastrointestinal illness, or other wasting condition, losing 11.4 kg in 90 days represents approximately 38 g per day of net weight loss. This rate is only achievable through severe caloric restriction or significant medical illness. Neither condition is documented in any other table for P015.",
+      "expected_state": "P015's T2 weight should be approximately 57–58 kg based on her stable trajectory. A deviation of more than 5% of body weight in a single 90-day window, without clinical explanation, should be flagged for data verification.",
+      "cross_references": [
+        {
+          "table": "08_diagnoses.csv",
+          "row_id": "P015",
+          "column": "icd10_code",
+          "context": "no wasting or malignancy diagnosis"
+        },
+        {
+          "table": "09_medications.csv",
+          "row_id": "P015",
+          "column": "drug_name",
+          "context": "no weight-loss medication"
+        }
+      ],
+      "notes": "",
+      "category": "implausible_longitudinal_value"
+    },
+    {
+      "id": "F28",
+      "severity": "soft",
+      "table": "08_diagnoses.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "DGN-008"
+        ],
+        "reference_ids": [],
+        "id_column": "diagnosis_id"
+      },
+      "columns_involved": [
+        "icd10_code"
+      ],
+      "what_a_human_expert_would_observe": "DGN-008 contains the icd10_code value '571.40'. This code is in ICD-9-CM format: a numeric string without an alphabetic prefix, representing 'Fatty change of liver, not elsewhere classified' in the ICD-9 system. Every other code in this table follows the ICD-10-CM format (alphabetic prefix + numerics, e.g. K76.0, E11.9, I10). The ICD-10-CM equivalent of ICD-9 571.40 is K76.0. The presence of an ICD-9 code in a field declared as ICD-10 indicates either a system migration that was not completed, or data pulled from a legacy source without code translation.",
+      "expected_state": "All values in the icd10_code column must follow ICD-10-CM format. If historical ICD-9 data is included, it must be translated to ICD-10 equivalents before loading into this field.",
+      "cross_references": [],
+      "notes": "",
+      "category": "wrong_coding_vocabulary"
+    },
+    {
+      "id": "F29",
+      "severity": "hard",
+      "table": "08_diagnoses.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "DGN-007"
+        ],
+        "reference_ids": [],
+        "id_column": "diagnosis_id"
+      },
+      "columns_involved": [
+        "icd10_code",
+        "diagnosis_name"
+      ],
+      "what_a_human_expert_would_observe": "DGN-007 records the diagnosis N40.1 (Benign prostatic hyperplasia with lower urinary tract symptoms) for patient P005. Cross-referencing with 01_patients.csv, P005 is recorded as female. The prostate is an exclusively male anatomical structure — benign prostatic hyperplasia cannot occur in a female patient. This is either a wrong patient ID assigned to the diagnosis, a sex coding error in the patients table, or a copy-paste error where a male patient's diagnosis was incorrectly attributed to P005.",
+      "expected_state": "N40.x diagnosis codes must only appear for male patients. P005 is female. The clinically appropriate diagnosis for P005, who has iron-deficiency anaemia per her biomarker profile, would be D50.9 (Iron-deficiency anaemia, unspecified).",
+      "cross_references": [
+        {
+          "table": "01_patients.csv",
+          "row_id": "P005",
+          "column": "gender",
+          "context": "gender = female"
+        }
+      ],
+      "notes": "",
+      "category": "sex_condition_incoherence"
+    },
+    {
+      "id": "F30",
+      "severity": "soft",
+      "table": "08_diagnoses.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "DGN-020",
+          "DGN-021",
+          "DGN-022"
+        ],
+        "reference_ids": [],
+        "id_column": "diagnosis_id"
+      },
+      "columns_involved": [
+        "patient_id"
+      ],
+      "what_a_human_expert_would_observe": "P014 has no rows in the diagnoses table, yet three other data sources provide strong evidence that P014 has multiple documented chronic conditions: (1) 04_health_profile records chronic_conditions as 'TYPE_2_DIABETES,HYPERTENSION,CHRONIC_KIDNEY_DISEASE'; (2) 09_medications includes Lisinopril (first-line for hypertension and CKD), Metformin (first-line for type 2 diabetes), Amlodipine (hypertension), and Furosemide (fluid management in CKD); (3) 02_biomarker_results shows elevated creatinine and reduced eGFR consistent with CKD. A patient for whom three tables collectively imply the existence of formal diagnoses, but who has no diagnosis records at all, represents a data completeness failure — either the diagnoses were never imported, were deleted, or were never created in the source system.",
+      "expected_state": "P014 should have at minimum three diagnosis records corresponding to their documented conditions: I10 (Hypertension), E11.9 (Type 2 diabetes mellitus without complications), and N18.x (Chronic kidney disease). Their absence creates cross-table incoherence.",
+      "cross_references": [
+        {
+          "table": "04_health_profile.csv",
+          "row_id": "P014",
+          "column": "chronic_conditions",
+          "context": "TYPE_2_DIABETES,HYPERTENSION,CHRONIC_KIDNEY_DISEASE"
+        },
+        {
+          "table": "09_medications.csv",
+          "row_id": "P014",
+          "column": "drug_name",
+          "context": "Lisinopril, Metformin, Amlodipine, Furosemide"
+        },
+        {
+          "table": "02_biomarker_results.csv",
+          "row_id": "P014",
+          "column": "egfr_ml_min",
+          "context": "reduced eGFR consistent with CKD"
+        }
+      ],
+      "notes": "",
+      "category": "missing_expected_records"
+    },
+    {
+      "id": "F31",
+      "severity": "soft",
+      "table": "09_medications.csv",
+      "affected_rows": {
+        "primary_ids": [
+          "MED-018"
+        ],
+        "reference_ids": [],
+        "id_column": "medication_id"
+      },
+      "columns_involved": [
+        "dose_mg"
+      ],
+      "what_a_human_expert_would_observe": "The dose_mg field for MED-018 contains the value '25mg' — a string where the numeric quantity and its unit are concatenated. The column is a numeric measurement field; the unit 'mg' is already implied by the column name. Embedding the unit string in the value means the field cannot be cast to a number for any arithmetic operation (e.g., calculating total daily dose, checking dosing ranges, comparing doses across patients). This pattern commonly arises when data is manually entered into a free-text interface or exported from a clinical system that stores doses as strings.",
+      "expected_state": "dose_mg must contain a plain numeric value (e.g., 25 or 25.0). Units must not be embedded in numeric measurement columns.",
+      "cross_references": [],
+      "notes": "",
+      "category": "unit_embedded_in_numeric_field"
+    }
+  ]
+}

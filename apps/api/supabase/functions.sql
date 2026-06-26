@@ -171,6 +171,61 @@ begin
       is_hard_constraint = excluded.is_hard_constraint,
       notes = excluded.notes;
 
+  -- Dimension grammar / affix archetypes (FK order: kinds → archetypes →
+  -- values/aliases; anchor_concept_id resolves against the concepts upserted above).
+  insert into public.dimension_kinds
+    select * from jsonb_populate_recordset(
+      null::public.dimension_kinds,
+      coalesce(p_payload->'dimension_kinds', '[]'::jsonb))
+    on conflict (dimension_kind_id) do update set
+      label = excluded.label,
+      description = excluded.description,
+      value_model = excluded.value_model,
+      default_comparability = excluded.default_comparability,
+      structural_role = excluded.structural_role,
+      review_status = excluded.review_status,
+      version = excluded.version,
+      active = excluded.active;
+
+  insert into public.affix_archetypes
+    select * from jsonb_populate_recordset(
+      null::public.affix_archetypes,
+      coalesce(p_payload->'affix_archetypes', '[]'::jsonb))
+    on conflict (affix_archetype_id) do update set
+      archetype_name = excluded.archetype_name,
+      dimension_kind_id = excluded.dimension_kind_id,
+      position = excluded.position,
+      separator_style = excluded.separator_style,
+      value_model = excluded.value_model,
+      comparability = excluded.comparability,
+      anchor_concept_id = excluded.anchor_concept_id,
+      operator = excluded.operator,
+      extraction_rule = excluded.extraction_rule,
+      requires_residual_maps = excluded.requires_residual_maps,
+      requires_sibling_family = excluded.requires_sibling_family,
+      evidence_weight = excluded.evidence_weight,
+      confidence_threshold = excluded.confidence_threshold,
+      review_status = excluded.review_status,
+      version = excluded.version,
+      active = excluded.active;
+
+  insert into public.affix_archetype_values
+    select * from jsonb_populate_recordset(
+      null::public.affix_archetype_values,
+      coalesce(p_payload->'affix_archetype_values', '[]'::jsonb))
+    on conflict (affix_archetype_id, canonical_value) do update set
+      label = excluded.label,
+      review_status = excluded.review_status;
+
+  insert into public.affix_archetype_aliases
+    select * from jsonb_populate_recordset(
+      null::public.affix_archetype_aliases,
+      coalesce(p_payload->'affix_archetype_aliases', '[]'::jsonb))
+    on conflict (affix_archetype_id, token) do update set
+      canonical_value = excluded.canonical_value,
+      source = excluded.source,
+      review_status = excluded.review_status;
+
   -- Bascule la release courante (append-only, une seule is_current).
   update public.semantic_releases set is_current = false where is_current;
   insert into public.semantic_releases (
@@ -198,7 +253,8 @@ begin
   return jsonb_build_object(
     'version', v_version,
     'concepts', jsonb_array_length(coalesce(p_payload->'taxonomy_concepts', '[]'::jsonb)),
-    'relations', jsonb_array_length(coalesce(p_payload->'ontology_relations', '[]'::jsonb))
+    'relations', jsonb_array_length(coalesce(p_payload->'ontology_relations', '[]'::jsonb)),
+    'affix_archetypes', jsonb_array_length(coalesce(p_payload->'affix_archetypes', '[]'::jsonb))
   );
 end;
 $$;

@@ -1,0 +1,27 @@
+diagnosis_id,patient_id,icd10_code,diagnosis_name,onset_date,status,site_id
+DGN-001,P001,E11.9,Type 2 diabetes mellitus without complications,2020-03-10,ACTIVE,SITE_A
+DGN-002,P001,E78.5,"Hyperlipidaemia, unspecified",2020-03-10,ACTIVE,SITE_A
+DGN-003,P003,E03.9,"Hypothyroidism, unspecified",2018-06-20,CHRONIC,SITE_A
+DGN-004,P004,N18.3,"Chronic kidney disease, stage 3",2019-11-05,CHRONIC,SITE_A
+DGN-005,P004,E11.9,Type 2 diabetes mellitus without complications,2016-04-18,CHRONIC,SITE_A
+DGN-006,P004,I10,Essential hypertension,2015-09-12,CHRONIC,SITE_A
+DGN-007,P005,D50.9,"Iron deficiency anaemia, unspecified",2023-08-30,ACTIVE,SITE_A
+DGN-008,P006,K76.0,"Fatty liver disease, not elsewhere classified",2021-05-14,CHRONIC,SITE_A
+DGN-009,P006,E78.1,Pure hyperglyceridaemia,2021-05-14,ACTIVE,SITE_A
+DGN-010,P007,M81.0,Age-related osteoporosis without fracture,2022-02-28,CHRONIC,SITE_A
+DGN-011,P008,I10,Essential hypertension,2019-07-22,CHRONIC,SITE_A
+DGN-012,P008,E78.00,"Pure hypercholesterolaemia, unspecified",2019-07-22,ACTIVE,SITE_A
+DGN-013,P010,E11.65,Type 2 diabetes with hyperglycaemia,2022-01-10,ACTIVE,SITE_B
+DGN-014,P010,E66.01,Morbid obesity due to excess calories,2022-01-10,ACTIVE,SITE_B
+DGN-015,P011,C18.9,"Malignant neoplasm of colon, unspecified",2023-03-15,ACTIVE,SITE_B
+DGN-016,P011,E11.9,Type 2 diabetes mellitus,2019-08-20,CHRONIC,SITE_B
+DGN-017,P011,I10,Essential hypertension,2017-11-05,CHRONIC,SITE_B
+DGN-018,P012,E29.1,Testicular hypofunction,2023-05-10,ACTIVE,SITE_B
+DGN-019,P013,N95.1,Menopausal and female climacteric states,2023-09-01,ACTIVE,SITE_B
+DGN-020,P014,I10,Essential hypertension,2008-03-15,CHRONIC,SITE_B
+DGN-021,P014,E11.9,Type 2 diabetes mellitus,2012-07-28,CHRONIC,SITE_B
+DGN-022,P014,N18.2,"Chronic kidney disease, stage 2",2020-10-14,CHRONIC,SITE_B
+DGN-023,P015,F32.1,Moderate depressive episode,2023-01-08,ACTIVE,SITE_B
+DGN-024,P015,F41.1,Generalised anxiety disorder,2022-11-15,ACTIVE,SITE_B
+DGN-025,P002,S93.40,"Sprain of ankle, unspecified",2023-10-05,RESOLVED,SITE_A
+DGN-026,P009,J06.9,"Acute upper respiratory infection, unspecified",2024-01-12,RESOLVED,SITE_B

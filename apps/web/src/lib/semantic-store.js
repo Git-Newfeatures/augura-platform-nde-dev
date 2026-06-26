@@ -13,12 +13,13 @@
  *   now arrives through `apiJson('/semantic/bundle')`, tenant-scoped by RLS.
  *
  * Backend contract — `GET /semantic/bundle` returns one JSON object whose keys
- * are the 14 tables below, each an array of rows: taxonomy_concepts,
+ * are the 18 tables below, each an array of rows: taxonomy_concepts,
  * taxonomy_synonyms, taxonomy_standard_codes, taxonomy_therapeutic_areas,
  * taxonomy_relationships, taxonomy_dq_valid_values, taxonomy_measurement_units,
  * unit_conversions, causal_predicates, ontology_relations,
  * ontology_relation_evidence, ontology_relation_qualifiers, dq_constraints,
- * table_archetypes.
+ * table_archetypes, dimension_kinds, affix_archetypes, affix_archetype_values,
+ * affix_archetype_aliases.
  *
  * Fallback: if the fetch fails (no network, backend down, not yet seeded) the
  * store stays null and the loaders throw a clear error rather than silently
@@ -88,6 +89,11 @@ export const getStoredOntologyEvidence      = () => get('ontology_relation_evide
 export const getStoredOntologyQualifiers    = () => get('ontology_relation_qualifiers')
 export const getStoredDqConstraints         = () => get('dq_constraints')
 export const getStoredTableArchetypes       = () => get('table_archetypes')
+// Dimension grammar / affix archetypes (A1).
+export const getStoredDimensionKinds        = () => get('dimension_kinds')
+export const getStoredAffixArchetypes       = () => get('affix_archetypes')
+export const getStoredAffixArchetypeValues  = () => get('affix_archetype_values')
+export const getStoredAffixArchetypeAliases = () => get('affix_archetype_aliases')
 
 /**
  * Clear the in-memory cache so the next initSemanticStore() call re-fetches.

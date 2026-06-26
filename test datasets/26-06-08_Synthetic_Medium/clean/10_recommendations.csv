@@ -1,0 +1,31 @@
+rec_id,patient_id,rec_date,pillar,priority,title,status,created_by,site_id
+REC-001,P001,2024-01-15,NUTRITION_GUT_HEALTH,HIGH,Reduce refined carbohydrates and increase fibre intake,ACTIVE,SYSTEM,SITE_A
+REC-002,P001,2024-01-15,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,HIGH,Add 30-min structured walks 5×/week to improve insulin sensitivity,ACTIVE,SYSTEM,SITE_A
+REC-003,P002,2024-01-17,NUTRITION_GUT_HEALTH,MEDIUM,Increase omega-3 rich foods (fatty fish 3×/week),ACTIVE,SYSTEM,SITE_A
+REC-004,P002,2024-01-17,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,MEDIUM,Optimise post-workout recovery with protein timing,ACTIVE,SYSTEM,SITE_A
+REC-005,P003,2024-01-22,SLEEP_RECOVERY,HIGH,Prioritise 7-8h consistent sleep to support thyroid recovery,ACTIVE,SYSTEM,SITE_A
+REC-006,P003,2024-01-22,NUTRITION_GUT_HEALTH,MEDIUM,Iodine-rich diet review in context of levothyroxine therapy,ACTIVE,SYSTEM,SITE_A
+REC-007,P004,2024-01-25,NUTRITION_GUT_HEALTH,HIGH,Restrict dietary potassium and phosphorus (CKD stage 3),ACTIVE,SYSTEM,SITE_A
+REC-008,P004,2024-01-25,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,MEDIUM,Low-impact aquatic exercise 3×/week to preserve muscle mass,ACTIVE,SYSTEM,SITE_A
+REC-009,P005,2024-01-29,NUTRITION_GUT_HEALTH,HIGH,Iron-rich food pairing with vitamin C to enhance absorption,ACTIVE,SYSTEM,SITE_A
+REC-010,P005,2024-01-29,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,MEDIUM,Moderate aerobic activity to support haematopoiesis,ACTIVE,SYSTEM,SITE_A
+REC-011,P006,2024-02-01,NUTRITION_GUT_HEALTH,HIGH,Eliminate alcohol and reduce fructose; Mediterranean pattern,ACTIVE,SYSTEM,SITE_A
+REC-012,P006,2024-02-01,STRESS_MENTAL_SOCIAL_HEALTH,HIGH,Structured stress-reduction programme (cortisol reduction),ACTIVE,SYSTEM,SITE_A
+REC-013,P007,2024-02-08,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,HIGH,Weight-bearing exercise programme for bone density,ACTIVE,SYSTEM,SITE_A
+REC-014,P007,2024-02-08,SMART_SUPPLEMENTATION,HIGH,Vitamin D3 + K2 supplementation (VitD < 30 nmol/L),ACTIVE,SYSTEM,SITE_A
+REC-015,P008,2024-02-12,NUTRITION_GUT_HEALTH,HIGH,Saturated fat reduction and plant-sterol-enriched foods,ACTIVE,SYSTEM,SITE_A
+REC-016,P008,2024-02-12,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,HIGH,Zone 2 cardio 4×/week to reduce LDL and CRP,ACTIVE,SYSTEM,SITE_A
+REC-017,P009,2024-02-17,NUTRITION_GUT_HEALTH,LOW,Maintain current dietary pattern; add 1 portion fatty fish/week,ACTIVE,SYSTEM,SITE_B
+REC-018,P009,2024-02-17,SLEEP_RECOVERY,LOW,"Sleep hygiene optimisation (already good, reinforce routine)",ACTIVE,SYSTEM,SITE_B
+REC-019,P010,2024-02-21,NUTRITION_GUT_HEALTH,HIGH,Low glycaemic index diet with caloric deficit of 500 kcal/day,ACTIVE,SYSTEM,SITE_B
+REC-020,P010,2024-02-21,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,HIGH,Step-count target of 8000/day; progress to 10000 by T2,ACTIVE,SYSTEM,SITE_B
+REC-021,P011,2024-02-25,NUTRITION_GUT_HEALTH,HIGH,Nutritional support during chemotherapy (anti-nausea foods),ACTIVE,SYSTEM,SITE_B
+REC-022,P011,2024-02-25,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,MEDIUM,Palliative fatigue management and gentle mobility programme,ACTIVE,SYSTEM,SITE_B
+REC-023,P012,2024-02-29,SMART_SUPPLEMENTATION,HIGH,Zinc and vitamin D optimisation for testosterone support,ACTIVE,SYSTEM,SITE_B
+REC-024,P012,2024-02-29,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,HIGH,Resistance training protocol to support endogenous testosterone,ACTIVE,SYSTEM,SITE_B
+REC-025,P013,2024-03-08,NUTRITION_GUT_HEALTH,MEDIUM,"Phytoestrogen-rich diet (legumes, flaxseed) for menopause support",ACTIVE,SYSTEM,SITE_B
+REC-026,P013,2024-03-08,STRESS_MENTAL_SOCIAL_HEALTH,MEDIUM,Stress reduction and improved sleep for hormonal balance,ACTIVE,SYSTEM,SITE_B
+REC-027,P014,2024-03-12,NUTRITION_GUT_HEALTH,HIGH,Low-sodium DASH diet for combined HTN and CKD management,ACTIVE,SYSTEM,SITE_B
+REC-028,P014,2024-03-12,PHYSICAL_ACTIVITY_LONGEVITY_FITNESS,MEDIUM,Chair-based and aquatic exercise for frail elderly,ACTIVE,SYSTEM,SITE_B
+REC-029,P015,2024-03-17,SMART_SUPPLEMENTATION,HIGH,Magnesium glycinate supplementation for anxiety and sleep,ACTIVE,SYSTEM,SITE_B
+REC-030,P015,2024-03-17,SLEEP_RECOVERY,HIGH,Digital detox evenings + consistent sleep schedule,ACTIVE,SYSTEM,SITE_B

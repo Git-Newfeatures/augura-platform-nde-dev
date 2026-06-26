@@ -1,0 +1,16 @@
+protocol_id,patient_id,title,status,start_date,end_date,lucis_score_at_creation,goal_count,review_date,site_id
+PROT-P001,P001,Metabolic Syndrome Reversal Protocol,ACTIVE,2024-01-15,,58.5,4,2024-04-14,SITE_A
+PROT-P002,P002,Elite Athletic Performance Maintenance,ACTIVE,2024-01-17,,91.2,2,2024-04-16,SITE_A
+PROT-P003,P003,Thyroid Optimisation & Metabolic Recovery,ACTIVE,2024-01-22,,67.8,2,2024-04-21,SITE_A
+PROT-P004,P004,CKD Progression Slowdown & Anaemia Management,ACTIVE,2024-01-25,,44.2,3,2024-04-24,SITE_A
+PROT-P005,P005,Iron Repletion & Haematological Recovery,ACTIVE,2024-01-29,,72.5,2,2024-04-28,SITE_A
+PROT-P006,P006,Hepatic Regeneration & Cardiometabolic Control,ACTIVE,2024-02-01,,55.1,4,2024-05-01,SITE_A
+PROT-P007,P007,Bone Density Preservation & Fall Prevention,ACTIVE,2024-02-08,,69.8,2,2024-05-08,SITE_A
+PROT-P008,P008,Cardiovascular Risk Reduction Programme,ACTIVE,2024-02-12,,61.5,4,2024-05-12,SITE_A
+PROT-P009,P009,Preventive Longevity Optimisation,ACTIVE,2024-02-17,,88.4,2,2024-05-17,SITE_B
+PROT-P010,P010,Type 2 Diabetes Remission Programme,ACTIVE,2024-02-21,,52.5,4,2024-05-21,SITE_B
+PROT-P011,P011,Oncology Supportive Care Protocol,COMPLETED,2024-02-25,2024-06-02,38.2,3,2024-05-25,SITE_B
+PROT-P012,P012,Hormonal Rebalancing & Vitality Protocol,ACTIVE,2024-02-29,,74.5,2,2024-05-29,SITE_B
+PROT-P013,P013,Perimenopausal Transition Support,ACTIVE,2024-03-08,,81.5,2,2024-06-06,SITE_B
+PROT-P014,P014,Multi-Morbidity Stabilisation Programme,ACTIVE,2024-03-12,,41.2,3,2024-06-10,SITE_B
+PROT-P015,P015,Mental Health & Resilience Building Protocol,ACTIVE,2024-03-17,,62.5,2,2024-06-15,SITE_B

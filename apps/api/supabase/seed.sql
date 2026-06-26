@@ -2525,3 +2525,86 @@ insert into ontology_relation_qualifiers ("qualifier_id", "relation_id", "qualif
 insert into ontology_relation_qualifiers ("qualifier_id", "relation_id", "qualifier_type", "qualifier_concept_id", "qualifier_value", "qualifier_effect", "is_hard_constraint", "notes") values ('QUAL_005', 'REL_023', 'measurement_context', NULL, 'smart_inhaler_device', 'The measured_by relation between actuation count and adherence is only valid when using a validated smart inhaler device with dose-counting capability. Manual patient-reported adherence does not have this relation.', true, 'Actuation count as adherence proxy requires a connected inhaler device with validated dose capture') on conflict do nothing;
 insert into ontology_relation_qualifiers ("qualifier_id", "relation_id", "qualifier_type", "qualifier_concept_id", "qualifier_value", "qualifier_effect", "is_hard_constraint", "notes") values ('QUAL_006', 'REL_030', 'treatment_setting', NULL, 'hemodialysis', 'The Kt/V to mortality relationship applies specifically to hemodialysis adequacy targets. Do not generalize to peritoneal dialysis where different adequacy metrics apply.', true, 'Kt/V targets differ between hemodialysis and peritoneal dialysis; this relation is HD-specific') on conflict do nothing;
 insert into ontology_relation_qualifiers ("qualifier_id", "relation_id", "qualifier_type", "qualifier_concept_id", "qualifier_value", "qualifier_effect", "is_hard_constraint", "notes") values ('QUAL_007', 'REL_068', 'population_context', NULL, 'refractory_chronic_pain', 'The SCS pain reduction relationship applies to patients with refractory chronic pain conditions specifically FBSS or CRPS who have failed conservative management. Evidence does not generalize to acute pain or non-refractory conditions.', true, 'SCS effect on pain applies only to refractory FBSS and CRPS populations') on conflict do nothing;
+
+-- ===== dimension grammar / affix archetypes seed (A1) =====
+-- Governed recognition shapes (semantic layer v3 §2.7). Starter set: small and
+-- accurate (accuracy over coverage), exercising every value_model. Tuned against
+-- the mapping golden fixtures. anchor_concept_id FKs into taxonomy_concepts.
+
+-- Anchor concept for the relative-time (post-operative) archetype. Generic
+-- surgical-procedure event — PROPOSED, pending domain review (distinct from the
+-- specific L1_P002 "Bariatric Surgery"). Lets the event_anchored archetype resolve.
+insert into taxonomy_concepts ("local_concept_id", "layer", "concept_name", "review_section", "augura_domain", "omop_domain_id", "omop_target_table", "omop_target_concept_field", "namespace", "unit_source_value", "value_min", "value_max", "value_type", "design_rationale", "review_status", "version", "active", "canonical_unit", "temporality", "dq_column_role", "fhir_crosswalk", "sdtm_crosswalk", "unit_coverage_status", "range_support_status") values ('L1_surgery', 1, 'Surgery (procedure)', 'procedure', 'procedure', 'Procedure', NULL, NULL, 'AUG_PROC', NULL, NULL, NULL, NULL, 'Generic surgical-procedure event used as the anchor for relative-time affixes (postop/preop). Proposed anchor pending domain review; not a specific procedure (cf. L1_P002 Bariatric Surgery).', 'proposed', '2.3.0', true, NULL, 'static', NULL, 'Procedure', NULL, 'not_applicable', 'not_applicable') on conflict do nothing;
+
+-- dimension_kinds (the 12 structural families, §2.7)
+insert into dimension_kinds ("dimension_kind_id", "label", "description", "value_model", "default_comparability", "structural_role", "review_status", "version", "active") values
+  ('scheduled_time', 'Scheduled Time', 'Study-schedule visit/timepoint carried in a label (baseline, week12, 6mo), resolved via the study visit map.', 'scheduled', 'preserves', 'observation_time', 'approved', '2.3.0', true),
+  ('relative_time', 'Relative Time', 'Time relative to an anchoring clinical event (postop, day3); reconciles to the same statement as a long-table observation time.', 'event_anchored', 'preserves', 'observation_time', 'approved', '2.3.0', true),
+  ('laterality', 'Laterality', 'Body side: left / right / bilateral.', 'closed_set', 'preserves', NULL, 'approved', '2.3.0', true),
+  ('body_site', 'Body Site', 'Anatomical site qualifier (knee, hip, lumbar).', 'closed_set', 'case_by_case', NULL, 'approved', '2.3.0', true),
+  ('specimen', 'Specimen', 'Biological specimen the measurement was taken from (serum, plasma, urine, csf).', 'closed_set', 'case_by_case', NULL, 'approved', '2.3.0', true),
+  ('method', 'Method', 'Measurement method / assay / modality qualifier.', 'closed_set', 'case_by_case', NULL, 'approved', '2.3.0', true),
+  ('derived_statistic', 'Derived Statistic', 'A statistic computed over a base concept (mean, delta, AUC, nadir); may change unit/range.', 'parametric', 'case_by_case', NULL, 'approved', '2.3.0', true),
+  ('aggregation_window', 'Aggregation Window', 'Window over which a value is aggregated (24h, 7d, weekly).', 'parametric', 'case_by_case', NULL, 'approved', '2.3.0', true),
+  ('rater', 'Rater', 'Who or what produced the rating (clinician, self, device).', 'closed_set', 'case_by_case', NULL, 'approved', '2.3.0', true),
+  ('replicate', 'Replicate', 'Replicate / sequence index of a repeated measurement (rep1, r2).', 'ordinal', 'preserves', NULL, 'approved', '2.3.0', true),
+  ('vocabulary', 'Vocabulary', 'Coding vocabulary the value is expressed in (icd10, snomed, loinc).', 'closed_set', 'preserves', NULL, 'approved', '2.3.0', true),
+  ('condition_status', 'Condition Status', 'Status qualifier that changes clinical meaning (active, history_of, suspected).', 'closed_set', 'forks', NULL, 'approved', '2.3.0', true)
+on conflict do nothing;
+
+-- affix_archetypes (starter matchers; one per value_model)
+insert into affix_archetypes ("affix_archetype_id", "archetype_name", "dimension_kind_id", "position", "separator_style", "value_model", "comparability", "anchor_concept_id", "operator", "extraction_rule", "requires_residual_maps", "requires_sibling_family", "evidence_weight", "confidence_threshold", "review_status", "version", "active") values
+  ('AFX_LATERALITY', 'Laterality suffix', 'laterality', 'suffix', '_', 'closed_set', 'preserves', NULL, NULL, NULL, true, true, 1.0, 0.60, 'approved', '2.3.0', true),
+  ('AFX_SCHEDULED_TIME', 'Scheduled-time suffix', 'scheduled_time', 'suffix', '_', 'parametric', 'preserves', NULL, NULL, 'visit_map', true, true, 0.80, 0.60, 'approved', '2.3.0', true),
+  ('AFX_RELATIVE_TIME_POSTOP', 'Post-operative relative time', 'relative_time', 'prefix', '_', 'event_anchored', 'preserves', 'L1_surgery', 'post', 'offset_regex', true, false, 0.90, 0.60, 'proposed', '2.3.0', true),
+  ('AFX_SPECIMEN', 'Specimen suffix', 'specimen', 'suffix', '_', 'closed_set', 'forks', NULL, NULL, NULL, true, false, 0.90, 0.65, 'approved', '2.3.0', true),
+  ('AFX_DERIVED_STAT', 'Derived-statistic prefix', 'derived_statistic', 'prefix', '_', 'parametric', 'preserves', NULL, 'statistic', 'stat_fn', true, false, 0.70, 0.60, 'approved', '2.3.0', true)
+on conflict do nothing;
+
+-- affix_archetype_values (closed_set archetypes only)
+insert into affix_archetype_values ("affix_archetype_id", "canonical_value", "label", "review_status") values
+  ('AFX_LATERALITY', 'left', 'Left', 'approved'),
+  ('AFX_LATERALITY', 'right', 'Right', 'approved'),
+  ('AFX_LATERALITY', 'bilateral', 'Bilateral', 'approved'),
+  ('AFX_SPECIMEN', 'serum', 'Serum', 'approved'),
+  ('AFX_SPECIMEN', 'plasma', 'Plasma', 'approved'),
+  ('AFX_SPECIMEN', 'urine', 'Urine', 'approved'),
+  ('AFX_SPECIMEN', 'csf', 'Cerebrospinal fluid', 'approved')
+on conflict do nothing;
+
+-- affix_archetype_aliases (token set; canonical_value null for parametric/event_anchored)
+insert into affix_archetype_aliases ("affix_archetype_id", "token", "canonical_value", "source", "review_status") values
+  ('AFX_LATERALITY', 'left', 'left', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'l', 'left', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'right', 'right', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'r', 'right', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'bilateral', 'bilateral', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'bilat', 'bilateral', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'od', 'right', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'os', 'left', 'curated', 'approved'),
+  ('AFX_LATERALITY', 'ou', 'bilateral', 'curated', 'approved'),
+  ('AFX_SPECIMEN', 'serum', 'serum', 'curated', 'approved'),
+  ('AFX_SPECIMEN', 'plasma', 'plasma', 'curated', 'approved'),
+  ('AFX_SPECIMEN', 'urine', 'urine', 'curated', 'approved'),
+  ('AFX_SPECIMEN', 'csf', 'csf', 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'baseline', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'screening', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'eot', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'week12', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'wk12', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'w12', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', '6mo', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'm6', NULL, 'curated', 'approved'),
+  ('AFX_SCHEDULED_TIME', 'month6', NULL, 'curated', 'approved'),
+  ('AFX_RELATIVE_TIME_POSTOP', 'postop', NULL, 'curated', 'proposed'),
+  ('AFX_RELATIVE_TIME_POSTOP', 'post_op', NULL, 'curated', 'proposed'),
+  ('AFX_RELATIVE_TIME_POSTOP', 'postoperative', NULL, 'curated', 'proposed'),
+  ('AFX_DERIVED_STAT', 'mean', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'min', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'max', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'sd', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'delta', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'change', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'auc', NULL, 'curated', 'approved'),
+  ('AFX_DERIVED_STAT', 'nadir', NULL, 'curated', 'approved')
+on conflict do nothing;

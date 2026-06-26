@@ -40,6 +40,11 @@ EXPECTED_TABLES = {
     "unit_conversions",
     "table_archetypes",
     "dq_constraints",
+    # Dimension grammar / affix archetypes (A1) — global, read-only.
+    "dimension_kinds",
+    "affix_archetypes",
+    "affix_archetype_values",
+    "affix_archetype_aliases",
     # Ontology/causal (B1) — global, read-only.
     "taxonomy_standard_codes",
     "taxonomy_therapeutic_areas",
@@ -246,6 +251,42 @@ def test_seed_includes_ontology() -> None:
         assert f"insert into {t} " in seed
 
 
+# ── Dimension grammar / affix archetypes (A1): 4 governed read-only tables. ──
+AFFIX_TABLES = (
+    "dimension_kinds",
+    "affix_archetypes",
+    "affix_archetype_values",
+    "affix_archetype_aliases",
+)
+
+
+def test_affix_tables_have_select_only_rls() -> None:
+    # RLS set via the same B1 format() loop as the ontology catalogs.
+    policies = _read("policies.sql")
+    array_blocks = re.findall(r"array\[(.*?)\]", policies, re.DOTALL)
+    looped = {name for block in array_blocks for name in re.findall(r"'(\w+)'", block)}
+    missing = set(AFFIX_TABLES) - looped
+    assert not missing, f"backend_read RLS missing on affix tables: {missing}"
+
+
+def test_seed_includes_affix_grammar() -> None:
+    seed = _read("seed.sql").lower()
+    for t in AFFIX_TABLES:
+        assert f"insert into {t} " in seed
+    # The relative-time archetype's anchor concept must be seeded too (FK).
+    assert "'l1_surgery'" in seed
+
+
+def test_affix_archetypes_declare_comparability() -> None:
+    """Comparability invariant (§18): affix archetypes declare 'preserves' or
+    'forks' (enforced by the DB CHECK; the starter set exercises both)."""
+    seed = _read("seed.sql")
+    block = re.search(r"insert into affix_archetypes\b.*?on conflict do nothing;", seed, re.DOTALL)
+    assert block, "affix_archetypes seed block not found"
+    assert "'preserves'" in block.group(0)
+    assert "'forks'" in block.group(0)
+
+
 # ── Seed hygiene: seed.sql must stay demo-free (tenant/demo data lives only in
 # tests/integration/fixtures.sql). Reference/ontology catalogs are allowed. ──
 TENANT_DATA_TABLES = {
@@ -296,6 +337,11 @@ POST_BASELINE_TABLES = {
     "semantic_releases",
     "dataset_files",
     "audit_events",
+    # Dimension grammar / affix archetypes (0011_affix_archetypes).
+    "dimension_kinds",
+    "affix_archetypes",
+    "affix_archetype_values",
+    "affix_archetype_aliases",
 } | REFERENCE_CATALOGS
 
 # Everything the baseline bundle (0001 applies schema.sql wholesale) already created.

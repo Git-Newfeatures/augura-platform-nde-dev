@@ -57,6 +57,9 @@ class DatasetColumn(Base):
     user_decision: Mapped[str] = mapped_column(Text, server_default=text("'pending'"))
     final_role: Mapped[str | None] = mapped_column(Text)
     final_canonical_id: Mapped[str | None] = mapped_column(Text)
+    # Canonical dimensions decomposed by affix archetypes (semantic layer v3 §2.7).
+    proposed_dimensions: Mapped[list[Any] | None] = mapped_column(JSONB)
+    final_dimensions: Mapped[list[Any] | None] = mapped_column(JSONB)
 
 
 class DatasetFile(Base):

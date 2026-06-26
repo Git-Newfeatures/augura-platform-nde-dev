@@ -1,0 +1,945 @@
+{
+  "_comment": "Ground truth DQ bundle for the Augura DQ engine pressure-test (degraded dataset). All finding IDs use GT-F-NNN format. Scores carry a ±0.05 tolerance to account for minor implementation variation. See README.md for the injected-error catalog.",
+  "meta": {
+    "bundle_id": "GT-DEGRADED-001",
+    "dataset_version": "degraded",
+    "created_at": "2026-06-06T00:00:00Z",
+    "policy_version": "2026-06-05",
+    "score_profile": "exploratory",
+    "score_tolerance": 0.05,
+    "tables_in_scope": [
+      "01_patients",
+      "02_lab_results",
+      "03_visits",
+      "04_dexa_scans",
+      "05_device_records",
+      "06_questionnaire_responses"
+    ]
+  },
+
+  "scoring": {
+    "overall_score": 0.58,
+    "dimensions": {
+      "completeness": {
+        "score": 0.66,
+        "weight": 0.25,
+        "finding_counts": { "hard": 1, "soft": 8, "info": 0 },
+        "deduction_breakdown": "−0.10 (DQ_MISS_003 testosterone) + 8×−0.03 (DQ_MISS_001,002×3,004,005,006,007) = −0.34"
+      },
+      "validity": {
+        "score": 0.52,
+        "weight": 0.25,
+        "finding_counts": { "hard": 3, "soft": 6, "info": 0 },
+        "deduction_breakdown": "3×−0.10 (DQ_RANGE_001 ×3) + 6×−0.03 (DQ_TYPE_001×2, DQ_TYPE_002×2, DQ_UNIT_003, DQ_RANGE_002) = −0.48"
+      },
+      "consistency": {
+        "score": 0.04,
+        "weight": 0.20,
+        "finding_counts": { "hard": 9, "soft": 2, "info": 0 },
+        "deduction_breakdown": "9×−0.10 (DQ_CONS_001×3, DQ_CONS_002,003,004,005,007,008) + 2×−0.03 (DQ_CONS_006,009) = −0.96 → floor 0.04"
+      },
+      "coherence": {
+        "score": 0.84,
+        "weight": 0.15,
+        "finding_counts": { "hard": 1, "soft": 2, "info": 0 },
+        "deduction_breakdown": "−0.10 (DQ_COH_001) + 2×−0.03 (DQ_COH_002×2) = −0.16"
+      },
+      "labelling": {
+        "score": 1.00,
+        "weight": 0.15,
+        "finding_counts": { "hard": 0, "soft": 0, "info": 6 },
+        "deduction_breakdown": "6 info findings (DQ_MEAN_003 grain inferences) carry no deduction"
+      }
+    },
+    "hard_findings_total": 14,
+    "requires_resolution": true,
+    "score_gate": "RED (< 0.60)"
+  },
+
+  "tables": [
+    {
+      "table_label": "01_patients",
+      "row_count": 20,
+      "grain": {
+        "minimal_key": ["patient_id"],
+        "statement": "One row per patient (static entity table). Not longitudinal.",
+        "time_column": "enrollment_date",
+        "is_longitudinal": false
+      },
+      "attribute_cards": [
+        { "column": "patient_id",    "role": "entity_id",          "type": "categorical", "missing_rate": 0.00, "unique_count": 20, "finding_count": 0 },
+        { "column": "site_id",       "role": "coded_value",        "type": "categorical", "missing_rate": 0.00, "unique_count": 2,  "finding_count": 0 },
+        { "column": "birth_date",    "role": "timestamp",          "type": "date",        "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "sex",           "role": "coded_value",        "type": "categorical", "missing_rate": 0.00, "unique_count": 2,  "finding_count": 0 },
+        { "column": "enrollment_date","role": "timestamp",         "type": "date",        "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "death_date",    "role": "timestamp",          "type": "date",        "missing_rate": 0.95, "note": "Sparse by design — death events are rare. DQ_MISS_001 should NOT fire unless threshold is set very low.", "finding_count": 0 },
+        { "column": "weight_kg",     "role": "measurement_value",  "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "height_cm",     "role": "measurement_value",  "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "country_code",  "role": "coded_value",        "type": "categorical", "missing_rate": 0.00, "finding_count": 0 }
+      ],
+      "table_findings": [
+        { "finding_id": "GT-F-029", "check_id": "DQ_CONS_006" },
+        { "finding_id": "GT-F-033", "check_id": "DQ_MEAN_003" }
+      ]
+    },
+
+    {
+      "table_label": "02_lab_results",
+      "row_count": 62,
+      "grain": {
+        "minimal_key": ["patient_id", "visit_date", "timepoint"],
+        "statement": "One row per (patient, visit date, timepoint). Longitudinal — 3 timepoints per patient.",
+        "time_column": "visit_date",
+        "is_longitudinal": true
+      },
+      "attribute_cards": [
+        { "column": "result_id",          "role": "entity_id",         "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "patient_id",         "role": "foreign_key",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "visit_date",         "role": "timestamp",         "type": "date",        "missing_rate": 0.00, "mixed_format_rows": 1, "finding_count": 1, "findings": ["GT-F-003"] },
+        { "column": "timepoint",          "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "site_id",            "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "glucose_mg_dl",      "role": "measurement_value", "type": "numeric",     "missing_rate": 0.016, "non_numeric_rows": 1, "finding_count": 1, "findings": ["GT-F-001"] },
+        { "column": "hba1c_pct",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "outlier_count": 1, "plausible_range": [3, 18], "out_of_range_count": 1, "finding_count": 1, "findings": ["GT-F-006"] },
+        { "column": "creatinine_mg_dl",   "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "outlier_count": 2, "plausible_range": [0.2, 15], "out_of_range_count": 2, "note": "Row LAB-025 = 121.9 (µmol/L masquerading as mg/dL), LAB-035 = -0.5 (negative)", "finding_count": 3, "findings": ["GT-F-007", "GT-F-005", "GT-F-021"] },
+        { "column": "creatinine_unit",    "role": "unit_column",       "type": "categorical", "missing_rate": 0.00, "finding_count": 1, "findings": ["GT-F-005"] },
+        { "column": "egfr_ml_min",        "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "hdl_mg_dl",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "ldl_mg_dl",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "triglycerides_mg_dl","role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "alt_u_l",            "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "outlier_count": 1, "finding_count": 1, "findings": ["GT-F-009"] },
+        { "column": "ast_u_l",            "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "tsh_miu_l",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "vitamin_d_ng_ml",    "role": "measurement_value", "type": "numeric",     "missing_rate": 0.24, "sentinel_count": 2, "sentinel_values": [-99, 999], "site_concentration_flag": true, "time_concentration_flag": true, "finding_count": 4, "findings": ["GT-F-010", "GT-F-011", "GT-F-016", "GT-F-017"] },
+        { "column": "ferritin_ng_ml",     "role": "measurement_value", "type": "numeric",     "missing_rate": 0.048, "co_missing_with": "crp_mg_l", "finding_count": 1, "findings": ["GT-F-015"] },
+        { "column": "crp_mg_l",           "role": "measurement_value", "type": "numeric",     "missing_rate": 0.048, "co_missing_with": "ferritin_ng_ml", "finding_count": 1, "findings": ["GT-F-015"] },
+        { "column": "hemoglobin_g_dl",    "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "testosterone_ng_dl", "role": "measurement_value", "type": "numeric",     "missing_rate": 0.55, "finding_count": 1, "findings": ["GT-F-014"] }
+      ],
+      "cross_column_findings": [
+        { "finding_id": "GT-F-005", "check_id": "DQ_UNIT_003", "columns": ["creatinine_mg_dl", "creatinine_unit"] }
+      ],
+      "table_findings": [
+        { "finding_id": "GT-F-015", "check_id": "DQ_MISS_004" },
+        { "finding_id": "GT-F-016", "check_id": "DQ_MISS_005" },
+        { "finding_id": "GT-F-017", "check_id": "DQ_MISS_006" },
+        { "finding_id": "GT-F-025", "check_id": "DQ_CONS_002" },
+        { "finding_id": "GT-F-026", "check_id": "DQ_CONS_003" },
+        { "finding_id": "GT-F-034", "check_id": "DQ_MEAN_003" }
+      ]
+    },
+
+    {
+      "table_label": "03_visits",
+      "row_count": 57,
+      "grain": {
+        "minimal_key": ["patient_id", "visit_date", "timepoint"],
+        "statement": "One row per (patient, visit date, timepoint). Longitudinal — 3 timepoints per patient. NOTE: P015 has 0 rows (deliberate omission — DQ_MISS_007).",
+        "time_column": "visit_date",
+        "is_longitudinal": true
+      },
+      "attribute_cards": [
+        { "column": "visit_id",          "role": "entity_id",         "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "patient_id",        "role": "foreign_key",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "visit_date",        "role": "timestamp",         "type": "date",        "missing_rate": 0.00, "mixed_format_rows": 1, "finding_count": 1, "findings": ["GT-F-004"] },
+        { "column": "timepoint",         "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "site_id",           "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "visit_type",        "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "admission_datetime","role": "timestamp",         "type": "date",        "missing_rate": 0.00, "finding_count": 1, "findings": ["GT-F-027"] },
+        { "column": "discharge_datetime","role": "timestamp",         "type": "date",        "missing_rate": 0.00, "finding_count": 1, "findings": ["GT-F-027"] },
+        { "column": "systolic_bp",       "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 1, "findings": ["GT-F-019"] },
+        { "column": "diastolic_bp",      "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 1, "findings": ["GT-F-019"] },
+        { "column": "heart_rate",        "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "weight_kg",         "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "waist_cm",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "vo2_max",           "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 }
+      ],
+      "cross_column_findings": [
+        { "finding_id": "GT-F-027", "check_id": "DQ_CONS_004", "columns": ["admission_datetime", "discharge_datetime"] },
+        { "finding_id": "GT-F-019", "check_id": "DQ_COH_001",  "columns": ["systolic_bp", "diastolic_bp"] }
+      ],
+      "table_findings": [
+        { "finding_id": "GT-F-028", "check_id": "DQ_CONS_005" },
+        { "finding_id": "GT-F-035", "check_id": "DQ_MEAN_003" }
+      ]
+    },
+
+    {
+      "table_label": "04_dexa_scans",
+      "row_count": 30,
+      "grain": {
+        "minimal_key": ["patient_id", "scan_date", "timepoint"],
+        "statement": "One row per (patient, scan date, timepoint). Longitudinal — T0 and T2 only. Patients P001–P015 only.",
+        "time_column": "scan_date",
+        "is_longitudinal": true
+      },
+      "attribute_cards": [
+        { "column": "scan_id",                "role": "entity_id",         "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "patient_id",             "role": "foreign_key",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "scan_date",              "role": "timestamp",         "type": "date",        "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "timepoint",              "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "site_id",               "role": "coded_value",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "body_fat_pct",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "outlier_count": 1, "finding_count": 1, "findings": ["GT-F-020"] },
+        { "column": "lean_mass_kg",          "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "fat_mass_kg",           "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "visceral_fat_g",        "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "bmd_whole_body_g_cm2",  "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "lumbar_spine_t_score",  "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "plausible_range": [-4, 4], "out_of_range_count": 1, "finding_count": 1, "findings": ["GT-F-008"] },
+        { "column": "femoral_neck_t_score",  "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "total_hip_t_score",     "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "almi_kg_m2",            "role": "measurement_value", "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 }
+      ],
+      "table_findings": [
+        { "finding_id": "GT-F-020", "check_id": "DQ_COH_002" },
+        { "finding_id": "GT-F-036", "check_id": "DQ_MEAN_003" }
+      ]
+    },
+
+    {
+      "table_label": "05_device_records",
+      "row_count": 80,
+      "grain": {
+        "minimal_key": ["patient_id", "recorded_month"],
+        "statement": "One row per (patient, month). Longitudinal — 4 monthly windows per patient.",
+        "time_column": "recorded_month",
+        "is_longitudinal": true
+      },
+      "attribute_cards": [
+        { "column": "record_id",             "role": "entity_id",         "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "patient_id",            "role": "foreign_key",       "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "recorded_month",        "role": "timestamp",         "type": "date",        "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "site_id",              "role": "coded_value",        "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "device_type",          "role": "coded_value",        "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "daily_steps_avg",      "role": "measurement_value",  "type": "numeric",     "missing_rate": 0.013, "sentinel_count": 1, "sentinel_values": [-1], "finding_count": 1, "findings": ["GT-F-012"] },
+        { "column": "avg_heart_rate_bpm",   "role": "measurement_value",  "type": "numeric",     "missing_rate": 0.013, "sentinel_count": 1, "sentinel_values": [9999], "finding_count": 1, "findings": ["GT-F-013"] },
+        { "column": "sleep_hours_avg",      "role": "measurement_value",  "type": "numeric",     "missing_rate": 0.013, "non_numeric_rows": 1, "finding_count": 1, "findings": ["GT-F-002"] },
+        { "column": "active_minutes_avg",   "role": "measurement_value",  "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "screen_time_hours_avg","role": "measurement_value",  "type": "numeric",     "missing_rate": 0.00, "finding_count": 0 }
+      ],
+      "table_findings": [
+        { "finding_id": "GT-F-037", "check_id": "DQ_MEAN_003" }
+      ]
+    },
+
+    {
+      "table_label": "06_questionnaire_responses",
+      "row_count": 40,
+      "grain": {
+        "minimal_key": ["patient_id", "response_date", "timepoint"],
+        "statement": "One row per (patient, response date, timepoint). Longitudinal — T0 and T1 per patient.",
+        "time_column": "response_date",
+        "is_longitudinal": true
+      },
+      "attribute_cards": [
+        { "column": "response_id",           "role": "entity_id",   "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "patient_id",            "role": "foreign_key", "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "response_date",         "role": "timestamp",   "type": "date",        "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "timepoint",             "role": "coded_value", "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "site_id",              "role": "coded_value",  "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "questionnaire_id",     "role": "coded_value",  "type": "categorical", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "stress_level_0_10",    "role": "measurement_value", "type": "numeric", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "energy_level",         "role": "coded_value",  "type": "categorical", "missing_rate": 0.00, "valid_values": ["LOW", "MODERATE", "HIGH"], "invalid_count": 1, "invalid_sample": ["VERY_HIGH"], "finding_count": 1, "findings": ["GT-F-024"] },
+        { "column": "sleep_quality",        "role": "coded_value",  "type": "categorical", "missing_rate": 0.00, "valid_values": ["POOR", "FAIR", "GOOD", "EXCELLENT"], "invalid_count": 0, "finding_count": 0 },
+        { "column": "motivation_scale_1_10","role": "measurement_value", "type": "numeric", "missing_rate": 0.00, "finding_count": 0 },
+        { "column": "activity_level",       "role": "coded_value",  "type": "categorical", "missing_rate": 0.00, "valid_values": ["SEDENTARY", "LIGHT", "MODERATE", "VIGOROUS", "VERY_ACTIVE"], "invalid_count": 1, "invalid_sample": ["EXTREME"], "finding_count": 1, "findings": ["GT-F-022"] },
+        { "column": "diet_type",            "role": "coded_value",  "type": "categorical", "missing_rate": 0.00, "valid_values": ["OMNIVORE", "PESCATARIAN", "VEGETARIAN", "VEGAN", "KETO", "MEDITERRANEAN", "PALEO"], "invalid_count": 1, "invalid_sample": ["ATKINS"], "finding_count": 1, "findings": ["GT-F-023"] },
+        { "column": "general_wellbeing_1_10","role": "measurement_value", "type": "numeric", "missing_rate": 0.00, "finding_count": 0 }
+      ],
+      "table_findings": [
+        { "finding_id": "GT-F-038", "check_id": "DQ_MEAN_003" }
+      ]
+    }
+  ],
+
+  "cross_table_findings": [
+    { "finding_id": "GT-F-018", "check_id": "DQ_MISS_007" },
+    { "finding_id": "GT-F-030", "check_id": "DQ_CONS_007" },
+    { "finding_id": "GT-F-031", "check_id": "DQ_CONS_008" },
+    { "finding_id": "GT-F-032", "check_id": "DQ_CONS_009" }
+  ],
+
+  "findings": [
+    {
+      "id": "GT-F-001",
+      "check_id": "DQ_TYPE_001",
+      "category": "type",
+      "scope": "column",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "glucose_mg_dl",
+      "message": "Non-numeric value detected in numeric column. 1 of 62 rows contains 'pending' (row LAB-020, patient P007, timepoint T1).",
+      "evidence": {
+        "non_numeric_count": 1,
+        "non_numeric_rate": 0.016,
+        "sample_offenders": [{ "row_id": "LAB-020", "patient_id": "P007", "timepoint": "T1", "raw_value": "pending" }]
+      }
+    },
+    {
+      "id": "GT-F-002",
+      "check_id": "DQ_TYPE_001",
+      "category": "type",
+      "scope": "column",
+      "severity": "soft",
+      "table": "05_device_records",
+      "column": "sleep_hours_avg",
+      "message": "Non-numeric value detected in numeric column. 1 of 80 rows contains 'not recorded' (row DEV-072, patient P018, month 2024-06-01).",
+      "evidence": {
+        "non_numeric_count": 1,
+        "non_numeric_rate": 0.013,
+        "sample_offenders": [{ "row_id": "DEV-072", "patient_id": "P018", "recorded_month": "2024-06-01", "raw_value": "not recorded" }]
+      }
+    },
+    {
+      "id": "GT-F-003",
+      "check_id": "DQ_TYPE_002",
+      "category": "type",
+      "scope": "column",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "visit_date",
+      "message": "Mixed date formats detected. 1 of 62 rows uses MM/DD/YYYY instead of ISO 8601 (row LAB-025, patient P009, T0).",
+      "evidence": {
+        "formats_detected": ["ISO 8601 (YYYY-MM-DD)", "US (MM/DD/YYYY)"],
+        "mixed_format_count": 1,
+        "sample_offenders": [{ "row_id": "LAB-025", "patient_id": "P009", "raw_value": "02/08/2024" }]
+      }
+    },
+    {
+      "id": "GT-F-004",
+      "check_id": "DQ_TYPE_002",
+      "category": "type",
+      "scope": "column",
+      "severity": "soft",
+      "table": "03_visits",
+      "column": "visit_date",
+      "message": "Mixed date formats detected. 1 of 57 rows uses MM/DD/YYYY instead of ISO 8601 (row VIS-030, patient P010, T2).",
+      "evidence": {
+        "formats_detected": ["ISO 8601 (YYYY-MM-DD)", "US (MM/DD/YYYY)"],
+        "mixed_format_count": 1,
+        "sample_offenders": [{ "row_id": "VIS-030", "patient_id": "P010", "raw_value": "08/08/2024" }]
+      }
+    },
+    {
+      "id": "GT-F-005",
+      "check_id": "DQ_UNIT_003",
+      "category": "unit",
+      "scope": "cross_column",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "columns": ["creatinine_mg_dl", "creatinine_unit"],
+      "message": "Unit column disagrees with expected canonical unit. Row LAB-025 (P009-T0): creatinine_mg_dl = 121.9 is consistent with µmol/L (1.38 mg/dL × 88.4 = 121.9 µmol/L) but creatinine_unit declares 'mg/dL'. The value is ~88× higher than typical mg/dL range.",
+      "evidence": {
+        "disagreement_count": 1,
+        "canonical_unit": "mg/dL",
+        "sample_offenders": [{ "row_id": "LAB-025", "patient_id": "P009", "value": 121.9, "unit_declared": "mg/dL", "probable_actual_unit": "µmol/L" }]
+      }
+    },
+    {
+      "id": "GT-F-006",
+      "check_id": "DQ_RANGE_001",
+      "category": "range",
+      "scope": "column",
+      "severity": "hard",
+      "table": "02_lab_results",
+      "column": "hba1c_pct",
+      "message": "Value outside physiologically plausible range. Row LAB-015 (P005-T2): hba1c_pct = 85.3%. Plausible range is 3–18%. This is physiologically impossible.",
+      "evidence": {
+        "plausible_min": 3.0,
+        "plausible_max": 18.0,
+        "out_of_range_count": 1,
+        "sample_offenders": [{ "row_id": "LAB-015", "patient_id": "P005", "timepoint": "T2", "value": 85.3, "violation_type": "hard_max" }]
+      }
+    },
+    {
+      "id": "GT-F-007",
+      "check_id": "DQ_RANGE_001",
+      "category": "range",
+      "scope": "column",
+      "severity": "hard",
+      "table": "02_lab_results",
+      "column": "creatinine_mg_dl",
+      "message": "Value outside physiologically plausible range. Row LAB-035 (P012-T1): creatinine_mg_dl = -0.5. Negative creatinine is physiologically impossible (plausible range 0.2–15 mg/dL).",
+      "evidence": {
+        "plausible_min": 0.2,
+        "plausible_max": 15.0,
+        "out_of_range_count": 1,
+        "sample_offenders": [{ "row_id": "LAB-035", "patient_id": "P012", "timepoint": "T1", "value": -0.5, "violation_type": "hard_min" }]
+      }
+    },
+    {
+      "id": "GT-F-008",
+      "check_id": "DQ_RANGE_001",
+      "category": "range",
+      "scope": "column",
+      "severity": "hard",
+      "table": "04_dexa_scans",
+      "column": "lumbar_spine_t_score",
+      "message": "Value outside physiologically plausible range. Row DEX-015 (P008-T0): lumbar_spine_t_score = +8.5. T-scores are bounded approximately −4 to +4.",
+      "evidence": {
+        "plausible_min": -4.0,
+        "plausible_max": 4.0,
+        "out_of_range_count": 1,
+        "sample_offenders": [{ "row_id": "DEX-015", "patient_id": "P008", "timepoint": "T0", "value": 8.5, "violation_type": "hard_max" }]
+      }
+    },
+    {
+      "id": "GT-F-009",
+      "check_id": "DQ_RANGE_002",
+      "category": "range",
+      "scope": "column",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "alt_u_l",
+      "message": "Statistical outlier detected. Row LAB-057 (P019-T2): alt_u_l = 2847 U/L. This is approximately 40× above the column's 99th percentile and beyond Q3 + 3×IQR.",
+      "evidence": {
+        "method": "IQR/MAD",
+        "outlier_count": 1,
+        "column_iqr_approx": [20, 58],
+        "sample_offenders": [{ "row_id": "LAB-057", "patient_id": "P019", "timepoint": "T2", "value": 2847 }]
+      }
+    },
+    {
+      "id": "GT-F-010",
+      "check_id": "DQ_MISS_001",
+      "category": "missing",
+      "scope": "column",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "vitamin_d_ng_ml",
+      "message": "Missing rate exceeds 5% threshold. 15 of 62 rows are missing or sentinel (24.2%). Rows include 2 sentinel values (-99, 999) and 13 blank values.",
+      "evidence": {
+        "missing_count": 15,
+        "missing_rate": 0.242,
+        "includes_sentinels": true
+      }
+    },
+    {
+      "id": "GT-F-011",
+      "check_id": "DQ_MISS_002",
+      "category": "missing",
+      "scope": "column",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "vitamin_d_ng_ml",
+      "message": "Sentinel values detected masking missingness. Found values -99 (LAB-031, P011-T0) and 999 (LAB-033, P011-T2).",
+      "evidence": {
+        "sentinel_count": 2,
+        "sentinel_values_found": [-99, 999],
+        "sample_offenders": [
+          { "row_id": "LAB-031", "patient_id": "P011", "timepoint": "T0", "value": -99 },
+          { "row_id": "LAB-033", "patient_id": "P011", "timepoint": "T2", "value": 999 }
+        ]
+      }
+    },
+    {
+      "id": "GT-F-012",
+      "check_id": "DQ_MISS_002",
+      "category": "missing",
+      "scope": "column",
+      "severity": "soft",
+      "table": "05_device_records",
+      "column": "daily_steps_avg",
+      "message": "Sentinel value detected masking missingness. Found value -1 (DEV-041, P011, month 2024-02-01).",
+      "evidence": {
+        "sentinel_count": 1,
+        "sentinel_values_found": [-1],
+        "sample_offenders": [{ "row_id": "DEV-041", "patient_id": "P011", "recorded_month": "2024-02-01", "value": -1 }]
+      }
+    },
+    {
+      "id": "GT-F-013",
+      "check_id": "DQ_MISS_002",
+      "category": "missing",
+      "scope": "column",
+      "severity": "soft",
+      "table": "05_device_records",
+      "column": "avg_heart_rate_bpm",
+      "message": "Sentinel value detected masking missingness. Found value 9999 (DEV-073, P019, month 2024-03-01). A resting HR of 9999 bpm is physically impossible.",
+      "evidence": {
+        "sentinel_count": 1,
+        "sentinel_values_found": [9999],
+        "sample_offenders": [{ "row_id": "DEV-073", "patient_id": "P019", "recorded_month": "2024-03-01", "value": 9999 }]
+      }
+    },
+    {
+      "id": "GT-F-014",
+      "check_id": "DQ_MISS_003",
+      "category": "missing",
+      "scope": "column",
+      "severity": "hard",
+      "table": "02_lab_results",
+      "column": "testosterone_ng_dl",
+      "message": "Column is mostly missing (≥50% threshold). 34 of 62 rows (54.8%) have no value. Requires a handling-policy decision: Exclude / Flag / Keep as-is.",
+      "evidence": {
+        "missing_count": 34,
+        "missing_rate": 0.548,
+        "threshold": 0.50,
+        "note": "Blanks cover all female patients (P002,P004,P006,P008,P010,P012,P014,P016,P020) plus P003 and P005 (male patients with intentionally blanked values) plus the P005-T1 duplicate row."
+      }
+    },
+    {
+      "id": "GT-F-015",
+      "check_id": "DQ_MISS_004",
+      "category": "missing",
+      "scope": "table",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "columns": ["ferritin_ng_ml", "crp_mg_l"],
+      "message": "Co-missingness detected. ferritin_ng_ml and crp_mg_l are always missing together: both are blank in exactly 3 rows (LAB-033, LAB-042, LAB-048), with Pearson correlation of missingness indicators = 1.0.",
+      "evidence": {
+        "co_missing_pair": ["ferritin_ng_ml", "crp_mg_l"],
+        "co_missing_count": 3,
+        "missingness_correlation": 1.0,
+        "affected_rows": [
+          { "row_id": "LAB-033", "patient_id": "P011", "timepoint": "T2" },
+          { "row_id": "LAB-042", "patient_id": "P014", "timepoint": "T2" },
+          { "row_id": "LAB-048", "patient_id": "P016", "timepoint": "T2" }
+        ]
+      }
+    },
+    {
+      "id": "GT-F-016",
+      "check_id": "DQ_MISS_005",
+      "category": "missing",
+      "scope": "table",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "vitamin_d_ng_ml",
+      "message": "Missing rate is concentrated in SITE_B. 100% of missing/sentinel vitamin_d values originate from SITE_B patients (P011, P014, P016, P017, P019). SITE_A missing rate = 0%.",
+      "evidence": {
+        "missing_by_site": {
+          "SITE_A": { "missing_count": 0, "row_count": 30, "missing_rate": 0.0 },
+          "SITE_B": { "missing_count": 15, "row_count": 32, "missing_rate": 0.47 }
+        },
+        "site_outlier": "SITE_B"
+      }
+    },
+    {
+      "id": "GT-F-017",
+      "check_id": "DQ_MISS_006",
+      "category": "missing",
+      "scope": "table",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "vitamin_d_ng_ml",
+      "message": "Missing rate increases monotonically over time. T0: 2/20 = 10% (2 sentinels); T1: 5/21 = 24%; T2: 8/21 = 38%. Suggests deteriorating data collection at later time windows.",
+      "evidence": {
+        "missing_by_timepoint": {
+          "T0": { "missing_count": 2, "row_count": 20, "missing_rate": 0.10 },
+          "T1": { "missing_count": 5, "row_count": 21, "missing_rate": 0.24 },
+          "T2": { "missing_count": 8, "row_count": 21, "missing_rate": 0.38 }
+        },
+        "trend": "monotonically_increasing"
+      }
+    },
+    {
+      "id": "GT-F-018",
+      "check_id": "DQ_MISS_007",
+      "category": "missing",
+      "scope": "dataset",
+      "severity": "soft",
+      "table": null,
+      "columns": null,
+      "message": "Entity P015 is present in 03_visits as a foreign-key reference but has zero rows there. P015 appears in lab_results (3 rows), dexa_scans (2 rows), and device_records (4 rows) but is entirely absent from visits.",
+      "evidence": {
+        "entity_id": "P015",
+        "presence_by_table": {
+          "01_patients": true,
+          "02_lab_results": true,
+          "03_visits": false,
+          "04_dexa_scans": true,
+          "05_device_records": true,
+          "06_questionnaire_responses": true
+        },
+        "absent_from": ["03_visits"]
+      }
+    },
+    {
+      "id": "GT-F-019",
+      "check_id": "DQ_COH_001",
+      "category": "coherence",
+      "scope": "cross_column",
+      "severity": "hard",
+      "table": "03_visits",
+      "columns": ["systolic_bp", "diastolic_bp"],
+      "message": "Clinical impossibility: diastolic blood pressure exceeds systolic in row VIS-039 (P013-T2). systolic_bp = 85 mmHg, diastolic_bp = 92 mmHg. Diastolic > systolic is physiologically impossible.",
+      "evidence": {
+        "incompatibility_rule": "systolic_bp > diastolic_bp",
+        "violation_count": 1,
+        "sample_offenders": [{ "row_id": "VIS-039", "patient_id": "P013", "timepoint": "T2", "systolic_bp": 85, "diastolic_bp": 92, "delta": -7 }]
+      }
+    },
+    {
+      "id": "GT-F-020",
+      "check_id": "DQ_COH_002",
+      "category": "coherence",
+      "scope": "table",
+      "severity": "soft",
+      "table": "04_dexa_scans",
+      "column": "body_fat_pct",
+      "message": "Implausible per-entity trajectory. Patient P001: body_fat_pct drops from 24.5% (T0) to 7.2% (T2) — a 17.3-percentage-point decrease in 6 months. This exceeds 3× the IQR of all per-entity deltas and is physiologically implausible.",
+      "evidence": {
+        "entity_id": "P001",
+        "trajectory": [
+          { "timepoint": "T0", "scan_date": "2024-01-10", "value": 24.5 },
+          { "timepoint": "T2", "scan_date": "2024-07-08", "value": 7.2 }
+        ],
+        "delta": -17.3,
+        "method": "exceeds_3x_iqr_of_per_entity_deltas"
+      }
+    },
+    {
+      "id": "GT-F-021",
+      "check_id": "DQ_COH_002",
+      "category": "coherence",
+      "scope": "table",
+      "severity": "soft",
+      "table": "02_lab_results",
+      "column": "creatinine_mg_dl",
+      "message": "Implausible per-entity trajectory. Patient P009: creatinine_mg_dl spikes from 1.38 (T0) to 8.92 (T1) then returns to 1.30 (T2). The T0→T1 jump of +7.54 mg/dL is physiologically implausible as a within-90-day change without a corresponding clinical event.",
+      "evidence": {
+        "entity_id": "P009",
+        "trajectory": [
+          { "timepoint": "T0", "visit_date": "2024-02-08", "value": 1.38 },
+          { "timepoint": "T1", "visit_date": "2024-05-08", "value": 8.92 },
+          { "timepoint": "T2", "visit_date": "2024-08-06", "value": 1.30 }
+        ],
+        "max_delta": 7.54,
+        "method": "exceeds_3x_iqr_of_per_entity_deltas"
+      }
+    },
+    {
+      "id": "GT-F-022",
+      "check_id": "DQ_CONS_001",
+      "category": "consistency",
+      "scope": "column",
+      "severity": "hard",
+      "table": "06_questionnaire_responses",
+      "column": "activity_level",
+      "message": "Value outside declared valid set. Row QST-011 (P006-T0): activity_level = 'EXTREME'. Valid values are {SEDENTARY, LIGHT, MODERATE, VIGOROUS, VERY_ACTIVE}.",
+      "evidence": {
+        "valid_set": ["SEDENTARY", "LIGHT", "MODERATE", "VIGOROUS", "VERY_ACTIVE"],
+        "invalid_count": 1,
+        "sample_offenders": [{ "row_id": "QST-011", "patient_id": "P006", "timepoint": "T0", "value": "EXTREME" }]
+      }
+    },
+    {
+      "id": "GT-F-023",
+      "check_id": "DQ_CONS_001",
+      "category": "consistency",
+      "scope": "column",
+      "severity": "hard",
+      "table": "06_questionnaire_responses",
+      "column": "diet_type",
+      "message": "Value outside declared valid set. Row QST-025 (P013-T0): diet_type = 'ATKINS'. Valid values are {OMNIVORE, PESCATARIAN, VEGETARIAN, VEGAN, KETO, MEDITERRANEAN, PALEO}.",
+      "evidence": {
+        "valid_set": ["OMNIVORE", "PESCATARIAN", "VEGETARIAN", "VEGAN", "KETO", "MEDITERRANEAN", "PALEO"],
+        "invalid_count": 1,
+        "sample_offenders": [{ "row_id": "QST-025", "patient_id": "P013", "timepoint": "T0", "value": "ATKINS" }]
+      }
+    },
+    {
+      "id": "GT-F-024",
+      "check_id": "DQ_CONS_001",
+      "category": "consistency",
+      "scope": "column",
+      "severity": "hard",
+      "table": "06_questionnaire_responses",
+      "column": "energy_level",
+      "message": "Value outside declared valid set. Row QST-034 (P017-T1): energy_level = 'VERY_HIGH'. Valid values are {LOW, MODERATE, HIGH}.",
+      "evidence": {
+        "valid_set": ["LOW", "MODERATE", "HIGH"],
+        "invalid_count": 1,
+        "sample_offenders": [{ "row_id": "QST-034", "patient_id": "P017", "timepoint": "T1", "value": "VERY_HIGH" }]
+      }
+    },
+    {
+      "id": "GT-F-025",
+      "check_id": "DQ_CONS_002",
+      "category": "consistency",
+      "scope": "table",
+      "severity": "hard",
+      "table": "02_lab_results",
+      "columns": ["patient_id", "visit_date", "timepoint"],
+      "message": "Duplicate rows on minimal grain key. Key (P005, 2024-04-19, T1) appears twice: rows LAB-014 and LAB-061 are identical on all clinical columns.",
+      "evidence": {
+        "grain_key": ["patient_id", "visit_date", "timepoint"],
+        "duplicate_count": 1,
+        "duplicate_groups": [
+          {
+            "key": { "patient_id": "P005", "visit_date": "2024-04-19", "timepoint": "T1" },
+            "row_ids": ["LAB-014", "LAB-061"],
+            "row_count": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "GT-F-026",
+      "check_id": "DQ_CONS_003",
+      "category": "consistency",
+      "scope": "table",
+      "severity": "hard",
+      "table": "02_lab_results",
+      "message": "Per-entity rows not in temporal order. Patient P012: visit_date sequence is 2024-08-14 (T0) → 2024-05-16 (T1) → 2024-02-16 (T2) — reversed chronological order. T0 date is later than T2 date.",
+      "evidence": {
+        "entity_id": "P012",
+        "violation_count": 1,
+        "out_of_order_rows": [
+          { "row_id": "LAB-034", "visit_date": "2024-08-14", "timepoint": "T0" },
+          { "row_id": "LAB-035", "visit_date": "2024-05-16", "timepoint": "T1" },
+          { "row_id": "LAB-036", "visit_date": "2024-02-16", "timepoint": "T2" }
+        ]
+      }
+    },
+    {
+      "id": "GT-F-027",
+      "check_id": "DQ_CONS_004",
+      "category": "consistency",
+      "scope": "cross_column",
+      "severity": "hard",
+      "table": "03_visits",
+      "columns": ["admission_datetime", "discharge_datetime"],
+      "message": "Discharge before admission. Row VIS-023 (P008-T1): admission_datetime = '2024-05-05 10:30', discharge_datetime = '2024-05-05 08:00'. Duration = −2h 30m.",
+      "evidence": {
+        "violation_count": 1,
+        "sample_offenders": [
+          {
+            "row_id": "VIS-023",
+            "patient_id": "P008",
+            "timepoint": "T1",
+            "admission_datetime": "2024-05-05 10:30",
+            "discharge_datetime": "2024-05-05 08:00",
+            "duration_hours": -2.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "GT-F-028",
+      "check_id": "DQ_CONS_005",
+      "category": "consistency",
+      "scope": "table",
+      "severity": "hard",
+      "table": "03_visits",
+      "message": "Event timestamped after recorded death. Row VIS-009 (P003-T2): visit_date = 2024-07-25, but patients.death_date for P003 = 2024-07-20. Event occurs 5 days post-mortem.",
+      "evidence": {
+        "entity_id": "P003",
+        "death_date": "2024-07-20",
+        "violation_count": 1,
+        "sample_offenders": [
+          {
+            "row_id": "VIS-009",
+            "patient_id": "P003",
+            "event_date": "2024-07-25",
+            "days_post_death": 5
+          }
+        ]
+      }
+    },
+    {
+      "id": "GT-F-029",
+      "check_id": "DQ_CONS_006",
+      "category": "consistency",
+      "scope": "table",
+      "severity": "soft",
+      "table": "01_patients",
+      "message": "Near-duplicate entity pair detected. P017 (M, 1980-06-25, SITE_B, 81.0 kg, 174 cm) and P018 (M, 1980-06-28, SITE_B, 60.2 kg, 166 cm) share the same sex, site, and birth year-month with only a 3-day date gap. Possible duplicate registration.",
+      "evidence": {
+        "entity_pair": ["P017", "P018"],
+        "matching_fields": ["sex (M)", "site_id (SITE_B)", "birth_year_month (1980-06)"],
+        "differing_fields": {
+          "birth_date": ["1980-06-25", "1980-06-28"],
+          "weight_kg": [81.0, 60.2],
+          "height_cm": [174, 166]
+        },
+        "fuzzy_match_score": 0.82
+      }
+    },
+    {
+      "id": "GT-F-030",
+      "check_id": "DQ_CONS_007",
+      "category": "consistency",
+      "scope": "dataset",
+      "severity": "hard",
+      "table": null,
+      "message": "Orphan foreign key detected. Row LAB-062 in lab_results references patient_id = 'P025', which does not exist in 01_patients. 1 orphan row.",
+      "evidence": {
+        "source_table": "02_lab_results",
+        "source_column": "patient_id",
+        "target_table": "01_patients",
+        "target_column": "patient_id",
+        "orphan_values": ["P025"],
+        "orphan_row_count": 1,
+        "sample_offenders": [{ "row_id": "LAB-062", "patient_id": "P025" }]
+      }
+    },
+    {
+      "id": "GT-F-031",
+      "check_id": "DQ_CONS_008",
+      "category": "consistency",
+      "scope": "dataset",
+      "severity": "hard",
+      "table": null,
+      "message": "Event date precedes enrollment date. Row DEX-019 in dexa_scans: scan_date = 2024-01-20 for patient P010, whose enrollment_date in 01_patients = 2024-02-10. Scan performed 21 days before enrollment.",
+      "evidence": {
+        "entity_id": "P010",
+        "enrollment_date": "2024-02-10",
+        "event_table": "04_dexa_scans",
+        "event_row_id": "DEX-019",
+        "event_date": "2024-01-20",
+        "days_before_enrollment": 21
+      }
+    },
+    {
+      "id": "GT-F-032",
+      "check_id": "DQ_CONS_009",
+      "category": "consistency",
+      "scope": "dataset",
+      "severity": "soft",
+      "table": null,
+      "message": "Same concept disagrees across tables for the same entity. Patient P004: weight_kg in 01_patients = 58.7 kg (baseline), but weight_kg in 03_visits (VIS-012, T2) = 47.2 kg — an 11.5 kg discrepancy (19.6%) that exceeds a plausible 6-month weight change.",
+      "evidence": {
+        "concept": "weight_kg",
+        "entity_id": "P004",
+        "table_values": [
+          { "table": "01_patients", "row_id": "P004", "value": 58.7, "context": "baseline" },
+          { "table": "03_visits",   "row_id": "VIS-012", "value": 47.2, "context": "T2 visit" }
+        ],
+        "absolute_difference": 11.5,
+        "relative_difference_pct": 19.6
+      }
+    },
+    {
+      "id": "GT-F-033",
+      "check_id": "DQ_MEAN_003",
+      "category": "labelling",
+      "scope": "table",
+      "severity": "info",
+      "table": "01_patients",
+      "message": "Grain inferred. Proposed minimal key: [patient_id]. Entity type: static (one row per patient). No time column detected as a grain component.",
+      "evidence": {
+        "proposed_minimal_key": ["patient_id"],
+        "proposed_time_column": "enrollment_date",
+        "is_longitudinal": false
+      }
+    },
+    {
+      "id": "GT-F-034",
+      "check_id": "DQ_MEAN_003",
+      "category": "labelling",
+      "scope": "table",
+      "severity": "info",
+      "table": "02_lab_results",
+      "message": "Grain inferred. Proposed minimal key: [patient_id, visit_date, timepoint]. Longitudinal — 3 timepoints per entity. Time column: visit_date.",
+      "evidence": {
+        "proposed_minimal_key": ["patient_id", "visit_date", "timepoint"],
+        "proposed_time_column": "visit_date",
+        "is_longitudinal": true
+      }
+    },
+    {
+      "id": "GT-F-035",
+      "check_id": "DQ_MEAN_003",
+      "category": "labelling",
+      "scope": "table",
+      "severity": "info",
+      "table": "03_visits",
+      "message": "Grain inferred. Proposed minimal key: [patient_id, visit_date, timepoint]. Longitudinal. Time column: visit_date.",
+      "evidence": {
+        "proposed_minimal_key": ["patient_id", "visit_date", "timepoint"],
+        "proposed_time_column": "visit_date",
+        "is_longitudinal": true
+      }
+    },
+    {
+      "id": "GT-F-036",
+      "check_id": "DQ_MEAN_003",
+      "category": "labelling",
+      "scope": "table",
+      "severity": "info",
+      "table": "04_dexa_scans",
+      "message": "Grain inferred. Proposed minimal key: [patient_id, scan_date, timepoint]. Longitudinal — 2 timepoints per entity. Time column: scan_date.",
+      "evidence": {
+        "proposed_minimal_key": ["patient_id", "scan_date", "timepoint"],
+        "proposed_time_column": "scan_date",
+        "is_longitudinal": true
+      }
+    },
+    {
+      "id": "GT-F-037",
+      "check_id": "DQ_MEAN_003",
+      "category": "labelling",
+      "scope": "table",
+      "severity": "info",
+      "table": "05_device_records",
+      "message": "Grain inferred. Proposed minimal key: [patient_id, recorded_month]. Longitudinal — 4 monthly windows per entity. Time column: recorded_month.",
+      "evidence": {
+        "proposed_minimal_key": ["patient_id", "recorded_month"],
+        "proposed_time_column": "recorded_month",
+        "is_longitudinal": true
+      }
+    },
+    {
+      "id": "GT-F-038",
+      "check_id": "DQ_MEAN_003",
+      "category": "labelling",
+      "scope": "table",
+      "severity": "info",
+      "table": "06_questionnaire_responses",
+      "message": "Grain inferred. Proposed minimal key: [patient_id, response_date, timepoint]. Longitudinal — 2 timepoints per entity. Time column: response_date.",
+      "evidence": {
+        "proposed_minimal_key": ["patient_id", "response_date", "timepoint"],
+        "proposed_time_column": "response_date",
+        "is_longitudinal": true
+      }
+    }
+  ],
+
+  "findings_index": {
+    "_comment": "Quick-lookup table ordered by (severity DESC, check_id ASC). Use this for LLM comparison: verify each entry is present in the actual output with matching check_id, table, column, and severity.",
+    "hard": [
+      { "id": "GT-F-006", "check_id": "DQ_RANGE_001", "table": "02_lab_results",             "column": "hba1c_pct",                  "key_evidence": "value 85.3 in row LAB-015" },
+      { "id": "GT-F-007", "check_id": "DQ_RANGE_001", "table": "02_lab_results",             "column": "creatinine_mg_dl",            "key_evidence": "value -0.5 in row LAB-035" },
+      { "id": "GT-F-008", "check_id": "DQ_RANGE_001", "table": "04_dexa_scans",              "column": "lumbar_spine_t_score",        "key_evidence": "value +8.5 in row DEX-015" },
+      { "id": "GT-F-014", "check_id": "DQ_MISS_003",  "table": "02_lab_results",             "column": "testosterone_ng_dl",          "key_evidence": "55% missing rate" },
+      { "id": "GT-F-019", "check_id": "DQ_COH_001",   "table": "03_visits",                  "columns": ["systolic_bp","diastolic_bp"],"key_evidence": "diastolic=92 > systolic=85 in VIS-039" },
+      { "id": "GT-F-022", "check_id": "DQ_CONS_001",  "table": "06_questionnaire_responses", "column": "activity_level",              "key_evidence": "value 'EXTREME' in QST-011" },
+      { "id": "GT-F-023", "check_id": "DQ_CONS_001",  "table": "06_questionnaire_responses", "column": "diet_type",                   "key_evidence": "value 'ATKINS' in QST-025" },
+      { "id": "GT-F-024", "check_id": "DQ_CONS_001",  "table": "06_questionnaire_responses", "column": "energy_level",                "key_evidence": "value 'VERY_HIGH' in QST-034" },
+      { "id": "GT-F-025", "check_id": "DQ_CONS_002",  "table": "02_lab_results",             "columns": ["patient_id","visit_date","timepoint"], "key_evidence": "P005-T1 rows LAB-014 and LAB-061 share same grain key" },
+      { "id": "GT-F-026", "check_id": "DQ_CONS_003",  "table": "02_lab_results",             "entity_id": "P012",                    "key_evidence": "dates: 2024-08-14 (T0) > 2024-05-16 (T1) > 2024-02-16 (T2)" },
+      { "id": "GT-F-027", "check_id": "DQ_CONS_004",  "table": "03_visits",                  "columns": ["admission_datetime","discharge_datetime"], "key_evidence": "VIS-023 discharge 08:00 before admission 10:30" },
+      { "id": "GT-F-028", "check_id": "DQ_CONS_005",  "table": "03_visits",                  "entity_id": "P003",                    "key_evidence": "VIS-009 visit 2024-07-25, death 2024-07-20" },
+      { "id": "GT-F-030", "check_id": "DQ_CONS_007",  "table": "dataset",                    "source_table": "02_lab_results",       "key_evidence": "patient_id 'P025' in LAB-062 absent from 01_patients" },
+      { "id": "GT-F-031", "check_id": "DQ_CONS_008",  "table": "dataset",                    "source_table": "04_dexa_scans",        "key_evidence": "DEX-019 scan_date 2024-01-20 before P010 enrollment 2024-02-10" }
+    ],
+    "soft": [
+      { "id": "GT-F-001", "check_id": "DQ_TYPE_001",  "table": "02_lab_results",    "column": "glucose_mg_dl",                    "key_evidence": "'pending' in LAB-020" },
+      { "id": "GT-F-002", "check_id": "DQ_TYPE_001",  "table": "05_device_records", "column": "sleep_hours_avg",                  "key_evidence": "'not recorded' in DEV-072" },
+      { "id": "GT-F-003", "check_id": "DQ_TYPE_002",  "table": "02_lab_results",    "column": "visit_date",                       "key_evidence": "'02/08/2024' in LAB-025" },
+      { "id": "GT-F-004", "check_id": "DQ_TYPE_002",  "table": "03_visits",         "column": "visit_date",                       "key_evidence": "'08/08/2024' in VIS-030" },
+      { "id": "GT-F-005", "check_id": "DQ_UNIT_003",  "table": "02_lab_results",    "columns": ["creatinine_mg_dl","creatinine_unit"], "key_evidence": "value 121.9 with unit 'mg/dL' in LAB-025 (should be µmol/L)" },
+      { "id": "GT-F-009", "check_id": "DQ_RANGE_002", "table": "02_lab_results",    "column": "alt_u_l",                          "key_evidence": "value 2847 in LAB-057" },
+      { "id": "GT-F-010", "check_id": "DQ_MISS_001",  "table": "02_lab_results",    "column": "vitamin_d_ng_ml",                  "key_evidence": "24% missing rate (15/62 rows)" },
+      { "id": "GT-F-011", "check_id": "DQ_MISS_002",  "table": "02_lab_results",    "column": "vitamin_d_ng_ml",                  "key_evidence": "sentinels -99 (LAB-031) and 999 (LAB-033)" },
+      { "id": "GT-F-012", "check_id": "DQ_MISS_002",  "table": "05_device_records", "column": "daily_steps_avg",                  "key_evidence": "sentinel -1 in DEV-041" },
+      { "id": "GT-F-013", "check_id": "DQ_MISS_002",  "table": "05_device_records", "column": "avg_heart_rate_bpm",               "key_evidence": "sentinel 9999 in DEV-073" },
+      { "id": "GT-F-015", "check_id": "DQ_MISS_004",  "table": "02_lab_results",    "columns": ["ferritin_ng_ml","crp_mg_l"],      "key_evidence": "always co-missing in LAB-033, LAB-042, LAB-048" },
+      { "id": "GT-F-016", "check_id": "DQ_MISS_005",  "table": "02_lab_results",    "column": "vitamin_d_ng_ml",                  "key_evidence": "SITE_B: 47% missing vs SITE_A: 0%" },
+      { "id": "GT-F-017", "check_id": "DQ_MISS_006",  "table": "02_lab_results",    "column": "vitamin_d_ng_ml",                  "key_evidence": "T0=10%, T1=24%, T2=38% missing rate trend" },
+      { "id": "GT-F-018", "check_id": "DQ_MISS_007",  "table": "dataset",           "entity_id": "P015",                          "key_evidence": "P015 absent from 03_visits, present in 4 other tables" },
+      { "id": "GT-F-020", "check_id": "DQ_COH_002",   "table": "04_dexa_scans",     "column": "body_fat_pct",                     "key_evidence": "P001 trajectory: 24.5% → 7.2% in 6 months" },
+      { "id": "GT-F-021", "check_id": "DQ_COH_002",   "table": "02_lab_results",    "column": "creatinine_mg_dl",                 "key_evidence": "P009 trajectory: 1.38 → 8.92 → 1.30 mg/dL" },
+      { "id": "GT-F-029", "check_id": "DQ_CONS_006",  "table": "01_patients",       "entity_pair": ["P017","P018"],               "key_evidence": "M, SITE_B, birth dates 1980-06-25 vs 1980-06-28" },
+      { "id": "GT-F-032", "check_id": "DQ_CONS_009",  "table": "dataset",           "entity_id": "P004",                          "key_evidence": "weight 58.7 kg (patients) vs 47.2 kg (VIS-012)" }
+    ],
+    "info": [
+      { "id": "GT-F-033", "check_id": "DQ_MEAN_003", "table": "01_patients",              "key_evidence": "grain: [patient_id], static" },
+      { "id": "GT-F-034", "check_id": "DQ_MEAN_003", "table": "02_lab_results",           "key_evidence": "grain: [patient_id, visit_date, timepoint], longitudinal" },
+      { "id": "GT-F-035", "check_id": "DQ_MEAN_003", "table": "03_visits",                "key_evidence": "grain: [patient_id, visit_date, timepoint], longitudinal" },
+      { "id": "GT-F-036", "check_id": "DQ_MEAN_003", "table": "04_dexa_scans",            "key_evidence": "grain: [patient_id, scan_date, timepoint], longitudinal" },
+      { "id": "GT-F-037", "check_id": "DQ_MEAN_003", "table": "05_device_records",        "key_evidence": "grain: [patient_id, recorded_month], longitudinal" },
+      { "id": "GT-F-038", "check_id": "DQ_MEAN_003", "table": "06_questionnaire_responses","key_evidence": "grain: [patient_id, response_date, timepoint], longitudinal" }
+    ]
+  }
+}

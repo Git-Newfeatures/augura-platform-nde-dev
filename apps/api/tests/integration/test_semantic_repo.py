@@ -99,3 +99,51 @@ async def test_relations_for_concepts_returns_subgraph(
         subgraph = await repo.relations_for_concepts([anchor])
     assert subgraph, "empty subgraph for a concept present in the ontology"
     assert all(anchor in (r.subject_concept_id, r.object_concept_id) for r in subgraph)
+
+
+async def test_bundle_includes_affix_grammar(sm: async_sessionmaker[AsyncSession]) -> None:
+    tenant = TenantId(uuid4())
+    async with sm() as session, session.begin():
+        await _scope(session, tenant, USER)
+        bundle = await SemanticRepo(session).read_bundle()
+    for key in (
+        "dimension_kinds",
+        "affix_archetypes",
+        "affix_archetype_values",
+        "affix_archetype_aliases",
+    ):
+        assert key in bundle, f"{key} missing from the semantic bundle"
+    assert len(bundle["dimension_kinds"]) >= 12  # the 12 structural families
+    assert len(bundle["affix_archetypes"]) >= 1
+
+
+async def test_affix_referential_integrity(sm: async_sessionmaker[AsyncSession]) -> None:
+    """anchor concepts resolve, and closed-set aliases map to declared values (§8)."""
+    tenant = TenantId(uuid4())
+    async with sm() as session, session.begin():
+        await _scope(session, tenant, USER)
+        # Every non-null anchor_concept_id resolves to a taxonomy concept.
+        dangling_anchor = (
+            await session.execute(
+                text(
+                    "select count(*) from affix_archetypes a "
+                    "where a.anchor_concept_id is not null and not exists "
+                    "(select 1 from taxonomy_concepts c "
+                    " where c.local_concept_id = a.anchor_concept_id)"
+                )
+            )
+        ).scalar_one()
+        assert dangling_anchor == 0
+        # Every closed_set alias's canonical_value is a declared value.
+        dangling_value = (
+            await session.execute(
+                text(
+                    "select count(*) from affix_archetype_aliases al "
+                    "where al.canonical_value is not null and not exists "
+                    "(select 1 from affix_archetype_values v "
+                    " where v.affix_archetype_id = al.affix_archetype_id "
+                    "   and v.canonical_value = al.canonical_value)"
+                )
+            )
+        ).scalar_one()
+        assert dangling_value == 0

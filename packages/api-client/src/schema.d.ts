@@ -3128,13 +3128,29 @@ export interface components {
          * SemanticBundle
          * @description Response of GET /semantic/bundle — the governed semantic layer as a single block.
          *
-         *     14 tables, rows left as raw `dict`: the frontend indexes them itself
+         *     18 tables, rows left as raw `dict`: the frontend indexes them itself
          *     (semantic-store → taxonomy/ontology loaders). Typing each table would add
-         *     nothing to the read contract. All 14 fields are always present (coalesce to []).
+         *     nothing to the read contract. All 18 fields are always present (coalesce to []).
          */
         SemanticBundle: {
+            /** Affix Archetype Aliases */
+            affix_archetype_aliases: {
+                [key: string]: unknown;
+            }[];
+            /** Affix Archetype Values */
+            affix_archetype_values: {
+                [key: string]: unknown;
+            }[];
+            /** Affix Archetypes */
+            affix_archetypes: {
+                [key: string]: unknown;
+            }[];
             /** Causal Predicates */
             causal_predicates: {
+                [key: string]: unknown;
+            }[];
+            /** Dimension Kinds */
+            dimension_kinds: {
                 [key: string]: unknown;
             }[];
             /** Dq Constraints */

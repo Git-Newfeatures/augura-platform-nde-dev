@@ -1,0 +1,241 @@
+"""upsert_semantic_release: extend the write-path with the affix archetypes
+
+CREATE OR REPLACE of the SECURITY DEFINER function so a semantic release can carry
+the dimension-grammar payload (dimension_kinds, affix_archetypes,
+affix_archetype_values, affix_archetype_aliases) alongside the taxonomy/ontology
+tables. Idempotent (CREATE OR REPLACE + conditional grant); also lives in the
+canonical bundle functions.sql executed by 0001_baseline. Re-running 0006's body
+afterwards would revert it, so this migration must stay AFTER 0006 in the chain.
+
+Revision ID: 0012_affix_release_function
+Revises: 0011_affix_archetypes
+"""
+
+from collections.abc import Sequence
+
+from alembic import op
+
+revision: str = "0012_affix_release_function"
+down_revision: str | None = "0011_affix_archetypes"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+_FUNCTION_SQL = r"""
+-- NB: the owner of this function must be a BYPASSRLS/privileged role
+-- (Supabase service_role) so that SECURITY DEFINER can write the governed
+-- catalogs despite their RLS FORCE … FOR SELECT.
+create or replace function public.upsert_semantic_release(
+  p_manifest jsonb,
+  p_payload jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_version text := p_manifest->>'semantic_release_version';
+begin
+  if coalesce(v_version, '') = '' then
+    raise exception 'semantic_release_version required in the manifest';
+  end if;
+
+  -- Concepts first (FK target of relations / synonyms / codes / affix anchors).
+  insert into public.taxonomy_concepts
+    select * from jsonb_populate_recordset(
+      null::public.taxonomy_concepts,
+      coalesce(p_payload->'taxonomy_concepts', '[]'::jsonb))
+    on conflict (local_concept_id) do update set
+      layer = excluded.layer,
+      concept_name = excluded.concept_name,
+      review_section = excluded.review_section,
+      augura_domain = excluded.augura_domain,
+      omop_domain_id = excluded.omop_domain_id,
+      omop_target_table = excluded.omop_target_table,
+      omop_target_concept_field = excluded.omop_target_concept_field,
+      namespace = excluded.namespace,
+      unit_source_value = excluded.unit_source_value,
+      value_min = excluded.value_min,
+      value_max = excluded.value_max,
+      value_type = excluded.value_type,
+      design_rationale = excluded.design_rationale,
+      review_status = excluded.review_status,
+      version = excluded.version,
+      active = excluded.active,
+      canonical_unit = excluded.canonical_unit,
+      temporality = excluded.temporality,
+      dq_column_role = excluded.dq_column_role,
+      fhir_crosswalk = excluded.fhir_crosswalk,
+      sdtm_crosswalk = excluded.sdtm_crosswalk,
+      unit_coverage_status = excluded.unit_coverage_status,
+      range_support_status = excluded.range_support_status;
+
+  insert into public.taxonomy_synonyms
+    select * from jsonb_populate_recordset(
+      null::public.taxonomy_synonyms,
+      coalesce(p_payload->'taxonomy_synonyms', '[]'::jsonb))
+    on conflict (local_concept_id, synonym) do update set
+      synonym_type = excluded.synonym_type,
+      source = excluded.source,
+      review_status = excluded.review_status;
+
+  insert into public.taxonomy_standard_codes
+    select * from jsonb_populate_recordset(
+      null::public.taxonomy_standard_codes,
+      coalesce(p_payload->'taxonomy_standard_codes', '[]'::jsonb))
+    on conflict (local_concept_id, vocabulary_id, concept_code) do update set
+      standard_concept_id = excluded.standard_concept_id,
+      standard_concept_name = excluded.standard_concept_name,
+      standard_concept_flag = excluded.standard_concept_flag,
+      concept_class_id = excluded.concept_class_id;
+
+  insert into public.ontology_relations
+    select * from jsonb_populate_recordset(
+      null::public.ontology_relations,
+      coalesce(p_payload->'ontology_relations', '[]'::jsonb))
+    on conflict (relation_id) do update set
+      subject_concept_id = excluded.subject_concept_id,
+      predicate = excluded.predicate,
+      object_concept_id = excluded.object_concept_id,
+      polarity = excluded.polarity,
+      default_strength = excluded.default_strength,
+      default_temporal_lag = excluded.default_temporal_lag,
+      mechanism_summary = excluded.mechanism_summary,
+      review_status = excluded.review_status,
+      version = excluded.version,
+      active = excluded.active;
+
+  insert into public.ontology_relation_evidence
+    select * from jsonb_populate_recordset(
+      null::public.ontology_relation_evidence,
+      coalesce(p_payload->'ontology_relation_evidence', '[]'::jsonb))
+    on conflict (evidence_id) do update set
+      relation_id = excluded.relation_id,
+      source_type = excluded.source_type,
+      citation_or_url = excluded.citation_or_url,
+      evidence_summary = excluded.evidence_summary,
+      population_notes = excluded.population_notes,
+      evidence_strength = excluded.evidence_strength,
+      review_status = excluded.review_status;
+
+  insert into public.ontology_relation_qualifiers
+    select * from jsonb_populate_recordset(
+      null::public.ontology_relation_qualifiers,
+      coalesce(p_payload->'ontology_relation_qualifiers', '[]'::jsonb))
+    on conflict (qualifier_id) do update set
+      relation_id = excluded.relation_id,
+      qualifier_type = excluded.qualifier_type,
+      qualifier_concept_id = excluded.qualifier_concept_id,
+      qualifier_value = excluded.qualifier_value,
+      qualifier_effect = excluded.qualifier_effect,
+      is_hard_constraint = excluded.is_hard_constraint,
+      notes = excluded.notes;
+
+  -- Dimension grammar / affix archetypes (FK order: kinds → archetypes →
+  -- values/aliases; anchor_concept_id resolves against the concepts upserted above).
+  insert into public.dimension_kinds
+    select * from jsonb_populate_recordset(
+      null::public.dimension_kinds,
+      coalesce(p_payload->'dimension_kinds', '[]'::jsonb))
+    on conflict (dimension_kind_id) do update set
+      label = excluded.label,
+      description = excluded.description,
+      value_model = excluded.value_model,
+      default_comparability = excluded.default_comparability,
+      structural_role = excluded.structural_role,
+      review_status = excluded.review_status,
+      version = excluded.version,
+      active = excluded.active;
+
+  insert into public.affix_archetypes
+    select * from jsonb_populate_recordset(
+      null::public.affix_archetypes,
+      coalesce(p_payload->'affix_archetypes', '[]'::jsonb))
+    on conflict (affix_archetype_id) do update set
+      archetype_name = excluded.archetype_name,
+      dimension_kind_id = excluded.dimension_kind_id,
+      position = excluded.position,
+      separator_style = excluded.separator_style,
+      value_model = excluded.value_model,
+      comparability = excluded.comparability,
+      anchor_concept_id = excluded.anchor_concept_id,
+      operator = excluded.operator,
+      extraction_rule = excluded.extraction_rule,
+      requires_residual_maps = excluded.requires_residual_maps,
+      requires_sibling_family = excluded.requires_sibling_family,
+      evidence_weight = excluded.evidence_weight,
+      confidence_threshold = excluded.confidence_threshold,
+      review_status = excluded.review_status,
+      version = excluded.version,
+      active = excluded.active;
+
+  insert into public.affix_archetype_values
+    select * from jsonb_populate_recordset(
+      null::public.affix_archetype_values,
+      coalesce(p_payload->'affix_archetype_values', '[]'::jsonb))
+    on conflict (affix_archetype_id, canonical_value) do update set
+      label = excluded.label,
+      review_status = excluded.review_status;
+
+  insert into public.affix_archetype_aliases
+    select * from jsonb_populate_recordset(
+      null::public.affix_archetype_aliases,
+      coalesce(p_payload->'affix_archetype_aliases', '[]'::jsonb))
+    on conflict (affix_archetype_id, token) do update set
+      canonical_value = excluded.canonical_value,
+      source = excluded.source,
+      review_status = excluded.review_status;
+
+  -- Switch the current release (append-only, a single is_current).
+  update public.semantic_releases set is_current = false where is_current;
+  insert into public.semantic_releases (
+    semantic_release_version, taxonomy_version, causal_ontology_version,
+    dq_ontology_version, omop_cdm_version, source, manifest, is_current
+  ) values (
+    v_version,
+    coalesce(p_manifest->>'taxonomy_version', v_version),
+    coalesce(p_manifest->>'causal_ontology_version', v_version),
+    coalesce(p_manifest->>'dq_ontology_version', v_version),
+    p_manifest->>'omop_cdm_version',
+    coalesce(p_manifest->>'description', p_manifest->>'source'),
+    p_manifest,
+    true
+  )
+  on conflict (semantic_release_version) do update set
+    taxonomy_version = excluded.taxonomy_version,
+    causal_ontology_version = excluded.causal_ontology_version,
+    dq_ontology_version = excluded.dq_ontology_version,
+    omop_cdm_version = excluded.omop_cdm_version,
+    source = excluded.source,
+    manifest = excluded.manifest,
+    is_current = true;
+
+  return jsonb_build_object(
+    'version', v_version,
+    'concepts', jsonb_array_length(coalesce(p_payload->'taxonomy_concepts', '[]'::jsonb)),
+    'relations', jsonb_array_length(coalesce(p_payload->'ontology_relations', '[]'::jsonb)),
+    'affix_archetypes', jsonb_array_length(coalesce(p_payload->'affix_archetypes', '[]'::jsonb))
+  );
+end;
+$$;
+
+-- CREATE OR REPLACE preserves ownership and grants, so the anon/authenticated
+-- revokes set up by the canonical functions.sql survive this replace. We re-assert
+-- only the augura_app grant (mirrors 0006) so a from-scratch chain is self-sufficient.
+revoke all on function public.upsert_semantic_release(jsonb, jsonb) from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'augura_app') then
+    execute 'grant execute on function public.upsert_semantic_release(jsonb, jsonb) to augura_app';
+  end if;
+end $$;
+"""
+
+
+def upgrade() -> None:
+    op.execute(_FUNCTION_SQL)
+
+
+def downgrade() -> None:
+    # Revert to the 0006 definition (without the affix payload). The simplest safe
+    # downgrade is to drop; re-running 0006 on upgrade restores the prior body.
+    op.execute("DROP FUNCTION IF EXISTS public.upsert_semantic_release(jsonb, jsonb);")

@@ -39,9 +39,9 @@ class RelationOut(BaseModel):
 class SemanticBundle(BaseModel):
     """Response of GET /semantic/bundle — the governed semantic layer as a single block.
 
-    14 tables, rows left as raw `dict`: the frontend indexes them itself
+    18 tables, rows left as raw `dict`: the frontend indexes them itself
     (semantic-store → taxonomy/ontology loaders). Typing each table would add
-    nothing to the read contract. All 14 fields are always present (coalesce to []).
+    nothing to the read contract. All 18 fields are always present (coalesce to []).
     """
 
     taxonomy_concepts: list[dict[str, Any]]
@@ -58,6 +58,11 @@ class SemanticBundle(BaseModel):
     ontology_relation_qualifiers: list[dict[str, Any]]
     dq_constraints: list[dict[str, Any]]
     table_archetypes: list[dict[str, Any]]
+    # Dimension grammar / affix archetypes (A1).
+    dimension_kinds: list[dict[str, Any]]
+    affix_archetypes: list[dict[str, Any]]
+    affix_archetype_values: list[dict[str, Any]]
+    affix_archetype_aliases: list[dict[str, Any]]
 
 
 class ReleaseStatus(BaseModel):

@@ -1,0 +1,33 @@
+medication_id,patient_id,drug_name,rxnorm_code,dose_mg,frequency,start_date,end_date,indication,site_id
+MED-001,P001,Metformin,860975,500.0,TWICE_DAILY,2020-04-01,,Type 2 diabetes,SITE_A
+MED-002,P001,Atorvastatin,617310,20.0,DAILY,2020-04-01,,Hyperlipidaemia,SITE_A
+MED-003,P003,Levothyroxine,966571,0.1,DAILY,2018-07-10,,Hypothyroidism,SITE_A
+MED-004,P004,Ramipril,35208,5.0,DAILY,2019-12-01,,CKD / hypertension,SITE_A
+MED-005,P004,Furosemide,4603,40.0,DAILY,2020-02-15,,Fluid overload (CKD),SITE_A
+MED-006,P004,Darbepoetin alfa,1299251,0.04,WEEKLY,2021-03-10,,CKD-related anaemia,SITE_A
+MED-007,P005,Ferrous sulfate,4418,200.0,TWICE_DAILY,2023-09-15,,Iron deficiency,SITE_A
+MED-008,P006,Atorvastatin,617310,20.0,DAILY,2021-06-01,,Hyperlipidaemia / NAFLD,SITE_A
+MED-009,P007,Alendronic acid,17780,70.0,WEEKLY,2022-04-01,,Osteoporosis,SITE_A
+MED-010,P007,Colecalciferol,41889,0.025,DAILY,2022-04-01,,Vitamin D deficiency,SITE_A
+MED-011,P008,Rosuvastatin,301542,20.0,DAILY,2019-08-10,,Hypercholesterolaemia,SITE_A
+MED-012,P008,Amlodipine,17767,5.0,DAILY,2019-08-10,,Hypertension,SITE_A
+MED-013,P010,Metformin,860975,1000.0,TWICE_DAILY,2022-02-01,,Type 2 diabetes,SITE_B
+MED-014,P010,Orlistat,37925,120.0,THREE_DAILY,2023-05-15,,Obesity management,SITE_B
+MED-015,P011,FOLFOX regimen,1731083,85.0,AS_NEEDED,2023-05-01,2024-05-30,Colorectal cancer chemotherapy,SITE_B
+MED-016,P011,Ramipril,35208,5.0,DAILY,2017-12-01,,Hypertension,SITE_B
+MED-017,P011,Metformin,860975,1000.0,DAILY,2019-09-01,,Type 2 diabetes,SITE_B
+MED-018,P012,Clomiphene,2105,25.0,DAILY,2023-06-10,,Hypogonadism / low testosterone,SITE_B
+MED-019,P014,Lisinopril,29046,10.0,DAILY,2008-05-01,,Hypertension,SITE_B
+MED-020,P014,Metformin,860975,1000.0,DAILY,2012-09-01,,Type 2 diabetes,SITE_B
+MED-021,P014,Amlodipine,17767,5.0,DAILY,2015-02-20,,Hypertension (adjunct),SITE_B
+MED-022,P015,Sertraline,36437,50.0,DAILY,2023-02-10,,Major depressive disorder,SITE_B
+MED-023,P015,Escitalopram,321988,10.0,DAILY,2022-12-01,2023-02-10,Generalised anxiety disorder,SITE_B
+MED-024,P002,Ibuprofen,5640,400.0,AS_NEEDED,2023-10-06,2023-11-30,Ankle sprain,SITE_A
+MED-025,P004,Metformin,860975,500.0,TWICE_DAILY,2016-05-01,,Type 2 diabetes (CKD adjusted dose),SITE_A
+MED-026,P013,Calcium carbonate,1198648,500.0,TWICE_DAILY,2024-03-05,,Perimenopause bone support,SITE_B
+MED-027,P006,Silymarin,37242,150.0,THREE_DAILY,2021-06-01,,Liver support (NAFLD),SITE_A
+MED-028,P009,Folic acid,4511,0.4,DAILY,2024-01-15,,Preconception supplementation,SITE_B
+MED-029,P003,Calcium carbonate,1198648,500.0,DAILY,2020-01-01,,Bone support (hypothyroid risk),SITE_A
+MED-030,P008,Aspirin,1191,75.0,DAILY,2021-01-10,,Cardiovascular risk reduction,SITE_A
+MED-031,P014,Furosemide,4603,20.0,DAILY,2021-08-01,,Oedema management,SITE_B
+MED-032,P001,Omeprazole,7646,20.0,DAILY,2021-05-15,,Gastroprotection with metformin,SITE_A

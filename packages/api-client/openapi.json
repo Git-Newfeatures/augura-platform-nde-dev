@@ -4688,14 +4688,46 @@
         "type": "object"
       },
       "SemanticBundle": {
-        "description": "Response of GET /semantic/bundle — the governed semantic layer as a single block.\n\n14 tables, rows left as raw `dict`: the frontend indexes them itself\n(semantic-store → taxonomy/ontology loaders). Typing each table would add\nnothing to the read contract. All 14 fields are always present (coalesce to []).",
+        "description": "Response of GET /semantic/bundle — the governed semantic layer as a single block.\n\n18 tables, rows left as raw `dict`: the frontend indexes them itself\n(semantic-store → taxonomy/ontology loaders). Typing each table would add\nnothing to the read contract. All 18 fields are always present (coalesce to []).",
         "properties": {
+          "affix_archetype_aliases": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Affix Archetype Aliases",
+            "type": "array"
+          },
+          "affix_archetype_values": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Affix Archetype Values",
+            "type": "array"
+          },
+          "affix_archetypes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Affix Archetypes",
+            "type": "array"
+          },
           "causal_predicates": {
             "items": {
               "additionalProperties": true,
               "type": "object"
             },
             "title": "Causal Predicates",
+            "type": "array"
+          },
+          "dimension_kinds": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Dimension Kinds",
             "type": "array"
           },
           "dq_constraints": {
@@ -4817,7 +4849,11 @@
           "ontology_relation_evidence",
           "ontology_relation_qualifiers",
           "dq_constraints",
-          "table_archetypes"
+          "table_archetypes",
+          "dimension_kinds",
+          "affix_archetypes",
+          "affix_archetype_values",
+          "affix_archetype_aliases"
         ],
         "title": "SemanticBundle",
         "type": "object"

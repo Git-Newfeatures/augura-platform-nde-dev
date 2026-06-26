@@ -120,7 +120,13 @@ create table if not exists dataset_columns (
     user_decision        text not null default 'pending'
                          check (user_decision in ('pending', 'confirmed', 'rejected')),
     final_role           text,
-    final_canonical_id   text
+    final_canonical_id   text,
+    -- Canonical dimensions decomposed from the column label by affix archetypes
+    -- (semantic layer v3 §2.7): a list of {kind, value | operator+anchor+offset}.
+    -- The runtime output that reconciles wide-encoded dimensions with grain-derived
+    -- ones (North Star Step 1.3). Tenant-scoped via the dataset's org (RLS).
+    proposed_dimensions  jsonb,
+    final_dimensions     jsonb
 );
 create index if not exists ix_dataset_columns_dataset on dataset_columns(dataset_id);
 
@@ -635,8 +641,66 @@ create table if not exists dq_constraints (
   version text not null
 );
 
+-- ── Dimension grammar / affix archetypes (A1) ─────────────────────────────
+-- Governed, read-only recognition profiles that decompose a column label into a
+-- base concept + governed dimensions (semantic layer v3 §2.7), the wide-encoding
+-- sibling of table_archetypes. SHACL-like closed-world matchers, NOT a new
+-- ontology: they reference the shared taxonomy by id (no concept duplication).
+-- Order: dimension_kinds (FK parent) → affix_archetypes → values/aliases.
+create table if not exists dimension_kinds (
+  dimension_kind_id     text primary key,         -- 'laterality', 'relative_time', ...
+  label                 text not null,
+  description           text not null,
+  value_model           text not null,            -- closed_set | scheduled | parametric | event_anchored | ordinal
+  default_comparability text not null check (default_comparability in
+                          ('preserves','forks','case_by_case')),  -- §2.7 dimension-vs-distinct-concept
+  structural_role       text,                     -- optional Layer-0 role for long-table reconciliation (§2.7 rule 4)
+  review_status         text not null,
+  version               text not null,
+  active                boolean not null
+);
+
+create table if not exists affix_archetypes (
+  affix_archetype_id      text primary key,
+  archetype_name          text not null,
+  dimension_kind_id       text not null references dimension_kinds(dimension_kind_id),
+  position                text not null check (position in ('prefix','suffix','separator')),
+  separator_style         text,                   -- '_', '-', camelCase, ...  (matcher)
+  value_model             text not null check (value_model in
+                            ('closed_set','parametric','event_anchored')),
+  comparability           text not null check (comparability in ('preserves','forks')),  -- §2.7: must declare
+  anchor_concept_id       text references taxonomy_concepts(local_concept_id),  -- relative-time anchor (postop→surgery)
+  operator                text,                   -- pre|post|peri  OR a statistic fn (mean|delta|auc...)
+  extraction_rule         text,                   -- how to parse offset/value (regex or named spec id)
+  requires_residual_maps  boolean not null default true,   -- rule 1: carve only if residual maps to a concept
+  requires_sibling_family boolean not null default false,  -- rule 2: family evidence required
+  evidence_weight         numeric not null,
+  confidence_threshold    numeric not null check (confidence_threshold between 0 and 1),
+  review_status           text not null,
+  version                 text not null,
+  active                  boolean not null
+);
+
+create table if not exists affix_archetype_values (
+  affix_archetype_id text not null references affix_archetypes(affix_archetype_id),
+  canonical_value    text not null,               -- 'left','right','serum',...
+  label              text not null,
+  review_status      text not null,
+  primary key (affix_archetype_id, canonical_value)
+);
+
+create table if not exists affix_archetype_aliases (
+  affix_archetype_id text not null references affix_archetypes(affix_archetype_id),
+  token              text not null,               -- the source label fragment
+  canonical_value    text,                        -- → affix_archetype_values.canonical_value (closed_set); null otherwise
+  source             text not null,
+  review_status      text not null,
+  primary key (affix_archetype_id, token)
+);
+
 create index if not exists taxonomy_synonyms_synonym_idx on taxonomy_synonyms (lower(synonym));
 create index if not exists taxonomy_measurement_units_concept_idx on taxonomy_measurement_units (concept_id);
+create index if not exists affix_archetype_aliases_token_idx on affix_archetype_aliases (lower(token));
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Module: semantic (B1) — global ontology/causal (read-only). DDL ported

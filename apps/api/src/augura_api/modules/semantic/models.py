@@ -103,6 +103,60 @@ class DqConstraint(Base):
     version: Mapped[str] = mapped_column(Text)
 
 
+# ── Dimension grammar / affix archetypes (A1) — read-only governed catalogs ──
+
+
+class DimensionKind(Base):
+    __tablename__ = "dimension_kinds"
+    dimension_kind_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    label: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    value_model: Mapped[str] = mapped_column(Text)
+    default_comparability: Mapped[str] = mapped_column(Text)
+    structural_role: Mapped[str | None] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+    version: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean)
+
+
+class AffixArchetype(Base):
+    __tablename__ = "affix_archetypes"
+    affix_archetype_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    archetype_name: Mapped[str] = mapped_column(Text)
+    dimension_kind_id: Mapped[str] = mapped_column(Text)
+    position: Mapped[str] = mapped_column(Text)
+    separator_style: Mapped[str | None] = mapped_column(Text)
+    value_model: Mapped[str] = mapped_column(Text)
+    comparability: Mapped[str] = mapped_column(Text)
+    anchor_concept_id: Mapped[str | None] = mapped_column(Text)
+    operator: Mapped[str | None] = mapped_column(Text)
+    extraction_rule: Mapped[str | None] = mapped_column(Text)
+    requires_residual_maps: Mapped[bool] = mapped_column(Boolean)
+    requires_sibling_family: Mapped[bool] = mapped_column(Boolean)
+    evidence_weight: Mapped[float] = mapped_column(Numeric)
+    confidence_threshold: Mapped[float] = mapped_column(Numeric)
+    review_status: Mapped[str] = mapped_column(Text)
+    version: Mapped[str] = mapped_column(Text)
+    active: Mapped[bool] = mapped_column(Boolean)
+
+
+class AffixArchetypeValue(Base):
+    __tablename__ = "affix_archetype_values"
+    affix_archetype_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    canonical_value: Mapped[str] = mapped_column(Text, primary_key=True)
+    label: Mapped[str] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+
+
+class AffixArchetypeAlias(Base):
+    __tablename__ = "affix_archetype_aliases"
+    affix_archetype_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    token: Mapped[str] = mapped_column(Text, primary_key=True)
+    canonical_value: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text)
+    review_status: Mapped[str] = mapped_column(Text)
+
+
 # ── Ontology/causal (B1) — read-only (consumed by B2/B4) ────────────────────
 
 

@@ -94,7 +94,8 @@ create table if not exists datasets (
     row_count    integer,
     status       text not null default 'uploaded'
                  check (status in ('uploaded', 'profiled', 'mapped', 'error')),
-    created_at   timestamptz not null default now()
+    created_at       timestamptz not null default now(),
+    retention_until  timestamptz
 );
 create index if not exists ix_datasets_org on datasets(org_id);
 

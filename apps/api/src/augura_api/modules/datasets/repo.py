@@ -1,5 +1,6 @@
 """Database access for the datasets module — every method requires a TenantId."""
 
+import datetime
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
@@ -224,6 +225,18 @@ class DatasetRepo:
                 CohortBiomarker.cohort_name == cohort_name,
             )
             .order_by(CohortBiomarker.member_id, CohortBiomarker.timepoint_months)
+        )
+        return list(res.scalars().all())
+
+    async def list_expired_datasets(self, tenant_id: TenantId) -> list[Dataset]:
+        """Return datasets whose retention_until is in the past (now() in UTC)."""
+        now = datetime.datetime.now(tz=datetime.UTC)
+        res = await self.session.execute(
+            select(Dataset).where(
+                Dataset.org_id == tenant_id,
+                Dataset.retention_until.is_not(None),  # type: ignore[union-attr]
+                Dataset.retention_until < now,
+            )
         )
         return list(res.scalars().all())
 

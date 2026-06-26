@@ -27,6 +27,7 @@ class Dataset(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
+    retention_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class DatasetColumn(Base):

@@ -191,3 +191,10 @@ class DatasetExport(BaseModel):
     dataset: DatasetOut
     columns: list[ColumnOut]
     files: list[DatasetFileOut]
+
+
+class PurgeExpiredResult(BaseModel):
+    """Result of a purge-expired run — counts and IDs of erased datasets."""
+
+    erased_count: int
+    erased_ids: list[str]

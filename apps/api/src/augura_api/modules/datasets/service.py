@@ -433,6 +433,30 @@ class DatasetService:
             files=files,
         )
 
+    async def purge_expired(
+        self, tenant: CurrentTenant, settings: Settings
+    ) -> schemas.PurgeExpiredResult:
+        """Erase all datasets whose retention_until has passed for the tenant.
+
+        Selects expired datasets (retention_until < now()), then calls
+        erase_dataset for each one (DB commit + storage purge). Returns the
+        count of erased datasets and the list of their IDs.
+
+        Scheduling note: this method is NOT wired to any cron trigger here;
+        invoking it on a schedule is an ops step (Modal cron / pg_cron).
+        """
+        expired = await self.repo.list_expired_datasets(tenant.tenant_id)
+        erased_ids: list[str] = []
+        for dataset in expired:
+            await self.erase_dataset(tenant, settings, dataset.id)
+            erased_ids.append(str(dataset.id))
+        _log.info(
+            "purge_expired: erased datasets past retention_until",
+            tenant_id=str(tenant.tenant_id),
+            count=len(erased_ids),
+        )
+        return schemas.PurgeExpiredResult(erased_count=len(erased_ids), erased_ids=erased_ids)
+
     async def import_cohort(
         self, tenant: CurrentTenant, payload: schemas.CohortImportRequest
     ) -> schemas.CohortImportResult:

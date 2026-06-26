@@ -77,6 +77,21 @@ async def cohort_biomarkers(
     return await _service(session).cohort_biomarkers(tenant, cohort_name)
 
 
+@router.post("/purge-expired", response_model=schemas.PurgeExpiredResult)
+async def purge_expired(
+    tenant: OwnerTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> schemas.PurgeExpiredResult:
+    """Owner-only: erase all datasets whose retention_until timestamp has passed.
+
+    Scheduling note: this endpoint is NOT wired to any cron trigger in the
+    application layer; invoking it on a schedule is an ops step (Modal cron /
+    pg_cron pointing at this route or calling purge_expired() directly).
+    """
+    return await _service(session).purge_expired(tenant, settings)
+
+
 @router.post("/upload", response_model=schemas.UploadResult, status_code=status.HTTP_201_CREATED)
 async def upload_dataset(
     tenant: WriteTenantDep,

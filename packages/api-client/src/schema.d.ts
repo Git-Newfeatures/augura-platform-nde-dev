@@ -591,7 +591,13 @@ export interface paths {
         get: operations["get_dataset_datasets__dataset_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Erase Dataset
+         * @description GDPR Art 17 — permanently erase a dataset and all its backing storage objects.
+         *     Owner-only. Deletes dataset_files storage objects, then the dataset row (which
+         *     cascades to dataset_columns, dataset_files, etc.).
+         */
+        delete: operations["erase_dataset_datasets__dataset_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -649,6 +655,28 @@ export interface paths {
         put?: never;
         /** Run Dq */
         post: operations["run_dq_datasets__dataset_id__dq_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/datasets/{dataset_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Dataset
+         * @description GDPR Art 15/20 — access and portability export. Returns a JSON bundle of
+         *     the dataset metadata, profiled columns, and file metadata (no raw bytes).
+         *     Emits a usage_events row for the audit trail.
+         */
+        get: operations["export_dataset_datasets__dataset_id__export_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1929,6 +1957,21 @@ export interface components {
             storage_path?: string | null;
             /** Study Id */
             study_id?: string | null;
+        };
+        /**
+         * DatasetExport
+         * @description GDPR Art 15/20 portability bundle — metadata only, no raw bytes.
+         *
+         *     Contains the dataset record, its profiled columns, and file metadata. Raw
+         *     CSV bytes are NOT included; callers must fetch individual file contents
+         *     separately if needed.
+         */
+        DatasetExport: {
+            /** Columns */
+            columns: components["schemas"]["ColumnOut"][];
+            dataset: components["schemas"]["DatasetOut"];
+            /** Files */
+            files: components["schemas"]["DatasetFileOut"][];
         };
         /** DatasetFileOut */
         DatasetFileOut: {
@@ -4732,6 +4775,35 @@ export interface operations {
             };
         };
     };
+    erase_dataset_datasets__dataset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_columns_datasets__dataset_id__columns_get: {
         parameters: {
             query?: never;
@@ -4882,6 +4954,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DqRunResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_dataset_datasets__dataset_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetExport"];
                 };
             };
             /** @description Validation Error */

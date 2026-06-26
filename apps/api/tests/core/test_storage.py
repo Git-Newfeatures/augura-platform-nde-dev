@@ -142,3 +142,93 @@ async def test_read_bytes_rejects_foreign_org_prefix(tmp_path: object) -> None:
     # Foreign org: refused before any backend access.
     with pytest.raises(FileNotFoundError):
         await storage.read_bytes(settings, ref, expected_org="org-2")
+
+
+# ─── delete_bytes — disk backend ────────────────────────────────────────────────
+
+
+async def test_disk_delete_bytes_removes_file(tmp_path: object) -> None:
+    settings = _disk_settings(tmp_path)
+    ref = await storage.save_bytes(settings, org_id="org-1", name="del.csv", data=b"bye")
+    assert await storage.exists(settings, ref) is True
+    await storage.delete_bytes(settings, ref)
+    assert await storage.exists(settings, ref) is False
+
+
+async def test_disk_delete_bytes_idempotent(tmp_path: object) -> None:
+    """Deleting a non-existent file must not raise."""
+    settings = _disk_settings(tmp_path)
+    await storage.delete_bytes(settings, "org/org-1/ghost.csv")  # should not raise
+
+
+async def test_disk_delete_bytes_rejects_foreign_org(tmp_path: object) -> None:
+    settings = _disk_settings(tmp_path)
+    ref = await storage.save_bytes(settings, org_id="org-1", name="f.csv", data=b"x")
+    with pytest.raises(FileNotFoundError):
+        await storage.delete_bytes(settings, ref, expected_org="org-2")
+
+
+# ─── delete_bytes — Supabase backend ────────────────────────────────────────────
+
+
+def _install_fake_http_with_delete(
+    monkeypatch: pytest.MonkeyPatch, resp: _FakeResp
+) -> list[tuple[str, str, bytes | None, dict[str, str]]]:
+    """Fake httpx that also records DELETE calls."""
+    calls: list[tuple[str, str, bytes | None, dict[str, str]]] = []
+
+    class _Client:
+        def __init__(self, *args: object, **kwargs: object) -> None: ...
+
+        async def __aenter__(self) -> "_Client":
+            return self
+
+        async def __aexit__(self, *exc: object) -> bool:
+            return False
+
+        async def post(
+            self, url: str, *, content: bytes | None = None, headers: dict[str, str]
+        ) -> _FakeResp:
+            calls.append(("POST", url, content, headers))
+            return resp
+
+        async def get(self, url: str, *, headers: dict[str, str]) -> _FakeResp:
+            calls.append(("GET", url, None, headers))
+            return resp
+
+        async def delete(self, url: str, *, headers: dict[str, str]) -> _FakeResp:
+            calls.append(("DELETE", url, None, headers))
+            return resp
+
+    monkeypatch.setattr(storage.httpx, "AsyncClient", _Client)
+    return calls
+
+
+async def test_supabase_delete_bytes_sends_delete(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _supabase_settings()
+    calls = _install_fake_http_with_delete(monkeypatch, _FakeResp(200))
+
+    await storage.delete_bytes(settings, "org/org-1/f.csv")
+
+    assert len(calls) == 1
+    method, url, _body, headers = calls[0]
+    assert method == "DELETE"
+    assert url == "https://proj.supabase.co/storage/v1/object/datasets/org/org-1/f.csv"
+    assert headers["Authorization"] == "Bearer svc-secret"
+    assert headers["apikey"] == "svc-secret"
+
+
+async def test_supabase_delete_bytes_404_is_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """404 from Supabase DELETE must be treated as idempotent success."""
+    settings = _supabase_settings()
+    _install_fake_http_with_delete(monkeypatch, _FakeResp(404))
+    await storage.delete_bytes(settings, "org/org-1/gone.csv")  # must not raise
+
+
+async def test_supabase_delete_bytes_raises_on_server_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _supabase_settings()
+    _install_fake_http_with_delete(monkeypatch, _FakeResp(500, b"boom"))
+    with pytest.raises(OSError):
+        await storage.delete_bytes(settings, "org/org-1/f.csv")

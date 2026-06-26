@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from augura_api.core.config import Settings
 from augura_api.core.errors import BadRequestError, NotFoundError
+from augura_api.core.storage import delete_bytes
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules import analytics
 from augura_api.modules.datasets import schemas
@@ -288,7 +289,10 @@ class DatasetService:
         target = await self.repo.get_file(dataset_id, file_id)
         if target is None:
             raise NotFoundError("file not found", file_id=str(file_id))
+        storage_path = target.storage_path
         await self.repo.delete_file(dataset_id, file_id)
+        # Delete the backing object so it is never orphaned in storage.
+        await delete_bytes(settings, storage_path, expected_org=str(tenant.tenant_id))
         columns = await self._reprofile(settings, tenant, dataset_id)
         files_out = await self._files_out(dataset_id)
         refreshed = await self._require_dataset(tenant, dataset_id)
@@ -297,6 +301,61 @@ class DatasetService:
             columns=columns,
             files=files_out,
             warnings=[],
+        )
+
+    async def erase_dataset(
+        self, tenant: CurrentTenant, settings: Settings, dataset_id: UUID
+    ) -> None:
+        """GDPR Art 17 erasure: delete all storage objects for the dataset's files,
+        then delete the dataset row (which cascades to columns/files/etc.).
+
+        Storage objects are gathered before the DB delete to avoid losing the paths.
+        Each object deletion is attempted after the DB commit is expected; any OSError
+        propagates immediately (not silently orphaned).
+
+        Note: broader erasure across generated_documents, artifacts, corpus chunks,
+        literature_snapshots, and agent_cache is deferred to `erase_tenant_data` (a
+        full-org erasure orchestrator, to be built as a follow-up to this task).
+        """
+        dataset = await self._require_dataset(tenant, dataset_id)
+        files = await self.repo.list_files(dataset.id)
+        storage_paths = [f.storage_path for f in files]
+
+        # Delete DB rows first (cascade covers dataset_columns / dataset_files).
+        await self.repo.delete_dataset(tenant.tenant_id, dataset_id)
+
+        # Remove backing objects; failures raise — never silently orphaned.
+        for path in storage_paths:
+            await delete_bytes(settings, path, expected_org=str(tenant.tenant_id))
+
+    async def export_dataset(
+        self, tenant: CurrentTenant, dataset_id: UUID
+    ) -> schemas.DatasetExport:
+        """GDPR Art 15/20 access/portability: returns a JSON bundle of the dataset
+        metadata, profiled columns, and file metadata. Raw bytes are excluded
+        (this is a metadata export for portability, not a bulk data dump).
+
+        A usage_events row with event_type='dataset.exported' is emitted for the
+        audit trail (HIPAA 164.312(b))."""
+        dataset = await self._require_dataset(tenant, dataset_id)
+        columns = await self.repo.list_columns(dataset_id)
+        files = await self._files_out(dataset_id)
+        col_count = len(columns)
+        file_count = len(files)
+
+        await analytics.log_usage(
+            self.repo.session,
+            tenant_id=tenant.tenant_id,
+            user_id=tenant.user_id,
+            event_type="dataset.exported",
+            route=f"/datasets/{dataset_id}/export",
+            metadata={"dataset_id": str(dataset_id), "column_count": col_count},
+        )
+
+        return schemas.DatasetExport(
+            dataset=self._to_out(dataset, col_count, file_count),
+            columns=[schemas.ColumnOut.model_validate(c) for c in columns],
+            files=files,
         )
 
     async def import_cohort(

@@ -15,6 +15,7 @@ it is the object's key in the bucket. The same ref works for both backends.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
 
@@ -107,6 +108,16 @@ async def _supabase_exists(settings: Settings, ref: str) -> bool:
     return True
 
 
+async def _supabase_delete(settings: Settings, ref: str) -> None:
+    """DELETE the object; 404 is treated as success (idempotent)."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.delete(_object_url(settings, ref), headers=_auth_headers(settings))
+    if resp.status_code == 404:
+        return
+    if resp.status_code // 100 != 2:
+        raise OSError(f"Supabase Storage delete failed ({resp.status_code}): {resp.text}")
+
+
 # ─── local-disk helpers (sync — run off the event loop via run_sync) ─────────────
 
 
@@ -126,6 +137,15 @@ def _read_disk(root: Path, storage_path: str) -> bytes:
 def _exists_disk(root: Path, storage_path: str) -> bool:
     target = (root / storage_path).resolve()
     return str(target).startswith(str(root)) and target.is_file()
+
+
+def _delete_disk(root: Path, storage_path: str) -> None:
+    """Unlink the file; missing is treated as success (idempotent)."""
+    target = (root / storage_path).resolve()
+    if not str(target).startswith(str(root)):
+        raise FileNotFoundError("artifact path outside the allowed directory")
+    with contextlib.suppress(FileNotFoundError):
+        target.unlink()
 
 
 # ─── public interface (async, backend-agnostic) ─────────────────────────────────
@@ -157,3 +177,19 @@ async def exists(settings: Settings, storage_path: str, *, expected_org: str | N
     if _use_supabase(settings):
         return await _supabase_exists(settings, storage_path)
     return await run_sync(_exists_disk, _root(settings).resolve(), storage_path)
+
+
+async def delete_bytes(
+    settings: Settings, storage_path: str, *, expected_org: str | None = None
+) -> None:
+    """Deletes the object at `storage_path`. Idempotent: missing objects are not an error.
+
+    Raises FileNotFoundError if `expected_org` is given and the path is outside that org's
+    prefix (defense-in-depth, independent of DB RLS — the service_role key bypasses Storage
+    RLS). Raises OSError on unexpected backend failures (non-2xx and non-404).
+    """
+    _assert_org(storage_path, expected_org)
+    if _use_supabase(settings):
+        await _supabase_delete(settings, storage_path)
+    else:
+        await run_sync(_delete_disk, _root(settings).resolve(), storage_path)

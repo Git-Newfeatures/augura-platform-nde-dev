@@ -4,14 +4,25 @@ The `/datasets/cohorts...` routes are declared BEFORE `/datasets/{dataset_id}`
 so they are not captured as an identifier.
 """
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Form, UploadFile, status
+from fastapi import APIRouter, Depends, Form, UploadFile, status
 
-from augura_api.core.deps import CurrentTenantDep, SessionDep, SettingsDep, WriteTenantDep
+from augura_api.core.deps import (
+    CurrentTenantDep,
+    SessionDep,
+    SettingsDep,
+    WriteTenantDep,
+    require_role,
+)
+from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.repo import DatasetRepo
 from augura_api.modules.datasets.service import DatasetService
+
+# Owner-only dependency (GDPR Art 17 erasure must be owner-gated).
+OwnerTenantDep = Annotated[CurrentTenant, Depends(require_role("owner"))]
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
@@ -154,3 +165,28 @@ async def parse_data_dictionary(
     return await _service(session).parse_data_dictionary(
         tenant, settings, dataset_id, filename=file.filename or "dictionary.csv", data=data
     )
+
+
+@router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def erase_dataset(
+    dataset_id: UUID,
+    tenant: OwnerTenantDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> None:
+    """GDPR Art 17 — permanently erase a dataset and all its backing storage objects.
+    Owner-only. Deletes dataset_files storage objects, then the dataset row (which
+    cascades to dataset_columns, dataset_files, etc.)."""
+    await _service(session).erase_dataset(tenant, settings, dataset_id)
+
+
+@router.get("/{dataset_id}/export", response_model=schemas.DatasetExport)
+async def export_dataset(
+    dataset_id: UUID,
+    tenant: CurrentTenantDep,
+    session: SessionDep,
+) -> schemas.DatasetExport:
+    """GDPR Art 15/20 — access and portability export. Returns a JSON bundle of
+    the dataset metadata, profiled columns, and file metadata (no raw bytes).
+    Emits a usage_events row for the audit trail."""
+    return await _service(session).export_dataset(tenant, dataset_id)

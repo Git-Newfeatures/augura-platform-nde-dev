@@ -118,6 +118,13 @@ class DatasetRepo:
             )
         )
 
+    async def delete_dataset(self, tenant_id: TenantId, dataset_id: UUID) -> None:
+        """Delete the dataset row (tenant-scoped). Cascades to dataset_columns,
+        dataset_files, etc. via the DB-level ON DELETE CASCADE constraints."""
+        await self.session.execute(
+            delete(Dataset).where(Dataset.org_id == tenant_id, Dataset.id == dataset_id)
+        )
+
     async def set_storage_and_rowcount(
         self, dataset_id: UUID, *, storage_path: str | None, row_count: int | None
     ) -> None:

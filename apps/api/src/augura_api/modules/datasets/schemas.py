@@ -178,3 +178,16 @@ class CohortImportResult(BaseModel):
     cohort_name: str
     members: int
     biomarkers: int
+
+
+class DatasetExport(BaseModel):
+    """GDPR Art 15/20 portability bundle — metadata only, no raw bytes.
+
+    Contains the dataset record, its profiled columns, and file metadata. Raw
+    CSV bytes are NOT included; callers must fetch individual file contents
+    separately if needed.
+    """
+
+    dataset: DatasetOut
+    columns: list[ColumnOut]
+    files: list[DatasetFileOut]

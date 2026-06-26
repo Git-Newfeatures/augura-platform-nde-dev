@@ -2093,6 +2093,35 @@
         "title": "DatasetCreate",
         "type": "object"
       },
+      "DatasetExport": {
+        "description": "GDPR Art 15/20 portability bundle — metadata only, no raw bytes.\n\nContains the dataset record, its profiled columns, and file metadata. Raw\nCSV bytes are NOT included; callers must fetch individual file contents\nseparately if needed.",
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetOut"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetFileOut"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dataset",
+          "columns",
+          "files"
+        ],
+        "title": "DatasetExport",
+        "type": "object"
+      },
       "DatasetFileOut": {
         "properties": {
           "column_count": {
@@ -7715,6 +7744,41 @@
       }
     },
     "/datasets/{dataset_id}": {
+      "delete": {
+        "description": "GDPR Art 17 — permanently erase a dataset and all its backing storage objects.\nOwner-only. Deletes dataset_files storage objects, then the dataset row (which\ncascades to dataset_columns, dataset_files, etc.).",
+        "operationId": "erase_dataset_datasets__dataset_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Erase Dataset",
+        "tags": [
+          "datasets"
+        ]
+      },
       "get": {
         "operationId": "get_dataset_datasets__dataset_id__get",
         "parameters": [
@@ -7994,6 +8058,50 @@
         "summary": "Run Dq",
         "tags": [
           "dq"
+        ]
+      }
+    },
+    "/datasets/{dataset_id}/export": {
+      "get": {
+        "description": "GDPR Art 15/20 — access and portability export. Returns a JSON bundle of\nthe dataset metadata, profiled columns, and file metadata (no raw bytes).\nEmits a usage_events row for the audit trail.",
+        "operationId": "export_dataset_datasets__dataset_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetExport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Dataset",
+        "tags": [
+          "datasets"
         ]
       }
     },

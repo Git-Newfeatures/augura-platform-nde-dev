@@ -7,10 +7,15 @@ audience, then extract the `UserId` from it. Two modes:
 
 `verify_token` is pure and synchronous (testable core). `authenticate` resolves the
 key (JWKS via httpx, injectable) then delegates to `verify_token`.
+
+JWKS cache: module-level dict keyed by URL, entries expire after JWKS_TTL_SECONDS.
+On an unknown kid the cache entry is busted and the JWKS is refetched once before
+raising. A token that omits `kid` entirely is rejected (no silent first-key fallback).
 """
 
 from __future__ import annotations
 
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +33,18 @@ from augura_api.core.ids import UserId
 log = structlog.get_logger(__name__)
 
 JwksFetcher = Callable[[], Awaitable[dict[str, Any]]]
+
+# TTL for the in-process JWKS cache (seconds). Short enough that key rotations
+# propagate within a few minutes; long enough to avoid hammering the JWKS endpoint.
+JWKS_TTL_SECONDS: float = 300.0
+
+# {url: (fetched_at_monotonic, jwks_dict)}
+_jwks_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def clear_jwks_cache() -> None:
+    """Evict all cached JWKS entries. Intended for tests."""
+    _jwks_cache.clear()
 
 
 @dataclass(frozen=True)
@@ -85,12 +102,17 @@ def _unverified_kid(token: str) -> str | None:
         raise UnauthorizedError("unreadable jwt header", reason=str(exc)) from exc
 
 
-def _signing_key_from_jwks(jwks: dict[str, Any], kid: str | None) -> Any:
+def _signing_key_from_jwks(jwks: dict[str, Any], kid: str) -> Any:
+    """Return the signing key matching *kid* from *jwks*.
+
+    Raises UnauthorizedError if *kid* is not found (never falls back to first key).
+    Callers must validate that `kid` is not None before calling this function.
+    """
     key_set = PyJWKSet.from_dict(jwks)
     for jwk in key_set.keys:
-        if kid is None or jwk.key_id == kid:
+        if jwk.key_id == kid:
             return jwk.key
-    raise UnauthorizedError("signing key not found", kid=kid)
+    raise UnauthorizedError("signing key not found")
 
 
 async def _default_jwks_fetcher(url: str) -> dict[str, Any]:
@@ -99,6 +121,25 @@ async def _default_jwks_fetcher(url: str) -> dict[str, Any]:
         resp.raise_for_status()
         data: dict[str, Any] = resp.json()
         return data
+
+
+async def _fetch_jwks(url: str, fetcher: JwksFetcher, *, bust: bool = False) -> dict[str, Any]:
+    """Return the JWKS for *url*, using the module-level TTL cache.
+
+    If *bust* is True the cache entry for *url* is evicted before fetching
+    (used for a single refetch on unknown-kid).
+    """
+    now = time.monotonic()
+    if not bust:
+        cached = _jwks_cache.get(url)
+        if cached is not None:
+            fetched_at, jwks = cached
+            if now - fetched_at < JWKS_TTL_SECONDS:
+                return jwks
+    # Cache miss, expired, or bust — fetch fresh.
+    jwks = await fetcher()
+    _jwks_cache[url] = (now, jwks)
+    return jwks
 
 
 def _check_mfa(principal: Principal, settings: Settings) -> None:
@@ -130,17 +171,34 @@ async def authenticate(
     if settings.supabase_jwks_url is None:
         raise UnauthorizedError("no key configured (AUGURA_SUPABASE_JWKS_URL or _JWT_SECRET)")
 
-    fetcher = jwks_fetcher
-    if fetcher is None:
-        jwks_url = settings.supabase_jwks_url
+    jwks_url = settings.supabase_jwks_url
 
-        async def _fetch() -> dict[str, Any]:
+    # Build the fetcher callable so _fetch_jwks can delegate to it.
+    effective_fetcher: JwksFetcher
+    if jwks_fetcher is not None:
+        effective_fetcher = jwks_fetcher
+    else:
+
+        async def _default_fetch() -> dict[str, Any]:
             return await _default_jwks_fetcher(jwks_url)
 
-        fetcher = _fetch
+        effective_fetcher = _default_fetch
 
-    jwks = await fetcher()
-    key = _signing_key_from_jwks(jwks, _unverified_kid(token))
+    # Require kid — never silently fall back to the first key.
+    kid = _unverified_kid(token)
+    if kid is None:
+        raise UnauthorizedError("jwt missing kid")
+
+    # Attempt key lookup from (possibly cached) JWKS.
+    jwks = await _fetch_jwks(jwks_url, effective_fetcher)
+    try:
+        key = _signing_key_from_jwks(jwks, kid)
+    except UnauthorizedError:
+        # Unknown kid: bust the cache and refetch exactly once.
+        log.info("jwks_unknown_kid_refetch", kid=kid)
+        jwks = await _fetch_jwks(jwks_url, effective_fetcher, bust=True)
+        key = _signing_key_from_jwks(jwks, kid)  # raises UnauthorizedError if still not found
+
     principal = verify_token(
         token,
         key=key,

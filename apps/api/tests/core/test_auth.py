@@ -8,7 +8,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from augura_api.core.auth import Principal, authenticate, verify_token
+from augura_api.core.auth import Principal, authenticate, clear_jwks_cache, verify_token
 from augura_api.core.config import Settings
 from augura_api.core.errors import UnauthorizedError
 
@@ -101,6 +101,92 @@ async def test_authenticate_rs256_via_jwks() -> None:
     )
     principal = await authenticate(token, settings, jwks_fetcher=fetcher)
     assert str(principal.user_id) == claims["sub"]
+
+
+def _make_rsa_jwk(kid: str) -> tuple[Any, dict[str, Any]]:
+    """Return (private_key, JWK-dict) for use in JWKS fetcher stubs."""
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk: dict[str, Any] = jwt.algorithms.RSAAlgorithm.to_jwk(  # type: ignore[no-untyped-call]
+        private_key.public_key(), as_dict=True
+    )
+    jwk.update({"kid": kid, "use": "sig", "alg": "RS256"})
+    return private_key, jwk
+
+
+async def test_jwks_missing_kid_rejected() -> None:
+    """A token with no kid header in JWKS mode → UnauthorizedError (not silent first-key)."""
+    private_key, jwk = _make_rsa_jwk("k1")
+    private_pem = private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    # Encode WITHOUT a kid header — PyJWT omits kid when not provided in headers
+    token = jwt.encode(_claims(), private_pem, algorithm="RS256")
+
+    async def fetcher() -> dict[str, Any]:
+        return {"keys": [jwk]}
+
+    settings = Settings(  # pyright: ignore[reportCallIssue] -- env fields
+        env="dev", supabase_jwks_url="https://example.test/jwks"
+    )
+    clear_jwks_cache()
+    with pytest.raises(UnauthorizedError):
+        await authenticate(token, settings, jwks_fetcher=fetcher)
+
+
+async def test_jwks_cached_within_ttl() -> None:
+    """A second authenticate call within TTL reuses the cached JWKS (fetcher called once)."""
+    private_key, jwk = _make_rsa_jwk("k2")
+    private_pem = private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    call_count = 0
+
+    async def fetcher() -> dict[str, Any]:
+        nonlocal call_count
+        call_count += 1
+        return {"keys": [jwk]}
+
+    settings = Settings(  # pyright: ignore[reportCallIssue] -- env fields
+        env="dev", supabase_jwks_url="https://example.test/jwks-cache"
+    )
+    clear_jwks_cache()
+    token = jwt.encode(_claims(), private_pem, algorithm="RS256", headers={"kid": "k2"})
+    await authenticate(token, settings, jwks_fetcher=fetcher)
+    await authenticate(token, settings, jwks_fetcher=fetcher)
+    assert call_count == 1, f"expected 1 fetch, got {call_count}"
+
+
+async def test_jwks_unknown_kid_triggers_one_refetch() -> None:
+    """Unknown kid triggers exactly one refetch before raising UnauthorizedError."""
+    private_key, jwk_k1 = _make_rsa_jwk("k1")
+    private_pem = private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    # Token signed with k1 but the fetcher returns k9 (unknown kid)
+    token = jwt.encode(_claims(), private_pem, algorithm="RS256", headers={"kid": "k9"})
+
+    call_count = 0
+
+    async def fetcher() -> dict[str, Any]:
+        nonlocal call_count
+        call_count += 1
+        return {"keys": [jwk_k1]}  # only k1, never k9
+
+    settings = Settings(  # pyright: ignore[reportCallIssue] -- env fields
+        env="dev", supabase_jwks_url="https://example.test/jwks-miss"
+    )
+    # Seed a stale cache entry so the first call is a cache hit, then one refetch
+    clear_jwks_cache()
+    with pytest.raises(UnauthorizedError):
+        await authenticate(token, settings, jwks_fetcher=fetcher)
+    # Must have fetched exactly twice: initial (miss→fetch) + one refetch on unknown kid
+    assert call_count == 2, f"expected 2 fetches, got {call_count}"
 
 
 # ── MFA / aal2 enforcement ────────────────────────────────────────────────

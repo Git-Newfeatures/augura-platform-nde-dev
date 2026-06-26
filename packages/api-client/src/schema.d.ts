@@ -563,6 +563,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/datasets/purge-expired": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Expired
+         * @description Owner-only: erase all datasets whose retention_until timestamp has passed.
+         *
+         *     Scheduling note: this endpoint is NOT wired to any cron trigger in the
+         *     application layer; invoking it on a schedule is an ops step (Modal cron /
+         *     pg_cron pointing at this route or calling purge_expired() directly).
+         */
+        post: operations["purge_expired_datasets_purge_expired_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/datasets/upload": {
         parameters: {
             query?: never;
@@ -594,8 +618,10 @@ export interface paths {
         /**
          * Erase Dataset
          * @description GDPR Art 17 — permanently erase a dataset and all its backing storage objects.
-         *     Owner-only. Deletes dataset_files storage objects, then the dataset row (which
-         *     cascades to dataset_columns, dataset_files, etc.).
+         *     Owner-only. DB rows are committed in a dedicated session, then storage objects are
+         *     purged synchronously after that commit — no BackgroundTask (FastAPI 0.136.x runs
+         *     background tasks before yield-dependency teardown, i.e. before the request session
+         *     commits).
          */
         delete: operations["erase_dataset_datasets__dataset_id__delete"];
         options?: never;
@@ -2940,6 +2966,16 @@ export interface components {
             /** Subject Concept Id */
             subject_concept_id: string;
         };
+        /**
+         * PurgeExpiredResult
+         * @description Result of a purge-expired run — counts and IDs of erased datasets.
+         */
+        PurgeExpiredResult: {
+            /** Erased Count */
+            erased_count: number;
+            /** Erased Ids */
+            erased_ids: string[];
+        };
         /** Quality */
         Quality: {
             /** Data Backed Edges */
@@ -4707,6 +4743,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_expired_datasets_purge_expired_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgeExpiredResult"];
                 };
             };
         };

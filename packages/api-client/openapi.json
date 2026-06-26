@@ -4321,6 +4321,28 @@
         "title": "ProposedRelation",
         "type": "object"
       },
+      "PurgeExpiredResult": {
+        "description": "Result of a purge-expired run — counts and IDs of erased datasets.",
+        "properties": {
+          "erased_count": {
+            "title": "Erased Count",
+            "type": "integer"
+          },
+          "erased_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Erased Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "erased_count",
+          "erased_ids"
+        ],
+        "title": "PurgeExpiredResult",
+        "type": "object"
+      },
       "Quality": {
         "properties": {
           "data_backed_edges": {
@@ -7702,6 +7724,28 @@
         ]
       }
     },
+    "/datasets/purge-expired": {
+      "post": {
+        "description": "Owner-only: erase all datasets whose retention_until timestamp has passed.\n\nScheduling note: this endpoint is NOT wired to any cron trigger in the\napplication layer; invoking it on a schedule is an ops step (Modal cron /\npg_cron pointing at this route or calling purge_expired() directly).",
+        "operationId": "purge_expired_datasets_purge_expired_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeExpiredResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Purge Expired",
+        "tags": [
+          "datasets"
+        ]
+      }
+    },
     "/datasets/upload": {
       "post": {
         "operationId": "upload_dataset_datasets_upload_post",
@@ -7745,7 +7789,7 @@
     },
     "/datasets/{dataset_id}": {
       "delete": {
-        "description": "GDPR Art 17 — permanently erase a dataset and all its backing storage objects.\nOwner-only. Deletes dataset_files storage objects, then the dataset row (which\ncascades to dataset_columns, dataset_files, etc.).",
+        "description": "GDPR Art 17 — permanently erase a dataset and all its backing storage objects.\nOwner-only. DB rows are committed in a dedicated session, then storage objects are\npurged synchronously after that commit — no BackgroundTask (FastAPI 0.136.x runs\nbackground tasks before yield-dependency teardown, i.e. before the request session\ncommits).",
         "operationId": "erase_dataset_datasets__dataset_id__delete",
         "parameters": [
           {

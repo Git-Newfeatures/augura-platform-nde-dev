@@ -101,3 +101,47 @@ async def test_authenticate_rs256_via_jwks() -> None:
     )
     principal = await authenticate(token, settings, jwks_fetcher=fetcher)
     assert str(principal.user_id) == claims["sub"]
+
+
+# ── MFA / aal2 enforcement ────────────────────────────────────────────────
+
+
+def _hs_settings_mfa(require_mfa: bool) -> Settings:
+    return Settings(  # pyright: ignore[reportCallIssue] -- env fields
+        env="dev",
+        supabase_jwt_secret="test-secret-please-ignore-0123456789abcdef",
+        supabase_jwt_audience="authenticated",
+        require_mfa=require_mfa,
+    )
+
+
+async def test_mfa_required_no_aal_claim_rejected() -> None:
+    """require_mfa=True + token without aal claim → UnauthorizedError."""
+    claims = _claims()  # no aal key
+    token = jwt.encode(claims, "test-secret-please-ignore-0123456789abcdef", algorithm="HS256")
+    with pytest.raises(UnauthorizedError):
+        await authenticate(token, _hs_settings_mfa(require_mfa=True))
+
+
+async def test_mfa_required_aal1_rejected() -> None:
+    """require_mfa=True + aal1 token → UnauthorizedError."""
+    claims = _claims(aal="aal1")
+    token = jwt.encode(claims, "test-secret-please-ignore-0123456789abcdef", algorithm="HS256")
+    with pytest.raises(UnauthorizedError):
+        await authenticate(token, _hs_settings_mfa(require_mfa=True))
+
+
+async def test_mfa_required_aal2_accepted() -> None:
+    """require_mfa=True + aal2 token → succeeds."""
+    claims = _claims(aal="aal2")
+    token = jwt.encode(claims, "test-secret-please-ignore-0123456789abcdef", algorithm="HS256")
+    principal = await authenticate(token, _hs_settings_mfa(require_mfa=True))
+    assert isinstance(principal, Principal)
+
+
+async def test_mfa_disabled_aal_ignored() -> None:
+    """require_mfa=False (default) → aal claim is ignored; no aal = OK."""
+    claims = _claims()  # no aal key
+    token = jwt.encode(claims, "test-secret-please-ignore-0123456789abcdef", algorithm="HS256")
+    principal = await authenticate(token, _hs_settings_mfa(require_mfa=False))
+    assert isinstance(principal, Principal)

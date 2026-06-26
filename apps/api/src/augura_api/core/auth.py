@@ -101,6 +101,14 @@ async def _default_jwks_fetcher(url: str) -> dict[str, Any]:
         return data
 
 
+def _check_mfa(principal: Principal, settings: Settings) -> None:
+    """Raise UnauthorizedError if MFA enforcement is enabled and the token lacks aal2."""
+    if not settings.require_mfa:
+        return
+    if principal.claims.get("aal") != "aal2":
+        raise UnauthorizedError("mfa required")
+
+
 async def authenticate(
     token: str,
     settings: Settings,
@@ -109,13 +117,15 @@ async def authenticate(
 ) -> Principal:
     """Resolve the key (HS256 secret or JWKS) then verify the token."""
     if settings.supabase_jwt_secret is not None:
-        return verify_token(
+        principal = verify_token(
             token,
             key=settings.supabase_jwt_secret,
             algorithms=["HS256"],
             audience=settings.supabase_jwt_audience,
             issuer=settings.supabase_jwt_issuer,
         )
+        _check_mfa(principal, settings)
+        return principal
 
     if settings.supabase_jwks_url is None:
         raise UnauthorizedError("no key configured (AUGURA_SUPABASE_JWKS_URL or _JWT_SECRET)")
@@ -131,10 +141,12 @@ async def authenticate(
 
     jwks = await fetcher()
     key = _signing_key_from_jwks(jwks, _unverified_kid(token))
-    return verify_token(
+    principal = verify_token(
         token,
         key=key,
         algorithms=["RS256", "ES256"],
         audience=settings.supabase_jwt_audience,
         issuer=settings.supabase_jwt_issuer,
     )
+    _check_mfa(principal, settings)
+    return principal

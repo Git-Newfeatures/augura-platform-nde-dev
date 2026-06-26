@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     agent_model_fast: str = "claude-haiku-4-5"
     agent_model_deep: str = "claude-opus-4-8"
 
+    # MFA enforcement — require aal2 (MFA-satisfied) tokens on all authenticated routes.
+    # Default OFF: flip to True only after MFA enrollment is live for all users.
+    require_mfa: bool = False  # enforce aal2 on PHI routes once MFA enrollment is live
+
     @field_validator(
         "anthropic_api_key",
         "openai_api_key",

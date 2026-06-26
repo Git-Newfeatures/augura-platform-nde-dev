@@ -112,7 +112,7 @@ async def test_add_then_remove_file_reprofiles(
 
         files = await svc.list_files(tenant_ctx, dsid)
         to_remove = next(f for f in files if f.filename == "b.csv")
-        removed = await svc.remove_file(tenant_ctx, settings, dsid, to_remove.id)
+        removed, _path = await svc.remove_file(tenant_ctx, settings, dsid, to_remove.id)
         assert removed.dataset.file_count == 1
         assert removed.dataset.row_count == 1
         assert "crp" not in {c.name for c in removed.columns}

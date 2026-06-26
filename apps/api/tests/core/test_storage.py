@@ -232,3 +232,14 @@ async def test_supabase_delete_bytes_raises_on_server_error(
     _install_fake_http_with_delete(monkeypatch, _FakeResp(500, b"boom"))
     with pytest.raises(OSError):
         await storage.delete_bytes(settings, "org/org-1/f.csv")
+
+
+async def test_supabase_delete_bytes_403_raises_oserror(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 403 from Supabase DELETE must raise OSError, NOT be silently swallowed as success.
+    Only 404 is idempotent-success; any other non-2xx is an error."""
+    settings = _supabase_settings()
+    _install_fake_http_with_delete(monkeypatch, _FakeResp(403, b"forbidden"))
+    with pytest.raises(OSError):
+        await storage.delete_bytes(settings, "org/org-1/f.csv")

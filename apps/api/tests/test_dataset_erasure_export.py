@@ -1,7 +1,7 @@
 """Unit tests for DatasetService.erase_dataset and DatasetService.export_dataset.
 
 These tests use async mock repos (no DB) to exercise the service logic in isolation:
-- erase_dataset gathers storage paths, deletes DB rows, then calls delete_bytes per file.
+- erase_dataset deletes DB rows, returns the storage paths, and calls NO storage I/O.
 - erase_dataset raises NotFoundError when the dataset is not found.
 - export_dataset returns a DatasetExport bundle with correct shape.
 - export_dataset emits a log_usage call with event_type='dataset.exported'.
@@ -14,7 +14,6 @@ from uuid import uuid4
 
 import pytest
 
-from augura_api.core.config import Settings
 from augura_api.core.errors import NotFoundError
 from augura_api.core.ids import TenantId, UserId
 from augura_api.core.tenancy import CurrentTenant
@@ -28,12 +27,6 @@ _DATASET_ID = uuid4()
 _FILE_ID = uuid4()
 
 TENANT = CurrentTenant(tenant_id=_TENANT_ID, user_id=_USER_ID, role="owner")
-
-
-def _settings(tmp_path: object) -> Settings:
-    return Settings(  # pyright: ignore[reportCallIssue]
-        env="dev", artifacts_dir=str(tmp_path)
-    )
 
 
 def _make_dataset() -> SimpleNamespace:
@@ -107,79 +100,65 @@ def _mock_repo(
 # ─── erase_dataset ────────────────────────────────────────────────────────────
 
 
-async def test_erase_dataset_calls_delete_bytes_per_file(tmp_path: object) -> None:
-    """erase_dataset must call delete_bytes for each file's storage_path."""
+async def test_erase_dataset_returns_storage_paths_and_deletes_db_rows() -> None:
+    """erase_dataset must delete DB rows and return the storage paths; it must NOT
+    call delete_bytes itself (storage deletion is deferred to the caller via BackgroundTask)."""
     storage_path = f"org/{_TENANT_ID}/file-abc.csv"
     dataset = _make_dataset()
     file_ = _make_file(storage_path)
     repo = _mock_repo(dataset=dataset, files=[file_])
     svc = DatasetService(repo)  # pyright: ignore[reportArgumentType]
-    settings = _settings(tmp_path)
 
     with patch(
         "augura_api.modules.datasets.service.delete_bytes", new_callable=AsyncMock
     ) as mock_delete:
-        await svc.erase_dataset(TENANT, settings, _DATASET_ID)
+        paths = await svc.erase_dataset(TENANT, _DATASET_ID)
 
     repo.delete_dataset.assert_awaited_once_with(_TENANT_ID, _DATASET_ID)
-    mock_delete.assert_awaited_once_with(settings, storage_path, expected_org=str(_TENANT_ID))
+    assert paths == [storage_path]
+    mock_delete.assert_not_called()
 
 
-async def test_erase_dataset_raises_not_found_for_unknown_dataset(tmp_path: object) -> None:
+async def test_erase_dataset_raises_not_found_for_unknown_dataset() -> None:
     repo = _mock_repo(dataset=None)
     svc = DatasetService(repo)  # pyright: ignore[reportArgumentType]
-    settings = _settings(tmp_path)
 
     with pytest.raises(NotFoundError):
-        await svc.erase_dataset(TENANT, settings, uuid4())
+        await svc.erase_dataset(TENANT, uuid4())
 
 
-async def test_erase_dataset_deletes_multiple_files(tmp_path: object) -> None:
-    """All storage paths from all files must be deleted."""
+async def test_erase_dataset_returns_all_paths_for_multiple_files() -> None:
+    """All storage paths from all files must be returned; no storage I/O inside the service."""
     paths = [f"org/{_TENANT_ID}/file-{i}.csv" for i in range(3)]
     dataset = _make_dataset()
     files = [_make_file(p) for p in paths]
     repo = _mock_repo(dataset=dataset, files=files)
     svc = DatasetService(repo)  # pyright: ignore[reportArgumentType]
-    settings = _settings(tmp_path)
 
     with patch(
         "augura_api.modules.datasets.service.delete_bytes", new_callable=AsyncMock
     ) as mock_delete:
-        await svc.erase_dataset(TENANT, settings, _DATASET_ID)
+        returned_paths = await svc.erase_dataset(TENANT, _DATASET_ID)
 
-    assert mock_delete.await_count == 3
-    called_paths = [c.args[1] for c in mock_delete.await_args_list]
-    assert set(called_paths) == set(paths)
+    assert set(returned_paths) == set(paths)
+    mock_delete.assert_not_called()
 
 
-async def test_erase_dataset_db_deleted_before_storage(tmp_path: object) -> None:
-    """DB delete must be called before delete_bytes — ensures we never lose the
-    path reference if delete_bytes raises."""
-    call_order: list[str] = []
+async def test_erase_dataset_no_storage_io_inside_service() -> None:
+    """Regression: the service must NOT touch storage (delete_bytes). This is the correctness
+    invariant — if the DB commit later fails, no bytes have been irreversibly deleted."""
     storage_path = f"org/{_TENANT_ID}/file.csv"
     dataset = _make_dataset()
     file_ = _make_file(storage_path)
     repo = _mock_repo(dataset=dataset, files=[file_])
-
-    async def _track_db_delete(*_: object, **__: object) -> None:
-        call_order.append("db_delete")
-
-    repo.delete_dataset = AsyncMock(side_effect=_track_db_delete)
     svc = DatasetService(repo)  # pyright: ignore[reportArgumentType]
-    settings = _settings(tmp_path)
-
-    async def _track_storage_delete(*_: object, **__: object) -> None:
-        call_order.append("storage_delete")
 
     with patch(
-        "augura_api.modules.datasets.service.delete_bytes",
-        new_callable=AsyncMock,
-        side_effect=_track_storage_delete,
-    ):
-        await svc.erase_dataset(TENANT, settings, _DATASET_ID)
+        "augura_api.modules.datasets.service.delete_bytes", new_callable=AsyncMock
+    ) as mock_delete:
+        await svc.erase_dataset(TENANT, _DATASET_ID)
 
-    assert call_order == ["db_delete", "storage_delete"]
+    mock_delete.assert_not_called()
 
 
 # ─── export_dataset ───────────────────────────────────────────────────────────
@@ -227,3 +206,71 @@ async def test_export_dataset_raises_not_found_for_unknown() -> None:
 
     with pytest.raises(NotFoundError):
         await svc.export_dataset(TENANT, uuid4())
+
+
+# ─── remove_file — no storage I/O inside service ──────────────────────────────
+
+
+async def test_remove_file_returns_result_and_path_no_storage_io() -> None:
+    """remove_file must return (UploadResult, storage_path) and NOT call delete_bytes;
+    the router schedules object deletion post-commit via BackgroundTask."""
+    storage_path = f"org/{_TENANT_ID}/f.csv"
+    dataset = _make_dataset()
+    file_ = _make_file(storage_path)
+    column = _make_column("id")
+
+    from augura_api.core.config import Settings
+
+    settings = Settings(env="dev", artifacts_dir="/tmp")  # pyright: ignore[reportCallIssue]
+
+    repo = _mock_repo(dataset=dataset, files=[], columns=[column])
+    repo.get_file = AsyncMock(return_value=file_)
+    repo.delete_file = AsyncMock()
+    repo.replace_columns = AsyncMock(return_value=[column])
+    repo.set_storage_and_rowcount = AsyncMock()
+    repo.next_position = AsyncMock(return_value=0)
+    repo.list_active_pii_patterns = AsyncMock(return_value=[])
+    svc = DatasetService(repo)  # pyright: ignore[reportArgumentType]
+
+    with patch(
+        "augura_api.modules.datasets.service.delete_bytes", new_callable=AsyncMock
+    ) as mock_delete:
+        result, returned_path = await svc.remove_file(TENANT, settings, _DATASET_ID, _FILE_ID)
+
+    assert returned_path == storage_path
+    assert isinstance(result, schemas.UploadResult)
+    mock_delete.assert_not_called()
+
+
+# ─── owner-gating HTTP test ────────────────────────────────────────────────────
+
+
+async def test_erase_dataset_non_owner_gets_403() -> None:
+    """DELETE /datasets/{id} must be 403 for member and viewer roles (OwnerTenantDep gate)."""
+    from collections.abc import AsyncIterator
+    from uuid import uuid4 as _uuid4
+
+    import httpx
+
+    from augura_api.core.deps import get_current_tenant, get_session
+    from augura_api.core.ids import TenantId, UserId
+    from augura_api.core.tenancy import CurrentTenant
+    from augura_api.main import create_app
+
+    for role in ("member", "viewer"):
+
+        def _non_owner(r: str = role) -> CurrentTenant:
+            return CurrentTenant(tenant_id=TenantId(_uuid4()), user_id=UserId(_uuid4()), role=r)
+
+        async def _session() -> AsyncIterator[object]:
+            yield object()
+
+        app = create_app()
+        app.dependency_overrides[get_current_tenant] = _non_owner
+        app.dependency_overrides[get_session] = _session
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.delete(f"/datasets/{_uuid4()}")
+
+        assert resp.status_code == 403, f"expected 403 for role={role}, got {resp.status_code}"

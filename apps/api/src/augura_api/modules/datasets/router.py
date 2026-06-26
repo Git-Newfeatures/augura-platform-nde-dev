@@ -7,7 +7,7 @@ so they are not captured as an identifier.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, UploadFile, status
 
 from augura_api.core.deps import (
     CurrentTenantDep,
@@ -19,7 +19,7 @@ from augura_api.core.deps import (
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.repo import DatasetRepo
-from augura_api.modules.datasets.service import DatasetService
+from augura_api.modules.datasets.service import DatasetService, purge_objects
 
 # Owner-only dependency (GDPR Art 17 erasure must be owner-gated).
 OwnerTenantDep = Annotated[CurrentTenant, Depends(require_role("owner"))]
@@ -146,8 +146,13 @@ async def remove_file(
     tenant: WriteTenantDep,
     session: SessionDep,
     settings: SettingsDep,
+    background_tasks: BackgroundTasks,
 ) -> schemas.UploadResult:
-    return await _service(session).remove_file(tenant, settings, dataset_id, file_id)
+    result, storage_path = await _service(session).remove_file(
+        tenant, settings, dataset_id, file_id
+    )
+    background_tasks.add_task(purge_objects, settings, str(tenant.tenant_id), [storage_path])
+    return result
 
 
 @router.post("/{dataset_id}/data-dictionary", response_model=schemas.DataDictionaryResult)
@@ -173,11 +178,14 @@ async def erase_dataset(
     tenant: OwnerTenantDep,
     session: SessionDep,
     settings: SettingsDep,
+    background_tasks: BackgroundTasks,
 ) -> None:
     """GDPR Art 17 — permanently erase a dataset and all its backing storage objects.
-    Owner-only. Deletes dataset_files storage objects, then the dataset row (which
-    cascades to dataset_columns, dataset_files, etc.)."""
-    await _service(session).erase_dataset(tenant, settings, dataset_id)
+    Owner-only. DB rows are deleted in this request (committed on response); backing
+    storage objects are purged post-commit in a BackgroundTask so the DB is durable
+    before any irreversible byte removal."""
+    paths = await _service(session).erase_dataset(tenant, dataset_id)
+    background_tasks.add_task(purge_objects, settings, str(tenant.tenant_id), paths)
 
 
 @router.get("/{dataset_id}/export", response_model=schemas.DatasetExport)

@@ -23,7 +23,7 @@ from augura_api.core.ids import TenantId, UserId
 from augura_api.core.tenancy import CurrentTenant
 from augura_api.modules.analytics.models import UsageEvent
 from augura_api.modules.datasets.repo import DatasetRepo
-from augura_api.modules.datasets.service import DatasetService
+from augura_api.modules.datasets.service import DatasetService, purge_objects
 
 pytestmark = pytest.mark.integration
 
@@ -102,10 +102,14 @@ async def test_erase_dataset_removes_db_rows_and_storage_objects(
     # Sanity: the object exists on disk.
     assert await storage.exists(settings, storage_path)
 
+    paths: list[str] = []
     async with sm() as session, session.begin():
         await _scope(session, tenant)
         svc = DatasetService(DatasetRepo(session))
-        await svc.erase_dataset(owner, settings, dataset_id)
+        paths = await svc.erase_dataset(owner, dataset_id)
+
+    # Simulate the post-commit BackgroundTask (runs after response/commit in prod).
+    await purge_objects(settings, str(tenant), paths)
 
     # Storage object must be gone.
     assert not await storage.exists(settings, storage_path)
@@ -118,11 +122,8 @@ async def test_erase_dataset_removes_db_rows_and_storage_objects(
 
 async def test_erase_dataset_unknown_id_raises_not_found(
     sm: async_sessionmaker[AsyncSession],
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tenant = TenantId(uuid4())
-    settings = _settings(tmp_path, monkeypatch)
     owner = CurrentTenant(tenant_id=tenant, user_id=USER, role="owner")
 
     async with sm() as session, session.begin():
@@ -130,7 +131,45 @@ async def test_erase_dataset_unknown_id_raises_not_found(
         await _make_org(session, tenant)
         svc = DatasetService(DatasetRepo(session))
         with pytest.raises(NotFoundError):
-            await svc.erase_dataset(owner, settings, uuid4())
+            await svc.erase_dataset(owner, uuid4())
+
+
+async def test_erase_dataset_tenant_isolation(
+    sm: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Tenant B must not be able to erase tenant A's dataset — erase_dataset raises
+    NotFoundError (RLS hides the row) and no rows are deleted."""
+    from augura_api.modules.datasets.models import Dataset
+
+    tenant_a = TenantId(uuid4())
+    tenant_b = TenantId(uuid4())
+    settings = _settings(tmp_path, monkeypatch)
+    owner_a = CurrentTenant(tenant_id=tenant_a, user_id=USER, role="owner")
+    owner_b = CurrentTenant(tenant_id=tenant_b, user_id=USER, role="owner")
+
+    dataset_id: UUID | None = None
+
+    async with sm() as session, session.begin():
+        await _scope(session, tenant_a)
+        await _make_org(session, tenant_a)
+        result = await DatasetService(DatasetRepo(session)).upload_dataset(
+            owner_a, settings, files=[("data.csv", b"id\n1\n")], name="private", study_id=None
+        )
+        dataset_id = result.dataset.id
+
+    # Tenant B attempts to erase tenant A's dataset — must fail with NotFoundError.
+    async with sm() as session, session.begin():
+        await _scope(session, tenant_b)
+        await _make_org(session, tenant_b)
+        with pytest.raises(NotFoundError):
+            await DatasetService(DatasetRepo(session)).erase_dataset(owner_b, dataset_id)
+
+    # Sanity: tenant A's row must still exist.
+    async with sm() as session:
+        res = await session.execute(select(Dataset).where(Dataset.id == dataset_id))
+        assert res.scalar_one_or_none() is not None, "tenant A row must NOT be deleted by tenant B"
 
 
 # ─── export_dataset ───────────────────────────────────────────────────────────

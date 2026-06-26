@@ -2,6 +2,8 @@
 
 from uuid import UUID, uuid4
 
+import structlog
+
 from augura_api.core.config import Settings
 from augura_api.core.errors import BadRequestError, NotFoundError
 from augura_api.core.storage import delete_bytes
@@ -11,6 +13,27 @@ from augura_api.modules.datasets import schemas
 from augura_api.modules.datasets.models import Dataset
 from augura_api.modules.datasets.parsing import Sheet
 from augura_api.modules.datasets.repo import DatasetRepo
+
+_log = structlog.get_logger(__name__)
+
+
+async def purge_objects(settings: Settings, org_id: str, paths: list[str]) -> None:
+    """Best-effort post-commit storage deletion.
+
+    Called as a FastAPI BackgroundTask so it runs AFTER the response is committed.
+    Per-path failures are logged and skipped — orphaned objects are recoverable;
+    orphaned DB rows (the inverse) are not.
+    """
+    for path in paths:
+        try:
+            await delete_bytes(settings, path, expected_org=org_id)
+        except Exception as exc:
+            _log.error(
+                "purge_objects: failed to delete storage object (orphaned object, not a row)",
+                storage_path=path,
+                org_id=org_id,
+                error=str(exc),
+            )
 
 
 class DatasetService:
@@ -284,34 +307,41 @@ class DatasetService:
 
     async def remove_file(
         self, tenant: CurrentTenant, settings: Settings, dataset_id: UUID, file_id: UUID
-    ) -> schemas.UploadResult:
+    ) -> tuple[schemas.UploadResult, str]:
+        """Delete a file row from the dataset and return (result, storage_path).
+
+        The caller (router) is responsible for scheduling the storage object deletion
+        post-commit via a BackgroundTask so the DB is durably committed before any
+        irreversible object removal.
+        """
         await self._require_dataset(tenant, dataset_id)
         target = await self.repo.get_file(dataset_id, file_id)
         if target is None:
             raise NotFoundError("file not found", file_id=str(file_id))
         storage_path = target.storage_path
         await self.repo.delete_file(dataset_id, file_id)
-        # Delete the backing object so it is never orphaned in storage.
-        await delete_bytes(settings, storage_path, expected_org=str(tenant.tenant_id))
         columns = await self._reprofile(settings, tenant, dataset_id)
         files_out = await self._files_out(dataset_id)
         refreshed = await self._require_dataset(tenant, dataset_id)
-        return schemas.UploadResult(
-            dataset=self._to_out(refreshed, len(columns), len(files_out)),
-            columns=columns,
-            files=files_out,
-            warnings=[],
+        return (
+            schemas.UploadResult(
+                dataset=self._to_out(refreshed, len(columns), len(files_out)),
+                columns=columns,
+                files=files_out,
+                warnings=[],
+            ),
+            storage_path,
         )
 
-    async def erase_dataset(
-        self, tenant: CurrentTenant, settings: Settings, dataset_id: UUID
-    ) -> None:
-        """GDPR Art 17 erasure: delete all storage objects for the dataset's files,
-        then delete the dataset row (which cascades to columns/files/etc.).
+    async def erase_dataset(self, tenant: CurrentTenant, dataset_id: UUID) -> list[str]:
+        """GDPR Art 17 erasure: delete the dataset row + all child rows (cascade) and
+        return the storage_paths that must be purged AFTER the DB commit.
 
-        Storage objects are gathered before the DB delete to avoid losing the paths.
-        Each object deletion is attempted after the DB commit is expected; any OSError
-        propagates immediately (not silently orphaned).
+        Deliberately performs NO storage I/O — the caller (router) schedules object
+        deletion as a BackgroundTask so the DB transaction is durably committed before
+        any irreversible byte removal.  If the commit fails the paths are never touched;
+        if object deletion later fails the objects are orphaned but the rows are gone
+        (recoverable via a storage audit, not the other way around).
 
         Note: broader erasure across generated_documents, artifacts, corpus chunks,
         literature_snapshots, and agent_cache is deferred to `erase_tenant_data` (a
@@ -321,12 +351,10 @@ class DatasetService:
         files = await self.repo.list_files(dataset.id)
         storage_paths = [f.storage_path for f in files]
 
-        # Delete DB rows first (cascade covers dataset_columns / dataset_files).
+        # Delete DB rows (cascade covers dataset_columns / dataset_files / etc.).
         await self.repo.delete_dataset(tenant.tenant_id, dataset_id)
 
-        # Remove backing objects; failures raise — never silently orphaned.
-        for path in storage_paths:
-            await delete_bytes(settings, path, expected_org=str(tenant.tenant_id))
+        return storage_paths
 
     async def export_dataset(
         self, tenant: CurrentTenant, dataset_id: UUID

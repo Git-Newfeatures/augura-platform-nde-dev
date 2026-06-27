@@ -21,9 +21,8 @@ from augura_api.modules.semantic.models import (
     UnitConversion,
 )
 
-# The 18 tables of the governed semantic layer exposed by GET /semantic/bundle
-# (in frontend-contract order; dq_predicates excluded — consumed by the DQ stack).
-# Hard-coded names (never user input) → no injection risk.
+# The 19 tables of the governed semantic layer exposed by GET /semantic/bundle
+# (in frontend-contract order). Hard-coded names (never user input) → no injection risk.
 _BUNDLE_TABLES = (
     "taxonomy_concepts",
     "taxonomy_synonyms",
@@ -38,6 +37,7 @@ _BUNDLE_TABLES = (
     "ontology_relation_evidence",
     "ontology_relation_qualifiers",
     "dq_constraints",
+    "dq_predicates",
     "table_archetypes",
     # Dimension grammar / affix archetypes (A1).
     "dimension_kinds",
@@ -157,7 +157,7 @@ class SemanticRepo:
     # ── Governed bundle + release status (block read) ───────────────────────
 
     async def read_bundle(self) -> dict[str, Any]:
-        """The 18 semantic tables as a single jsonb object (GET /semantic/bundle)."""
+        """The 19 semantic tables as a single jsonb object (GET /semantic/bundle)."""
         res = await self.session.execute(text(_BUNDLE_SQL))
         return coerce_jsonb(res.scalar_one())
 
@@ -174,10 +174,12 @@ class SemanticRepo:
         """Applies an enrichment batch + switches the current release.
 
         The application role has no direct write (RLS FOR SELECT); everything goes through
-        public.upsert_semantic_release (SECURITY DEFINER). Returns {version, concepts,
-        relations}."""
+        semantic.upsert_semantic_release (SECURITY DEFINER, Part B / B2 — writes the
+        `semantic` schema, the canonical layer). Returns {version, concepts, relations}.
+        The enrich helpers below read via the session's search_path (= semantic, public),
+        so authored data and reads stay consistent."""
         stmt = text(
-            "select public.upsert_semantic_release("
+            "select semantic.upsert_semantic_release("
             "cast(:manifest as jsonb), cast(:payload as jsonb))"
         ).bindparams(manifest=json.dumps(manifest), payload=json.dumps(payload))
         res = await self.session.execute(stmt)

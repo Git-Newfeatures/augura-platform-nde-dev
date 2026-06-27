@@ -4688,7 +4688,7 @@
         "type": "object"
       },
       "SemanticBundle": {
-        "description": "Response of GET /semantic/bundle — the governed semantic layer as a single block.\n\n18 tables, rows left as raw `dict`: the frontend indexes them itself\n(semantic-store → taxonomy/ontology loaders). Typing each table would add\nnothing to the read contract. All 18 fields are always present (coalesce to []).",
+        "description": "Response of GET /semantic/bundle — the governed semantic layer as a single block.\n\n19 tables, rows left as raw `dict`: the frontend indexes them itself\n(semantic-store → taxonomy/ontology loaders). Typing each table would add\nnothing to the read contract. All 19 fields are always present (coalesce to []).",
         "properties": {
           "affix_archetype_aliases": {
             "items": {
@@ -4736,6 +4736,14 @@
               "type": "object"
             },
             "title": "Dq Constraints",
+            "type": "array"
+          },
+          "dq_predicates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Dq Predicates",
             "type": "array"
           },
           "ontology_relation_evidence": {
@@ -4849,6 +4857,7 @@
           "ontology_relation_evidence",
           "ontology_relation_qualifiers",
           "dq_constraints",
+          "dq_predicates",
           "table_archetypes",
           "dimension_kinds",
           "affix_archetypes",

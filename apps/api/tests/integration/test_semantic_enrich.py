@@ -13,7 +13,12 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from augura_api.core.db import set_tenant_stmt, set_user_stmt, to_asyncpg_url
+from augura_api.core.db import (
+    set_search_path_stmt,
+    set_tenant_stmt,
+    set_user_stmt,
+    to_asyncpg_url,
+)
 from augura_api.core.ids import TenantId, UserId
 from augura_api.modules.semantic.repo import SemanticRepo
 
@@ -38,6 +43,10 @@ async def _scope(session: AsyncSession, tenant: TenantId, user: UserId) -> None:
     await session.execute(text("set local role augura_app"))
     await session.execute(set_user_stmt(user))
     await session.execute(set_tenant_stmt(tenant))
+    # Part B (B3): mirror production sessions — governed reads/writes resolve to
+    # `semantic`, so apply_release (→ semantic.upsert_semantic_release) and the
+    # read-back below stay consistent.
+    await session.execute(set_search_path_stmt())
 
 
 async def test_apply_release_writes_relation_and_bumps_current(

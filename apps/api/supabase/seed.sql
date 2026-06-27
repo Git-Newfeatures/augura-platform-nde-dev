@@ -2608,3 +2608,29 @@ insert into affix_archetype_aliases ("affix_archetype_id", "token", "canonical_v
   ('AFX_DERIVED_STAT', 'auc', NULL, 'curated', 'approved'),
   ('AFX_DERIVED_STAT', 'nadir', NULL, 'curated', 'approved')
 on conflict do nothing;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Part B (B1): mirror the governed catalogs public → semantic.
+-- Keeps the `semantic` schema in sync for dev/CI/prod parity. `semantic` is the
+-- canonical schema going forward (reads + the enrichment write path resolve
+-- there once B2/B3 are deployed); this copy bootstraps it from the public seed
+-- during the transition. Guarded so seed.sql still runs before 0014 is applied.
+-- Transition note (B4): remove or invert this block once `public` is dropped.
+-- ─────────────────────────────────────────────────────────────────────────
+do $$
+declare t text;
+begin
+  if exists (select 1 from information_schema.schemata where schema_name = 'semantic') then
+    foreach t in array array[
+      'taxonomy_concepts','taxonomy_synonyms','taxonomy_standard_codes',
+      'taxonomy_therapeutic_areas','taxonomy_relationships','taxonomy_dq_valid_values',
+      'taxonomy_measurement_units','unit_conversions','causal_predicates','dq_predicates',
+      'ontology_relations','ontology_relation_evidence','ontology_relation_qualifiers',
+      'dq_constraints','table_archetypes','dimension_kinds','affix_archetypes',
+      'affix_archetype_values','affix_archetype_aliases'
+    ] loop
+      execute format('insert into semantic.%I select * from public.%I on conflict do nothing;', t, t);
+    end loop;
+    insert into semantic.releases select * from public.semantic_releases on conflict do nothing;
+  end if;
+end $$;

@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
-import { BookOpen, GitMerge, History, Search, Sparkles, X } from 'lucide-react'
+import { BookOpen, GitMerge, History, Search, ShieldCheck, Sparkles, Tags, X } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { WorkspacePage } from '@/workspace/WorkspacePage'
 import { SubTabs } from '@/cockpit/SubTabs'
 import { apiJson } from '@/api'
 import { getTaxonomyIndex, getConceptById } from '@/semantic/taxonomy-loader'
 import { getCausalOntology } from '@/causal/ontology-loader'
+import { getAffixGrammar } from '@/semantic/affix-loader'
+import { getDqGovernance } from '@/dq/dq-loader'
 import { getStoredSynonyms, getStoredStandardCodes, initSemanticStore, isSemanticStoreReady } from '@/lib/semantic-store'
 import { EnrichmentPanel } from '@/workspace/EnrichmentPanel'
 
@@ -530,6 +532,449 @@ function CausalOntologyTab() {
   )
 }
 
+// ── Dimensions & affixes tab ──────────────────────────────────────────────────
+
+function ArchetypeModal({ archetype, onClose }) {
+  const [tab, setTab] = useState('overview')
+  return (
+    <Modal title={archetype.name} subtitle={archetype.id} onClose={onClose}>
+      <div className={MODAL_TABS_STYLE}>
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'values',   label: `Values${archetype.values.length ? ` (${archetype.values.length})` : ''}` },
+          { id: 'aliases',  label: `Aliases${archetype.aliases.length ? ` (${archetype.aliases.length})` : ''}` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={MODAL_TAB(tab === t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <dl className="grid grid-cols-[160px_1fr] gap-x-4 gap-y-3 text-[13px]">
+          {[
+            ['Dimension kind',       archetype.dimension_kind_label],
+            ['Position',             archetype.position],
+            ['Separator style',      archetype.separator_style],
+            ['Value model',          archetype.value_model],
+            ['Comparability',        archetype.comparability],
+            ['Anchor concept',       archetype.anchor_concept_id],
+            ['Operator',             archetype.operator],
+            ['Extraction rule',      archetype.extraction_rule],
+            ['Evidence weight',      archetype.evidence_weight != null ? String(archetype.evidence_weight) : null],
+            ['Confidence threshold', archetype.confidence_threshold != null ? String(archetype.confidence_threshold) : null],
+            ['Review status',        archetype.review_status],
+            ['Version',              archetype.version],
+          ].filter(([, v]) => v).map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="font-medium text-muted-foreground">{k}</dt>
+              <dd className="text-foreground">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {tab === 'values' && (
+        archetype.values.length === 0
+          ? <p className="text-[13px] text-muted-foreground">No canonical values recorded.</p>
+          : <div className="flex flex-col gap-2">
+              {archetype.values.map((v, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3.5 py-2.5">
+                  <span className="font-mono text-[13px] text-foreground">{v.canonical_value}</span>
+                  {v.label && v.label !== v.canonical_value && <span className="text-[12.5px] text-muted-foreground">{v.label}</span>}
+                </div>
+              ))}
+            </div>
+      )}
+
+      {tab === 'aliases' && (
+        archetype.aliases.length === 0
+          ? <p className="text-[13px] text-muted-foreground">No token aliases recorded.</p>
+          : <div className="flex flex-col gap-2">
+              {archetype.aliases.map((a, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2.5 rounded-lg border border-border bg-muted/20 px-3.5 py-2.5 text-[13px]">
+                  <span className="font-mono text-foreground">{a.token}</span>
+                  {a.canonical_value && (
+                    <>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-mono text-foreground">{a.canonical_value}</span>
+                    </>
+                  )}
+                  {a.source && <span className="ml-auto text-[11px] text-muted-foreground/70">{a.source}</span>}
+                </div>
+              ))}
+            </div>
+      )}
+    </Modal>
+  )
+}
+
+function AffixesTab() {
+  const [q, setQ] = useState('')
+  const [selected, setSelected] = useState(null)
+
+  const grammar = useMemo(() => getAffixGrammar(), [])
+
+  const filteredArchetypes = useMemo(() => {
+    const lq = q.toLowerCase()
+    if (!lq) return grammar.archetypes
+    return grammar.archetypes.filter(a =>
+      a.name.toLowerCase().includes(lq) ||
+      a.dimension_kind_label.toLowerCase().includes(lq) ||
+      a.id.toLowerCase().includes(lq)
+    )
+  }, [grammar, q])
+
+  return (
+    <>
+      <section className="mb-6">
+        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Dimension kinds ({grammar.dimensionKinds.length})
+        </h3>
+        <Card className="gap-0 px-[18px] py-1 overflow-x-auto">
+          <div className="flex min-w-[640px] gap-3 border-b border-border py-[11px] text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            <span className="w-[200px]">Kind</span>
+            <span className="flex-1">Description</span>
+            <span className="w-[120px]">Value model</span>
+            <span className="w-[120px]">Comparability</span>
+          </div>
+          {grammar.dimensionKinds.map((k, i) => (
+            <div key={k.id} className={`flex min-w-[640px] items-center gap-3 py-2.5 ${i < grammar.dimensionKinds.length - 1 ? 'border-b border-border' : ''}`}>
+              <div className="w-[200px] min-w-0">
+                <div className="truncate text-[13px] font-medium text-foreground">{k.label}</div>
+                <div className="font-mono text-[10.5px] text-muted-foreground/70">{k.id}</div>
+              </div>
+              <div className="flex-1 truncate text-[12.5px] text-muted-foreground">{k.description}</div>
+              <div className="w-[120px] font-mono text-[11.5px] text-muted-foreground">{k.value_model}</div>
+              <div className="w-[120px] font-mono text-[11.5px] text-muted-foreground">{k.default_comparability}</div>
+            </div>
+          ))}
+        </Card>
+      </section>
+
+      <section>
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Affix archetypes
+          </h3>
+          <div className="relative ml-auto min-w-[220px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search archetypes…"
+              className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <span className="text-[12px] text-muted-foreground">{filteredArchetypes.length} archetype{filteredArchetypes.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {filteredArchetypes.length === 0 ? (
+          <div className="py-12 text-center text-[13px] text-muted-foreground">No archetypes match your search.</div>
+        ) : (
+          <Card className="gap-0 px-[18px] py-1 overflow-x-auto">
+            <div className="flex min-w-[720px] gap-3 border-b border-border py-[11px] text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+              <span className="flex-1">Archetype</span>
+              <span className="w-[150px]">Kind</span>
+              <span className="w-[90px]">Position</span>
+              <span className="w-[120px]">Comparability</span>
+              <span className="w-16 text-right">Values</span>
+              <span className="w-16 text-right">Aliases</span>
+            </div>
+            {filteredArchetypes.map((a, i) => (
+              <div
+                key={a.id}
+                onClick={() => setSelected(a)}
+                className={`flex min-w-[720px] cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/30 ${i < filteredArchetypes.length - 1 ? 'border-b border-border' : ''}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="truncate text-[13px] font-medium text-foreground">{a.name}</div>
+                  <div className="font-mono text-[10.5px] text-muted-foreground/70">{a.id}</div>
+                </div>
+                <div className="w-[150px] truncate text-[12.5px] text-muted-foreground">{a.dimension_kind_label}</div>
+                <div className="w-[90px] font-mono text-[11.5px] text-muted-foreground">{a.position}</div>
+                <div className="w-[120px] font-mono text-[11.5px] text-muted-foreground">{a.comparability}</div>
+                <div className="w-16 text-right font-mono text-[12px] text-muted-foreground">{a.values.length}</div>
+                <div className="w-16 text-right font-mono text-[12px] text-muted-foreground">{a.aliases.length}</div>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      {selected && <ArchetypeModal archetype={selected} onClose={() => setSelected(null)} />}
+    </>
+  )
+}
+
+// ── Data quality tab ──────────────────────────────────────────────────────────
+
+const SEVERITY_CHIP = {
+  hard:    'bg-red-50 text-red-700 border-red-200',
+  soft:    'bg-amber-50 text-amber-700 border-amber-200',
+  warning: 'bg-amber-50 text-amber-700 border-amber-200',
+  info:    'bg-blue-50 text-blue-700 border-blue-200',
+}
+
+const conceptLabel = (id) => (id ? (getConceptById(id)?.label || id) : null)
+
+function ConstraintModal({ constraint, validValuesByConcept, onClose }) {
+  const [tab, setTab] = useState('overview')
+  const valueSets = useMemo(() => {
+    const out = []
+    for (const role of [constraint.subject_concept_or_role, constraint.object_concept_or_role]) {
+      const rows = role ? (validValuesByConcept.get(role) || []) : []
+      if (rows.length) out.push({ role, rows })
+    }
+    return out
+  }, [constraint, validValuesByConcept])
+
+  return (
+    <Modal title={constraint.id} subtitle={constraint.predicate ? constraint.predicate.label : constraint.operator} onClose={onClose}>
+      <div className={MODAL_TABS_STYLE}>
+        {[
+          { id: 'overview',  label: 'Overview' },
+          { id: 'predicate', label: 'Predicate' },
+          { id: 'values',    label: `Valid values${valueSets.length ? ` (${valueSets.reduce((n, s) => n + s.rows.length, 0)})` : ''}` },
+        ].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={MODAL_TAB(tab === t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-[13px]">
+            <span className="font-medium text-foreground">{conceptLabel(constraint.subject_concept_or_role) || constraint.subject_concept_or_role}</span>
+            <span className="rounded border border-border bg-muted/40 px-2 py-px font-mono text-[11px] text-muted-foreground">{constraint.operator.replace(/_/g, ' ')}</span>
+            {constraint.object_concept_or_role && (
+              <span className="font-medium text-foreground">{conceptLabel(constraint.object_concept_or_role) || constraint.object_concept_or_role}</span>
+            )}
+          </div>
+          <dl className="grid grid-cols-[150px_1fr] gap-x-4 gap-y-3 text-[13px]">
+            {[
+              ['Scope',          constraint.target_scope],
+              ['Applies when',   constraint.applies_when],
+              ['Parameters',     constraint.parameters],
+              ['Severity',       constraint.severity],
+              ['Implementation', constraint.implementation_id],
+              ['Evidence',       constraint.evidence_source],
+              ['Status',         constraint.status],
+              ['Version',        constraint.version],
+            ].filter(([, v]) => v).map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="font-medium text-muted-foreground">{k}</dt>
+                <dd className="text-foreground">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {tab === 'predicate' && (
+        constraint.predicate ? (
+          <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 text-[13px]">
+            {[
+              ['Predicate',   constraint.predicate.label],
+              ['Id',          constraint.predicate.id],
+              ['Direction',   constraint.predicate.direction_type],
+              ['Description', constraint.predicate.description],
+              ['Version',     constraint.predicate.version],
+            ].filter(([, v]) => v).map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="font-medium text-muted-foreground">{k}</dt>
+                <dd className="text-foreground">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-[13px] text-muted-foreground">No predicate bound (operator <span className="font-mono">{constraint.operator}</span> is not in the predicate catalog).</p>
+        )
+      )}
+
+      {tab === 'values' && (
+        valueSets.length === 0
+          ? <p className="text-[13px] text-muted-foreground">No valid value sets recorded for this constraint's concepts.</p>
+          : <div className="flex flex-col gap-4">
+              {valueSets.map(({ role, rows }) => (
+                <div key={role}>
+                  <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">{conceptLabel(role) || role}</div>
+                  <div className="flex flex-col gap-2">
+                    {rows.map((v, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3.5 py-2.5">
+                        <span className="font-mono text-[13px] text-foreground">{v.value}</span>
+                        {v.label && <span className="text-[12.5px] text-muted-foreground">{v.label}</span>}
+                        {v.coding_system && <span className="ml-auto text-[11px] text-muted-foreground/70">{v.coding_system}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+      )}
+    </Modal>
+  )
+}
+
+function TableArchetypeModal({ archetype, onClose }) {
+  return (
+    <Modal title={archetype.name} subtitle={archetype.id} onClose={onClose}>
+      <dl className="grid grid-cols-[150px_1fr] gap-x-4 gap-y-3 text-[13px]">
+        {[
+          ['Semantic score', archetype.semantic_score != null ? String(archetype.semantic_score) : null],
+          ['Surrogate',      archetype.is_surrogate ? 'yes' : 'no'],
+          ['Review status',  archetype.review_status],
+          ['Version',        archetype.version],
+        ].filter(([, v]) => v).map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="font-medium text-muted-foreground">{k}</dt>
+            <dd className="text-foreground">{v}</dd>
+          </div>
+        ))}
+        {archetype.key_selectors.length > 0 && (
+          <div className="contents">
+            <dt className="font-medium text-muted-foreground">Key selectors</dt>
+            <dd className="flex flex-wrap gap-1.5">
+              {archetype.key_selectors.map(s => (
+                <span key={s} className="rounded border border-border bg-muted/40 px-1.5 py-px font-mono text-[11px] text-muted-foreground">{s}</span>
+              ))}
+            </dd>
+          </div>
+        )}
+        {archetype.description_template && (
+          <div className="contents">
+            <dt className="font-medium text-muted-foreground">Description</dt>
+            <dd className="text-foreground">{archetype.description_template}</dd>
+          </div>
+        )}
+      </dl>
+    </Modal>
+  )
+}
+
+function DataQualityTab() {
+  const [q, setQ] = useState('')
+  const [severityFilter, setSeverityFilter] = useState('all')
+  const [constraintModal, setConstraintModal] = useState(null)
+  const [archetypeModal, setArchetypeModal] = useState(null)
+
+  const dq = useMemo(() => getDqGovernance(), [])
+  const severities = useMemo(
+    () => ['all', ...new Set(dq.constraints.map(c => c.severity).filter(Boolean))],
+    [dq]
+  )
+
+  const filtered = useMemo(() => {
+    const lq = q.toLowerCase()
+    return dq.constraints.filter(c => {
+      if (severityFilter !== 'all' && c.severity !== severityFilter) return false
+      if (lq) {
+        const hay = [
+          c.id, c.operator, c.subject_concept_or_role, c.object_concept_or_role,
+          conceptLabel(c.subject_concept_or_role), conceptLabel(c.object_concept_or_role),
+          c.predicate?.label,
+        ].filter(Boolean).join(' ').toLowerCase()
+        if (!hay.includes(lq)) return false
+      }
+      return true
+    })
+  }, [dq, q, severityFilter])
+
+  return (
+    <>
+      <section className="mb-6">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Constraints</h3>
+          <div className="relative ml-auto min-w-[220px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search constraints…"
+              className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[12.5px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+            {severities.map(s => <option key={s} value={s}>{s === 'all' ? 'All severities' : s}</option>)}
+          </select>
+          <span className="text-[12px] text-muted-foreground">{filtered.length} constraint{filtered.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="py-12 text-center text-[13px] text-muted-foreground">No constraints match your filters.</div>
+        ) : (
+          <Card className="gap-0 px-[18px] py-1 overflow-x-auto">
+            <div className="flex min-w-[760px] gap-3 border-b border-border py-[11px] text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+              <span className="flex-1">Constraint</span>
+              <span className="w-[150px]">Predicate</span>
+              <span className="w-[120px]">Scope</span>
+              <span className="w-[90px] text-center">Severity</span>
+            </div>
+            {filtered.map((c, i) => (
+              <div
+                key={c.id}
+                onClick={() => setConstraintModal(c)}
+                className={`flex min-w-[760px] cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/30 ${i < filtered.length - 1 ? 'border-b border-border' : ''}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="truncate text-[13px] text-foreground">
+                    <span className="font-medium">{conceptLabel(c.subject_concept_or_role) || c.subject_concept_or_role}</span>
+                    <span className="mx-1.5 font-mono text-[11.5px] text-muted-foreground">{c.operator.replace(/_/g, ' ')}</span>
+                    {c.object_concept_or_role && <span className="font-medium">{conceptLabel(c.object_concept_or_role) || c.object_concept_or_role}</span>}
+                  </div>
+                  <div className="font-mono text-[10.5px] text-muted-foreground/70">{c.id}</div>
+                </div>
+                <div className="w-[150px] truncate text-[12.5px] text-muted-foreground">{c.predicate ? c.predicate.label : c.operator}</div>
+                <div className="w-[120px] font-mono text-[11.5px] text-muted-foreground">{c.target_scope}</div>
+                <div className="w-[90px] text-center">
+                  <span className={`rounded border px-1.5 py-px text-[10.5px] font-medium ${SEVERITY_CHIP[c.severity] || 'bg-muted/40 text-muted-foreground border-border'}`}>
+                    {c.severity}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Table archetypes ({dq.tableArchetypes.length})
+        </h3>
+        <Card className="gap-0 px-[18px] py-1 overflow-x-auto">
+          <div className="flex min-w-[640px] gap-3 border-b border-border py-[11px] text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+            <span className="flex-1">Archetype</span>
+            <span className="w-[240px]">Key selectors</span>
+            <span className="w-[90px] text-right">Score</span>
+          </div>
+          {dq.tableArchetypes.map((a, i) => (
+            <div
+              key={a.id}
+              onClick={() => setArchetypeModal(a)}
+              className={`flex min-w-[640px] cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/30 ${i < dq.tableArchetypes.length - 1 ? 'border-b border-border' : ''}`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="truncate text-[13px] font-medium text-foreground">{a.name}</div>
+                <div className="font-mono text-[10.5px] text-muted-foreground/70">{a.id}</div>
+              </div>
+              <div className="flex w-[240px] flex-wrap gap-1">
+                {a.key_selectors.length
+                  ? a.key_selectors.map(s => (
+                      <span key={s} className="rounded border border-border bg-muted/40 px-1.5 py-px font-mono text-[10px] text-muted-foreground">{s}</span>
+                    ))
+                  : <span className="text-[11px] text-muted-foreground/50">—</span>}
+              </div>
+              <div className="w-[90px] text-right font-mono text-[12px] text-muted-foreground">{a.semantic_score}</div>
+            </div>
+          ))}
+        </Card>
+      </section>
+
+      {constraintModal && (
+        <ConstraintModal constraint={constraintModal} validValuesByConcept={dq.validValuesByConcept} onClose={() => setConstraintModal(null)} />
+      )}
+      {archetypeModal && <TableArchetypeModal archetype={archetypeModal} onClose={() => setArchetypeModal(null)} />}
+    </>
+  )
+}
+
 // ── Version admin tab ─────────────────────────────────────────────────────────
 
 const humanize = (s) => String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
@@ -629,16 +1074,20 @@ export function SemanticLayerPage() {
       <>
         <SubTabs
           tabs={[
-            { id: 'taxonomy',    label: 'Taxonomy',        icon: <BookOpen  size={13} /> },
-            { id: 'causal',      label: 'Causal ontology', icon: <GitMerge  size={13} /> },
-            { id: 'enrichment',  label: 'Enrichment',       icon: <Sparkles  size={13} />, badge: 'beta' },
-            { id: 'versions',    label: 'Versions',        icon: <History   size={13} />, badge: 'beta' },
+            { id: 'taxonomy',    label: 'Taxonomy',          icon: <BookOpen    size={13} /> },
+            { id: 'causal',      label: 'Causal ontology',   icon: <GitMerge    size={13} /> },
+            { id: 'affixes',     label: 'Dimensions & affixes', icon: <Tags     size={13} /> },
+            { id: 'dq',          label: 'Data quality',      icon: <ShieldCheck size={13} /> },
+            { id: 'enrichment',  label: 'Enrichment',        icon: <Sparkles    size={13} />, badge: 'beta' },
+            { id: 'versions',    label: 'Versions',          icon: <History     size={13} />, badge: 'beta' },
           ]}
           active={sub}
           onChange={setSub}
         />
         {sub === 'taxonomy'   && <TaxonomyTab />}
         {sub === 'causal'     && <CausalOntologyTab />}
+        {sub === 'affixes'    && <AffixesTab />}
+        {sub === 'dq'         && <DataQualityTab />}
         {sub === 'enrichment' && <EnrichmentPanel />}
         {sub === 'versions'   && <VersionAdminTab />}
       </>

@@ -1,11 +1,19 @@
-# Plan — `/semantic` admin: Affix & DQ views + migrate reads to the `semantic` schema
+# Plan — `/semantic` admin: Affix & DQ views + consolidate the semantic layer onto the `semantic` schema
 
 **Date:** 2026-06-26
 **Status:** Proposed
 **Scope:** Add two **read-only** administration tabs to the `/semantic` workspace — (1) dimension
 grammar / affix archetypes, (2) data-quality governance — modelled on the existing Taxonomy/Causal
-tabs. Separately, begin **migrating the `/semantic` admin reads from the `public` schema to the
-`semantic` schema**, leaving the other consumers on `public` for now.
+tabs. Then **consolidate the whole semantic layer onto the `semantic` schema**: move *all* semantic
+reads (admin + dataset mapping + causal DAG + enrichment) **and** the enrichment write path from the
+`public` copy to the `semantic` schema, in a safe order, so `public`'s governed copy can later be
+deprecated.
+
+> **Decision (2026-06-26):** the admin views stay under the **existing `/semantic` endpoints** (no
+> separate dedicated path), and **all shared consumers move to `semantic` together** — one consistent
+> source of truth. This supersedes the earlier "leave other consumers on `public`" framing: that was
+> rejected because `GET /semantic/bundle` (and `SemanticRepo`) are shared, so a partial move would
+> split reads from the write path (see §1.2).
 **Source specs:** `docs/specs/2026-06-25-augura-semantic-layer-v3.md` (§1.1, §2.3, §2.7, §15.4),
 `docs/specs/2026-06-25-dq-management-north-star.md`, `docs/plans/2026-06-25-affix-archetypes-supabase-plan.md` (§9 UI follow-up).
 
@@ -23,8 +31,9 @@ served by `GET /semantic/bundle`. Two governed capabilities have **data but no a
    `dq_predicates`) — partly in the bundle; `dq_predicates` is deliberately excluded today
    ([repo.py:25](../../apps/api/src/augura_api/modules/semantic/repo.py)).
 
-In parallel, the `/semantic` admin tool should read from the **`semantic` schema** rather than the
-`public` copy that the rest of the platform consumes.
+In parallel, the platform should read the governed layer from the **`semantic` schema** rather than the
+`public` copy. Per the 2026-06-26 decision this is a **full consolidation** (not admin-only), staged
+safely (§4).
 
 ### 1.1 Verified DB reality (checked live against `Augura_Prod`, `fqmoylmvjoafihiuiiuj`)
 
@@ -32,12 +41,12 @@ This inverts the assumption recorded in earlier notes, so it is stated explicitl
 
 - The governed layer **lives in `public`**. All ORM models use bare `__tablename__`; all bundle SQL
   uses bare table names → resolve to `public` via `search_path`. `public` is the **active source of
-  truth** (it holds `semantic_releases`, current release `2.2.0`, and is what enrichment writes to via
-  `public.upsert_semantic_release`).
-- The `semantic` schema is **no longer the stale 16-table leftover** — during planning it was brought
-  to **20 tables** and is currently **in sync** with `public` for the governed tables (affix 5/5,
-  dimension_kinds 12/12, ontology_relations 75/75, taxonomy_concepts 172/172). It holds **19 of the 20
-  governed tables** the admin tool needs.
+  truth** (it holds `semantic_releases`, current release **`2.3.0`**, and is what enrichment writes to
+  via `public.upsert_semantic_release`).
+- The `semantic` schema is **no longer the stale 16-table leftover** — it now holds **20 tables** and is
+  **in sync** with `public` for the governed tables (affix 5/5, dimension_kinds 12/12,
+  ontology_relations 75/75, taxonomy_concepts 172/172, dq_predicates 9/9, release **`2.3.0`**). It holds
+  **all governed tables** the admin tool needs.
 - **One naming gap:** `semantic` has a legacy **`releases`** table (same columns as
   `public.semantic_releases`); there is no `semantic.semantic_releases`.
 - The app role **`augura_api` can already read `semantic`**: `USAGE` on the schema, RLS enabled, one
@@ -48,6 +57,20 @@ This inverts the assumption recorded in earlier notes, so it is stated explicitl
   exists in prod unless we bring it into the bundle (§4.3).
 
 The plan is split so the **views (§3)** ship independently of the **schema migration (§4)**.
+
+### 1.2 Blast radius of repointing reads (verified)
+
+`GET /semantic/bundle` is **not** admin-only — it hydrates the frontend semantic store consumed by
+**dataset mapping, causal DAG modeling, the enrichment panel, and PICOT parsing**. On the backend,
+`modules/mapping/service.py` and `modules/causal/service.py` call `SemanticRepo` directly
+(`list_concepts`/`list_synonyms`/`list_relations`…). So "make `/semantic` read `semantic`"
+unavoidably moves mapping + causal + enrichment too. Two consequences drive the §4 ordering:
+
+- **Read/write split (critical):** enrichment **writes** `public.upsert_semantic_release`. If reads move
+  to `semantic` while writes stay on `public`, freshly-authored concepts/relations are invisible until a
+  mirror runs. → the write path must move to `semantic` **before** reads (§4.2 before §4.3).
+- **Dev/CI parity:** `semantic` exists only in prod. Repointing breaks local dev + `test_semantic_*` +
+  the `db-bundle` CI unless `semantic` is first brought into the managed bundle (§4.1).
 
 ---
 
@@ -104,88 +127,103 @@ Add to the `SubTabs` array (after `causal`, before `enrichment`):
 - **`affixes` — "Dimensions & affixes":** a `dimension_kinds` table (kind, value_model, comparability)
   and an `affix_archetypes` table (name, kind, position, value_model, comparability, thresholds). Row →
   modal showing the archetype's canonical values + token aliases.
-- **`dq` — "Data quality":** sub-sections (inner segmented control) for **Constraints**
-  (`dq_constraints` → bound predicate, scope, severity), **Predicates** (`dq_predicates`), **Table
-  archetypes** (`table_archetypes` → key selectors, semantic score), and **Valid value sets**
-  (`taxonomy_dq_valid_values` grouped by concept). Row → detail modal.
+- **`dq` — "Data quality":** a main **Constraints** table (`dq_constraints` → bound predicate, scope,
+  severity). A constraint row opens a detail modal whose sub-tabs **walk its linked entities** — the
+  bound **Predicate** (`dq_predicates`), its **Scope**, and the relevant **Valid value sets**
+  (`taxonomy_dq_valid_values`). **Table archetypes** (`table_archetypes` → key selectors, semantic
+  score) appear as a secondary table whose rows open their own detail modal.
+  **Decision (2026-06-26):** follow the north-star drill-down spine (constraint → predicate · scope ·
+  valid values) — *not* four parallel flat lists. Predicates and valid value sets are reached *through*
+  a constraint, not browsed as standalone top-level lists.
 
 No nav/route change — both live inside the existing `/semantic` page
 ([sections.js:20](../../apps/web/src/shell/sections.js), [App.jsx:59](../../apps/web/src/App.jsx)).
 
 ---
 
-## 4. Part B — migrate `/semantic` admin reads from `public` → `semantic`
+## 4. Part B — consolidate the semantic layer onto the `semantic` schema
 
-Goal: only the **read** endpoints of the semantic module resolve to the `semantic` schema; all other
-modules and the enrichment **write** path stay on `public`.
+Goal (per the 2026-06-26 decision): **all** semantic reads (the `/semantic` read endpoints **and** the
+`mapping`/`causal` services that call `SemanticRepo`) **and** the enrichment write path resolve to the
+`semantic` schema. `public`'s governed copy becomes unused and is deprecated later. The four steps are
+ordered so nothing breaks mid-flight — **B1 → B2 → B3 → B4**.
 
-### 4.1 Scope the switch to the semantic READ endpoints only
+### 4.1 (B1, prerequisite) Make `semantic` reproducible in dev/CI
 
-Reads: `GET /semantic/bundle`, `/semantic/release`, `/semantic/concepts`, `/semantic/relations`. They
-use shared ORM models (bare tablenames) + raw bundle SQL, so the cleanest contained switch is a
-**transaction-local `search_path`** set per request, applied **only** to those routes:
+`semantic` exists only in prod, so repointing first breaks local dev + `test_semantic_*` + `db-bundle`.
+Bring it into the managed bundle:
 
-1. Add a semantic-specific session dependency (new `modules/semantic/deps.py`) that takes the request
-   session and runs `select set_config('search_path', 'semantic, public', true)` — transaction-local,
-   like the tenant GUCs in [core/db.py:91-117](../../apps/api/src/augura_api/core/db.py). Use it in
-   [router.py](../../apps/api/src/augura_api/modules/semantic/router.py) for the four read endpoints in
-   place of the plain `SessionDep`.
-2. **Do NOT apply it to the enrich endpoints** (`/semantic/enrich/apply`, `/propose`). Their helpers
-   (`max_relation_seq`, `get_relation_row`, `existing_concept_ids`, and `apply_release` →
-   `public.upsert_semantic_release`) must keep reading/writing `public`. `upsert_semantic_release` is
-   already `public.`-qualified and so is safe regardless.
-3. `search_path = semantic, public` makes any table missing from `semantic` fall back to `public` — a
-   built-in safety net.
+- Add the `semantic` schema DDL + RLS + grants under `apps/api/supabase/` (a dedicated
+  `semantic_schema.sql`, or a guarded section of `schema.sql`).
+- New idempotent migration `0014_semantic_schema.py`,
+  `down_revision = "0013_dataset_column_dimensions"` (0011–0013 are already taken by the affix work).
+- Populate/seed it (mirror the `public` governed seed into `semantic`) so CI + local dev have the same
+  data.
+- Add the release view so the bare `semantic_releases` name resolves inside the schema:
 
-### 4.2 Fix the release-table name gap
+  ```sql
+  create view semantic.semantic_releases as select * from semantic.releases;
+  ```
 
-With `search_path = semantic, public`, `_RELEASE_SQL`'s bare `semantic_releases` would fall through to
-`public.semantic_releases` (inconsistent with the bundle now reading `semantic`). Add an **additive
-view** in the `semantic` schema so the release read resolves there:
+  (Additive; avoids a destructive rename of the legacy `semantic.releases`. Keeps `_RELEASE_SQL`'s bare
+  `semantic_releases` working once `search_path` is `semantic, …`.)
 
-```sql
-create view semantic.semantic_releases as select * from semantic.releases;
-```
+### 4.2 (B2) Flip the write path to `semantic` — BEFORE repointing reads
 
-No code change to `_RELEASE_SQL`, future-proof. (Alternative — rename `semantic.releases`; rejected as
-needlessly destructive.)
+`public.upsert_semantic_release` is `public.`-qualified internally, so it writes `public` regardless of
+`search_path`. Provide a `semantic`-writing release function (schema-qualify its inserts to `semantic.*`
+and the release switch to `semantic.releases`), and point `SemanticRepo.apply_release` + the enrich
+helpers (`max_relation_seq`, `get_relation_row`, `existing_concept_ids`) at `semantic`. Doing this
+before §4.3 keeps authored data and reads consistent (else freshly-enriched concepts/relations vanish
+from every UI). *Interim fallback if a hard cutover is too risky: keep writing `public` and mirror
+`public → semantic` at the end of the function — but a clean cutover matches the "deprecate `public`"
+goal.*
 
-### 4.3 The big decision — make `semantic` a first-class, reproducible schema
+### 4.3 (B3) Repoint reads via one transaction-local `search_path`
 
-Because dev/CI build only `public`, repointing reads breaks local dev and the `test_semantic_*`
-integration tests unless the `semantic` schema exists there too. Two paths:
+`semantic` holds only the 20 governed tables, so `search_path = semantic, public` routes governed reads
+to `semantic` and everything else (tenant tables: `dataset_columns`, `datasets`, …) to `public`
+automatically.
 
-- **4.3a (recommended, correct): bring `semantic` into the managed bundle.** Add the `semantic` schema
-  DDL + RLS + grants to `apps/api/supabase/` (a dedicated `semantic_schema.sql` or a section of
-  `schema.sql`), create it in a new idempotent migration (`0013_semantic_schema.py`,
-  `down_revision = "0012_affix_release_function"`), and define how it is populated/kept in sync with
-  `public` (see §4.4). Then `db-bundle` CI and local dev both have it and the repoint is reproducible.
-- **4.3b (interim, lighter): env-gated repoint.** Add a setting (e.g. `AUGURA_SEMANTIC_SCHEMA`, default
-  `public`); only set the `search_path` when configured (prod). Dev/CI stay on `public`. Fast to ship
-  but introduces prod-vs-dev divergence — the admin tool is then "migrated" in prod only. Acceptable as
-  a deliberate first step, to be promoted to 4.3a later.
+- **Decision (2026-06-26):** do this in **one central place** — a single shared helper/dependency that
+  runs `select set_config('search_path', 'semantic, public', true)` transaction-locally, in the style of
+  the tenant GUCs in [core/db.py:91-117](../../apps/api/src/augura_api/core/db.py). Never scattered or
+  duplicated per module.
+- **Incremental rollout:** wire that one helper to the `/semantic` read endpoints **first** (the admin
+  tool) and prove it. Then attach the **same** helper to the `mapping`/`causal` request sessions (they
+  read governed data via `SemanticRepo`). Those two **must** adopt it by the time the write path moves
+  (B2), or they read stale `public` rows — but it is the same single function, not new per-module logic.
+- **Watch-out:** `semantic, public` silently falls back to `public` for any table missing in
+  `semantic` — a useful transition net, but it **hides drift**. Once B1 makes `semantic` complete,
+  tighten to `search_path = semantic` (no fallback) so gaps error loudly instead of serving stale
+  `public` rows.
 
-### 4.4 Source-of-truth / sync coherence (must be decided, not assumed)
+### 4.4 (B4) Verify, then deprecate `public`
 
-Enrichment writes go to **`public`** (`upsert_semantic_release`), and the affix migration was applied to
-**both** schemas during planning — so something keeps `semantic` in sync, but the mechanism is not in
-this repo. After this change the admin tool reads `semantic` while authoring still targets `public`;
-they drift unless sync is explicit. Decide and document one of: (a) keep authoring in `public` and add a
-release-time mirror `public` → `semantic`; or (b) make `semantic` the authored copy and mirror to
-`public` for the other consumers. This is the key open governance item.
+After reads + writes are on `semantic` and CI is green, the `public` governed tables are unused by the
+app. Dropping them is a **separate later migration** (out of scope here) — flag for the team. Until
+then, `public` simply goes stale harmlessly (nothing reads or writes it).
+
+> **Source-of-truth resolved:** `semantic` is canonical; authoring writes `semantic` (B2). No ongoing
+> `public ↔ semantic` sync function is introduced — `public` is frozen and later dropped. (This matches
+> the directive: no always-on sync; the layer consolidates on `semantic`.)
 
 ---
 
 ## 5. Files touched (summary)
 
-- **Backend:** `modules/semantic/repo.py`, `schemas.py`, `router.py`, new `modules/semantic/deps.py`;
-  (4.3a) `apps/api/supabase/*.sql` + `alembic/versions/0013_semantic_schema.py`; regenerate
+- **Part A backend:** `modules/semantic/repo.py`, `schemas.py`; regenerate
   `packages/api-client/openapi.json` + `schema.d.ts`; tests in `tests/db/`, `tests/integration/`,
   `tests/test_semantic_service.py`.
-- **Frontend:** `lib/semantic-store.js`, `workspace/SemanticLayerPage.jsx`, new
+- **Part A frontend:** `lib/semantic-store.js`, `workspace/SemanticLayerPage.jsx`, new
   `semantic/affix-loader.js` + `dq/dq-loader.js`.
-- **DB (prod, via Supabase MCP):** `create view semantic.semantic_releases` (§4.2); confirm
-  `dq_predicates` in `semantic` has RLS + grant; (4.3a) apply the managed `semantic` schema DDL.
+- **Part B backend:** new `apps/api/supabase/semantic_schema.sql` (+ RLS/grants) and
+  `alembic/versions/0014_semantic_schema.py` (B1); `supabase/functions.sql` semantic-writing release fn
+  + `SemanticRepo.apply_release`/helpers (B2); the `search_path` set in `core/db.py` or a shared
+  dependency, applied to the semantic read endpoints **and** `mapping`/`causal` sessions (B3);
+  `modules/semantic/router.py` if wiring via a dependency.
+- **Part B DB (prod, via Supabase MCP):** `create view semantic.semantic_releases`; apply the managed
+  `semantic` schema DDL/seed from B1; deploy the semantic-writing release function from B2.
 
 ---
 
@@ -197,31 +235,44 @@ release-time mirror `public` → `semantic`; or (b) make `semantic` the authored
 2. **Bundle includes `dq_predicates`:** `GET /semantic/bundle` returns the key with 9 rows.
 3. **Reads hit `semantic` (Part B):** with the repoint active, confirm `GET /semantic/bundle` and
    `/semantic/release` return `semantic`-schema data (compare counts; temporarily diverge one row in
-   `semantic` to prove the source). Confirm enrichment `/apply` still targets `public`.
-4. **Frontend:** `cd apps/web && npm run dev`, open `/semantic`; verify the two new tabs render the
+   `semantic` to prove the source).
+4. **Write/read consistency (proves B2-before-B3):** run an enrichment `/apply`, then re-fetch the
+   bundle and confirm the newly-authored concept/relation **appears** (it must land in `semantic`).
+5. **Frontend:** `cd apps/web && npm run dev`, open `/semantic`; verify the two new tabs render the
    affix (5 archetypes / 12 kinds) and DQ (32 constraints / 9 predicates / 8 archetypes) data, modals
    open, filters work, and Taxonomy/Causal/Versions tabs still load.
-5. **No regression for other modules:** dq/mapping/causal endpoints still read `public` (search_path
-   change scoped to semantic read routes only).
+6. **Shared consumers moved cleanly:** dataset mapping + causal DAG still work and now read `semantic`;
+   tenant tables (`dataset_columns`, `datasets`) still resolve to `public` (governed-only `semantic`).
 
 ---
 
 ## 7. Execution checklist
 
+**Part A — read-only tabs (ship first, independently):**
 1. [ ] `repo.py` / `schemas.py` — add `dq_predicates` to the bundle (18 → 19); update comments.
 2. [ ] Regenerate OpenAPI + `packages/api-client`; update bundle count/shape tests.
 3. [ ] `semantic-store.js` — add `getStoredDqPredicates`.
 4. [ ] New `affix-loader.js` + `dq-loader.js`.
 5. [ ] `SemanticLayerPage.jsx` — add the `affixes` and `dq` SubTabs (read-only).
-6. [ ] `modules/semantic/deps.py` — scoped `search_path` dependency; wire the 4 read endpoints (§4.1).
-7. [ ] `create view semantic.semantic_releases` in prod (§4.2).
-8. [ ] Decide §4.3 (managed schema vs env-gate) and §4.4 (sync direction); implement chosen path.
-9. [ ] CI green (lint/types/import-linter/pytest/db-bundle/drift) + manual frontend verification.
+
+**Part B — consolidate onto `semantic` (strict order B1 → B4):**
+6. [ ] **B1** `semantic_schema.sql` + `0014_semantic_schema.py` + seed/populate + `create view
+   semantic.semantic_releases`; `db-bundle` CI + local dev build `semantic`.
+7. [ ] **B2** semantic-writing release function + `SemanticRepo.apply_release`/helpers → `semantic`
+   (deploy before B3).
+8. [ ] **B3** one central helper sets transaction-local `search_path = semantic, public` — wired to the
+   semantic read endpoints first, then the **same** helper attached to `mapping`/`causal` sessions;
+   tighten to `semantic` once B1 is complete.
+9. [ ] **B4** verify (incl. enrich-apply visibility); schedule the later `public` drop (separate migration).
+10. [ ] CI green (lint/types/import-linter/pytest/db-bundle/drift) + manual frontend verification.
 
 ## 8. Risks / notes
 
-- The memory note `semantic-layer-canonical-in-public` is now partially outdated (the `semantic` schema
-  is being kept in sync, not stale) — update it after this lands.
-- Part B couples the app to the `semantic` schema; do **not** ship it without §4.3 (managed schema or
-  env-gate) or local dev + CI break.
-- Both new tabs stay strictly read-only — consistent with Taxonomy/Causal (§15.4).
+- **Order is load-bearing:** B1 (dev/CI parity) before any repoint; B2 (write path) before B3 (reads),
+  or freshly-authored enrichment data disappears from every UI.
+- The memory note `semantic-layer-canonical-in-public` becomes outdated once Part B lands (`semantic`
+  becomes canonical) — update it then.
+- The `search_path = semantic, public` fallback hides drift; tighten to `semantic`-only after B1.
+- Both new tabs (Part A) stay strictly **read-only** — consistent with Taxonomy/Causal (§15.4). Part B
+  adds no data writes beyond moving the existing enrichment write path; its only new schema objects are
+  a view + the managed `semantic` DDL.

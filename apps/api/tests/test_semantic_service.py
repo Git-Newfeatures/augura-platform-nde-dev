@@ -44,7 +44,7 @@ class _FakeRepo:
         return [_relation("r-sub", concept_ids[0], "retinopathy")]
 
     async def read_bundle(self):
-        # The 18 keys are always present (coalesced to [] on the SQL side).
+        # The 19 keys are always present (coalesced to [] on the SQL side).
         empty: dict[str, list[Any]] = {
             t: []
             for t in (
@@ -61,6 +61,7 @@ class _FakeRepo:
                 "ontology_relation_evidence",
                 "ontology_relation_qualifiers",
                 "dq_constraints",
+                "dq_predicates",
                 "table_archetypes",
                 "dimension_kinds",
                 "affix_archetypes",
@@ -97,11 +98,12 @@ async def test_relations_subgraph_when_concept_id_given() -> None:
     assert out[0].subject_concept_id == "hba1c"
 
 
-async def test_bundle_exposes_18_tables_with_raw_rows() -> None:
+async def test_bundle_exposes_19_tables_with_raw_rows() -> None:
     out = await SemanticService(_FakeRepo()).bundle()  # type: ignore[arg-type]
     assert out.taxonomy_concepts[0]["local_concept_id"] == "hba1c"
-    # The empty tables remain present (18-key contract).
+    # The empty tables remain present (19-key contract).
     assert out.dq_constraints == []
+    assert out.dq_predicates == []
     assert out.table_archetypes == []
     # Dimension grammar / affix archetypes are part of the bundle.
     assert out.dimension_kinds == []

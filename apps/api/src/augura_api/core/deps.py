@@ -16,6 +16,7 @@ from augura_api.core.auth import Principal, authenticate
 from augura_api.core.config import Settings, get_settings
 from augura_api.core.db import (
     get_sessionmaker,
+    set_search_path_stmt,
     set_tenant_stmt,
     set_user_stmt,
 )
@@ -97,6 +98,9 @@ async def get_session(
     async with sessionmaker() as session, session.begin():
         await session.execute(set_user_stmt(tenant.user_id))
         await session.execute(set_tenant_stmt(tenant.tenant_id))
+        # Part B (B3): governed reads resolve to `semantic` (mapping/causal read
+        # via SemanticRepo on this session too); public stays the fallback.
+        await session.execute(set_search_path_stmt())
         yield session
 
 

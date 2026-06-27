@@ -12,7 +12,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from augura_api.core.db import set_tenant_stmt, set_user_stmt, to_asyncpg_url
+from augura_api.core.db import (
+    set_search_path_stmt,
+    set_tenant_stmt,
+    set_user_stmt,
+    to_asyncpg_url,
+)
 from augura_api.core.ids import TenantId, UserId
 from augura_api.modules.semantic.repo import SemanticRepo
 
@@ -37,6 +42,8 @@ async def _scope(session: AsyncSession, tenant: TenantId, user: UserId) -> None:
     await session.execute(text("set local role augura_app"))
     await session.execute(set_user_stmt(user))
     await session.execute(set_tenant_stmt(tenant))
+    # Part B (B3): governed reads resolve to `semantic` (mirrors production).
+    await session.execute(set_search_path_stmt())
 
 
 async def test_taxonomy_readable_and_seeded(sm: async_sessionmaker[AsyncSession]) -> None:
@@ -115,6 +122,9 @@ async def test_bundle_includes_affix_grammar(sm: async_sessionmaker[AsyncSession
         assert key in bundle, f"{key} missing from the semantic bundle"
     assert len(bundle["dimension_kinds"]) >= 12  # the 12 structural families
     assert len(bundle["affix_archetypes"]) >= 1
+    # DQ governance: dq_predicates is part of the bundle (A1 — DQ admin view).
+    assert "dq_predicates" in bundle, "dq_predicates missing from the semantic bundle"
+    assert len(bundle["dq_predicates"]) >= 1
 
 
 async def test_affix_referential_integrity(sm: async_sessionmaker[AsyncSession]) -> None:

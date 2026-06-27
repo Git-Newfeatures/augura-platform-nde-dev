@@ -98,11 +98,28 @@ def set_user_stmt(user_id: UserId) -> TextClause:
     return text("SELECT set_config('app.user_id', :uid, true)").bindparams(uid=str(user_id))
 
 
+# Part B (B3): the governed semantic layer resolves to the `semantic` schema.
+# One central helper — applied to every request-scoped session (the /semantic
+# admin reads AND the mapping/causal services that read via SemanticRepo), per
+# the Part B decision (no per-module duplication). `public` stays in the path as
+# the fallback for tenant/public-only tables (datasets, dataset_columns, …);
+# `semantic` holds only the governed catalogs. Transaction-local (like the
+# tenant GUCs) so pooled connections reset it on commit. NB: keep `public` — a
+# `semantic`-only path would break every bare-name read of a public table.
+_SEARCH_PATH = "semantic, public"
+
+
+def set_search_path_stmt() -> TextClause:
+    """Statement that routes governed reads to `semantic` (transaction-local)."""
+    return text("SELECT set_config('search_path', :sp, true)").bindparams(sp=_SEARCH_PATH)
+
+
 async def tenant_session(tenant_id: TenantId, settings: Settings) -> AsyncIterator[AsyncSession]:
     """Opens a tenant-scoped transaction (RLS active via app.tenant_id)."""
     sessionmaker = get_sessionmaker(settings)
     async with sessionmaker() as session, session.begin():
         await session.execute(set_tenant_stmt(tenant_id))
+        await session.execute(set_search_path_stmt())
         yield session
 
 
@@ -114,4 +131,5 @@ async def request_session(
     async with sessionmaker() as session, session.begin():
         await session.execute(set_user_stmt(user_id))
         await session.execute(set_tenant_stmt(tenant_id))
+        await session.execute(set_search_path_stmt())
         yield session

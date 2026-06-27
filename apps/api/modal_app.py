@@ -2,6 +2,7 @@
 # Rationale (spec §9): the `modal` library decorators are partially typed
 # (incomplete stubs). This file is deployment glue, outside `src/`; it is
 # covered by ruff and is not in the CI's pyright `include`.
+import os
 from pathlib import Path
 
 import modal
@@ -20,7 +21,14 @@ image = (
     .add_local_python_source("augura_api")
 )
 
-app = modal.App("augura-api")
+# App + secret names are overridable so an ISOLATED, non-prod instance (e.g.
+# NDE-DEV) can deploy alongside prod WITHOUT clobbering it: MODAL_APP_NAME yields a
+# distinct app + URL (…--<name>-api.modal.run), MODAL_SECRET_NAME selects the env
+# secret. Defaults reuse prod's, so the standard deploy is unchanged.
+_APP_NAME = os.environ.get("MODAL_APP_NAME", "augura-api")
+_SECRET_NAME = os.environ.get("MODAL_SECRET_NAME", "augura-api")
+
+app = modal.App(_APP_NAME)
 
 # Prod config injected via a Modal secret (NOT a frozen image env). Must contain
 # at minimum: AUGURA_ENV=prod, AUGURA_DATABASE_URL, AUGURA_CORS_ORIGINS (Vercel
@@ -28,7 +36,7 @@ app = modal.App("augura-api")
 # JWT verification; AUGURA_ANTHROPIC_API_KEY/OPENAI/NCBI depending on enabled agents.
 # Out-of-bundle creation:
 #   modal secret create augura-api AUGURA_ENV=prod AUGURA_DATABASE_URL=… …
-_secret = modal.Secret.from_name("augura-api")
+_secret = modal.Secret.from_name(_SECRET_NAME)
 
 
 @app.function(image=image, secrets=[_secret])

@@ -1,0 +1,51 @@
+name: deploy-nde-dev
+
+# Deploys an ISOLATED backend Modal app for the NDE-DEV branch, so prod
+# (app `augura-api`) is left untouched.
+#
+# - Deploys a SEPARATE Modal app: `augura-api-nde-dev`
+#   → URL: https://<workspace>--augura-api-nde-dev-api.modal.run
+# - REUSES the existing `augura-api` Modal secret for env/config (same Supabase DB)
+#   — so the ONLY repo secrets needed are the Modal token below.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   MODAL_TOKEN_ID, MODAL_TOKEN_SECRET   (for the Modal workspace that holds the
+#                                         `augura-api` secret)
+#
+# After it runs, copy the printed URL into the NDE-DEV Vercel deployment as
+# VITE_API_URL (Preview env for the NDE-DEV branch) and redeploy the frontend.
+#
+# NOTE: this isolates the app/URL + frontend, but still uses the shared prod
+# Supabase DB. Reads are safe (the `semantic` schema is in sync); an enrichment
+# `/apply` from this instance would write the shared `semantic` schema.
+
+# Manual only: deploying touches the shared prod Supabase DB, so it is an
+# explicit, user-initiated action (Actions tab → "Run workflow"), never automatic
+# on push.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-nde-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      # Distinct app name → isolated deployment + URL (prod's `augura-api` untouched).
+      MODAL_APP_NAME: augura-api-nde-dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --dev
+      - name: Deploy isolated NDE-DEV backend to Modal
+        run: uv run modal deploy modal_app.py

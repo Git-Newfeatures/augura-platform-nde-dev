@@ -1,7 +1,8 @@
 # Augura Platform — Semantic Layer v3 — Architecture
 
-**Date:** 2026-06-25
+**Date:** 2026-06-29
 **Status:** Proposed
+**Supersedes:** `docs/specs/2026-06-25-augura-semantic-layer-v3.md` — same architecture, plus coarse temporality for causal relations (§2.4, §4.6, §9, §10.4–§10.5, §13). The full effect-over-time curve is deferred to `docs/specs/2026-06-29-augura-semantic-layer-v4-proposal.md`.
 **Scope:** Data intake taxonomy, table-grain determination, causal modeling, and data quality.
 **Purpose:** Define stable boundaries so the semantic system can grow without mixing meanings, rules, and executable behavior.
 
@@ -230,6 +231,25 @@ The causal workflow combines the three execution boundaries:
 7. **Programmed functions** produce a reviewable causal model and analysis specification containing assumptions and unresolved questions.
 
 The current scope ends at a reviewable model or specification. It does not require the platform to execute the statistical analysis, and it does not require a new persistent audit store for causal-model generation.
+
+#### Temporal profile of a causal relation
+
+Not every causal relation acts on the same timescale, and the timescale decides whether a relation is even relevant to a given question. Aspirin's antiplatelet effect appears within hours; a statin's effect on cardiovascular events plays out over years. A relation therefore carries a small, **coarse** temporal profile. (The full effect-over-time curve is deliberately out of scope here; see the V4 proposal. The coarse markers below are that curve at low resolution, so nothing authored now is wasted later.)
+
+- **Onset** — how soon the effect begins after the cause, on the scale `immediate | days | weeks | months | years`. This makes the previously-unspecified `default_temporal_lag` field (§10.4) explicit.
+- **Post-onset behaviour** — what happens once the effect has started, with its own time where relevant:
+  - `stays` — once established, the effect holds;
+  - `wears_off` — the effect fades after the cause stops (record the rough decay time);
+  - `weakens_with_use` — the effect shrinks while the cause continues (tolerance, e.g. caffeine).
+- **Exposure model** — the dosing/exposure pattern the relation describes, from a small closed vocabulary: `standard_of_care` (chronic, as-prescribed — **the default**), `single_dose`, `overdose`, `chronic_toxicity`, `withdrawal`, `cumulative`. Giving the dosing pattern its own slot keeps it out of the qualifier table, and it participates in relation identity (§10.4) so two exposure variants of the same pair can coexist.
+
+Temporality is **not applicable** to definitional or measurement predicates (`component_of`, `measured_by`, `indicates`); only genuinely causal predicates carry a temporal profile.
+
+**Direction over time (flips).** A relation whose effect reverses over time — exercise raises heart rate acutely but lowers resting heart rate after weeks of training — is represented exactly as opposite directions already are: two relations on the same triple with opposite polarity (§10.5). The only addition is that the disambiguator may be a **time window** or an **exposure model**, not only a patient subgroup. A single relation is therefore always `stays`, `wears_off`, or `weakens_with_use`; "flips" is an emergent property of a disambiguated pair, never a field on one relation.
+
+**Anchor-relative timing.** Some effects flip on *when the cause occurs relative to another event* — a clot-buster helps within the stroke-treatment window and harms after it; hormone therapy started near menopause differs from therapy started years later. This is a conditional-applicability statement and is captured as a **temporal qualifier** (§10.5) naming the anchor event and the window. Recording the knowledge is in scope; having the builder evaluate it automatically against a dataset's timeline is deferred to the V4 proposal.
+
+**Using temporality when building the causal subgraph.** Graph assembly stays **broad and inclusive**: gather every relation that plausibly links the question's exposure to its outcome, ignoring time. Temporality is then a **trimming** step over that wide graph. From the question's PICOT time frame `T`, the builder walks each candidate chain from exposure to outcome, reads each step on its own clock (a step's clock starts when the previous step's effect arrives), adds up the per-step onset times, and keeps chains whose cumulative time **fits within `T`**; it also selects the time-appropriate side of any flip pair and drops effects that have worn off by `T`. This check is deliberately **fuzzy** — successive steps overlap in reality, so it is a plausibility filter ("could this chain produce an effect within `T`?"), not exact arithmetic. Each trimming decision is recorded with its reason (e.g. "excluded — cumulative onset exceeds the 6-month horizon") so it stays reviewable rather than silent.
 
 ### 2.5 DQ Ontology
 
@@ -590,6 +610,14 @@ Structural constraints can state that admission precedes discharge, specimen col
 
 These are good DQ constraint profiles because they are declarative, reusable, and independent of the mechanics used to scan rows.
 
+### 4.6 Temporality — exercise, statins, and a treatment window
+
+Exercise illustrates a **flip**: it raises heart rate immediately (onset `immediate`, `wears_off` after the session) and lowers resting heart rate after weeks of training (onset `weeks`, `stays` while training continues). These are two opposite-polarity relations on the same pair, told apart by their time windows (§2.4).
+
+Statins illustrate **chain timing**: statin → LDL cholesterol has onset `weeks`, but LDL → fewer cardiovascular events has onset `years`. For a "within 6 months" question the chain's cumulative onset (years) does not fit the horizon, so the builder trims that path; aspirin → platelet inhibition (onset `immediate`) survives the same trim.
+
+A clot-buster illustrates **anchor-relative timing**: it helps when given within the stroke-treatment window and harms after it — recorded as a temporal qualifier on the relation, applied by review today and automatically in a future release.
+
 ## 5. Grain and Archetype Inference
 
 ### 5.1 One Continuous Grain-Determination Workflow
@@ -819,6 +847,8 @@ The platform can use these principles while storing curated artifacts in Supabas
 16. No causal relation may reference the same concept as both subject and object.
 17. No two causal relations may share the same subject, predicate, object, and polarity. Opposite polarities on the same triple are permitted when at least one is disambiguated by a qualifier with `is_hard_constraint = true`.
 18. A per-column modifier is represented as a governed dimension on the mapping, not as a new concept — unless it changes what is measured such that values are no longer comparable, in which case it forks into a distinct concept (§2.7).
+19. A causal relation carries a temporal profile — `onset`, `post_onset_behaviour`, and `exposure_model` — or marks them `not_applicable` for definitional and measurement predicates (§2.4).
+20. A direction reversal over time ("flip") is represented as two opposite-polarity relations on the same triple, disambiguated by a subgroup, a time window, or an exposure model — never as a field on a single relation. Every flip pair must declare its disambiguator.
 
 The complete authoring and maintenance rules for each artifact type are defined in §10.
 
@@ -911,14 +941,17 @@ A concept may not be deleted while referenced by any active relation. The correc
 The platform should enforce:
 
 1. No self-loop: `subject_concept_id != object_concept_id`.
-2. No duplicate quadruple: unique `(subject_concept_id, predicate, object_concept_id, polarity)`.
+2. No duplicate key: unique `(subject_concept_id, predicate, object_concept_id, polarity, exposure_model)`. Adding `exposure_model` to the key lets two exposure variants of the same pair (e.g. chronic standard-of-care vs single-dose) coexist without colliding.
 
-Opposite polarities on the same triple are permitted when qualifiers provide disambiguation.
+Opposite polarities on the same triple are permitted when a qualifier — a patient subgroup, a **time window**, or an **exposure model** — disambiguates them.
 
 #### Soft validation rules
 
 - Both subject and object must be active, approved concepts.
 - When opposite-polarity rows exist for the same triple, at least one should carry a qualifier with `is_hard_constraint = true`.
+- A flip pair (opposite-polarity rows on the same triple) must declare what distinguishes the two sides — subgroup, time window, or exposure model. Pairs lacking a declared disambiguator are flagged for review.
+- A causal relation should declare its temporal profile (`onset`, `post_onset_behaviour`, `exposure_model`), or mark it `not_applicable` for definitional/measurement predicates.
+- **Migration:** flip pairs already in the store must be upgraded to declare their disambiguator and temporal profile as part of this release — a backfill validated by the mapping/graph regression tests of §11.
 - Approved relations should have evidence rows, or be documented as `established_physiology`.
 - Approved concepts without active relation membership should be flagged for review.
 
@@ -930,7 +963,9 @@ Opposite polarities on the same triple are permitted when qualifiers provide dis
 - `object_concept_id`
 - `polarity`
 - `default_strength`
-- `default_temporal_lag`
+- `onset` — how soon the effect begins: `immediate | days | weeks | months | years` (the now-defined `default_temporal_lag`); `not_applicable` for definitional/measurement predicates
+- `post_onset_behaviour` — `stays | wears_off | weakens_with_use`, with a decay time when `wears_off`
+- `exposure_model` — `standard_of_care` (default) `| single_dose | overdose | chronic_toxicity | withdrawal | cumulative`
 - `mechanism_summary`
 - `version`
 
@@ -948,7 +983,9 @@ Qualifiers assign a structural condition or scope to a relation. They affect DAG
 
 #### Rule 1
 
-If `(A, predicate, B, increases)` and `(A, predicate, B, decreases)` both exist, at least one must carry a qualifier with `is_hard_constraint = true` specifying the condition under which that polarity applies.
+If `(A, predicate, B, increases)` and `(A, predicate, B, decreases)` both exist, at least one must carry a qualifier with `is_hard_constraint = true` specifying the condition under which that polarity applies. The disambiguating condition may be a patient subgroup, a **time window** (the direction depends on how long the cause has acted), or an **exposure model**.
+
+A flip driven by *when the cause occurs relative to another event* (anchor-relative timing) is recorded as a temporal qualifier whose `qualifier_concept_id` names the anchor event and whose `qualifier_value` carries the window (e.g. "within 4.5h of stroke onset"). Automatic evaluation of such qualifiers against a dataset's timeline is deferred to the V4 proposal; today they are applied by review.
 
 #### Rule 2
 
@@ -1050,6 +1087,7 @@ These gaps should be addressed before adding more extensive contextual clinical 
 ### Phase 3: Causal Execution
 
 - Implement the causal procedural workflow through generation of a reviewable causal model and analysis specification.
+- Record a coarse temporal profile (onset, post-onset behaviour, exposure model) on causal relations; build the subgraph broadly, then trim it against the question's PICOT time frame with the fuzzy path-time rule (§2.4); upgrade existing flip pairs to declare their disambiguator.
 
 ### Phase 4: Contextual Clinical Knowledge
 
@@ -1080,6 +1118,7 @@ These gaps should be addressed before adding more extensive contextual clinical 
 - Leverage standards whenever they apply without forcing an unsuitable standard onto a use case.
 - Prefer efficacy, accuracy, clarity, and stable operation over semantic exhaustivity.
 - Defer pathology-dependent ranges until units, identifiers, grain, and cross-table relationships are reliable.
+- Give causal relations a coarse temporal profile (onset, post-onset behaviour, exposure model); represent direction reversals as disambiguated opposite-polarity pairs rather than a field on one relation; build the causal subgraph broadly and trim it against the question's time frame with a fuzzy path-time rule. Defer the full effect-over-time curve to V4.
 
 ## 15. Semantic Release Version Management
 

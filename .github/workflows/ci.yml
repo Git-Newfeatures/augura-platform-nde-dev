@@ -117,7 +117,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -148,7 +148,7 @@ jobs:
         working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
@@ -170,7 +170,7 @@ jobs:
         run: |
           uv sync --dev
           uv run --with pip-audit pip-audit || (echo "::warning::pip-audit found advisories" && exit 1)
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
